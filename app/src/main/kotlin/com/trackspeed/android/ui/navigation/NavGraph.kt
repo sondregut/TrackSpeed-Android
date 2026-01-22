@@ -6,12 +6,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.trackspeed.android.ui.screens.home.HomeScreen
+import com.trackspeed.android.ui.screens.sync.ClockSyncScreen
 import com.trackspeed.android.ui.screens.timing.BasicTimingScreen
 
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object BasicTiming : Screen("basic_timing")
     data object RaceMode : Screen("race_mode")
+    data object ClockSync : Screen("clock_sync")
     data object Calibration : Screen("calibration")
     data object ActiveTiming : Screen("active_timing")
     data object DevicePairing : Screen("device_pairing")
@@ -43,6 +45,9 @@ fun TrackSpeedNavHost(
                 onRaceModeClick = {
                     navController.navigate(Screen.RaceMode.route)
                 },
+                onClockSyncClick = {
+                    navController.navigate(Screen.ClockSync.route)
+                },
                 onHistoryClick = {
                     navController.navigate(Screen.History.route)
                 },
@@ -55,6 +60,15 @@ fun TrackSpeedNavHost(
         composable(Screen.BasicTiming.route) {
             BasicTimingScreen(
                 onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.ClockSync.route) {
+            ClockSyncScreen(
+                onSyncComplete = {
+                    // Navigate to race mode or back after sync
                     navController.popBackStack()
                 }
             )

@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -26,6 +27,7 @@ import com.trackspeed.android.ui.theme.TrackSpeedTheme
 fun HomeScreen(
     onBasicModeClick: () -> Unit = {},
     onRaceModeClick: () -> Unit = {},
+    onClockSyncClick: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {}
 ) {
@@ -49,6 +51,12 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onClockSyncClick) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = "Clock Sync"
+                        )
+                    }
                     IconButton(onClick = onHistoryClick) {
                         Icon(
                             imageVector = Icons.Default.History,
