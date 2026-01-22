@@ -9,6 +9,8 @@ import com.trackspeed.android.detection.GateEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 @HiltViewModel
@@ -21,7 +23,8 @@ class BasicTimingViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(BasicTimingUiState())
     val uiState: StateFlow<BasicTimingUiState> = _uiState.asStateFlow()
 
-    // Timing state
+    // Timing state - protected by mutex for thread safety
+    private val timingMutex = Mutex()
     private var startTimeNanos: Long? = null
     private var lastCrossingTimeNanos: Long? = null
     private val _splits = mutableListOf<Double>()
@@ -74,8 +77,21 @@ class BasicTimingViewModel @Inject constructor(
             }
         }
 
-        // Initialize camera
-        cameraManager.initialize()
+        // Initialize camera and handle errors
+        initializeCamera()
+    }
+
+    private fun initializeCamera() {
+        val initialized = cameraManager.initialize()
+        if (!initialized) {
+            _uiState.update {
+                it.copy(
+                    cameraState = HighSpeedCameraManager.CameraState.Error(
+                        "No suitable camera found. This device may not support high-speed capture."
+                    )
+                )
+            }
+        }
     }
 
     fun onCameraPermissionGranted() {
@@ -84,8 +100,7 @@ class BasicTimingViewModel @Inject constructor(
     }
 
     fun onSurfaceReady(surface: Surface) {
-        // Re-open camera with preview surface
-        cameraManager.closeCamera()
+        // openCamera already calls closeCamera first (fixed in HighSpeedCameraManager)
         cameraManager.openCamera(surface) { frameData ->
             processFrame(frameData)
         }
@@ -121,51 +136,65 @@ class BasicTimingViewModel @Inject constructor(
     }
 
     fun startTiming() {
-        if (_uiState.value.isArmed && !_uiState.value.isRunning) {
-            _uiState.update {
-                it.copy(
-                    isRunning = true,
-                    currentTime = 0.0,
-                    waitingForStart = true
-                )
+        viewModelScope.launch {
+            timingMutex.withLock {
+                val currentState = _uiState.value
+                if (currentState.isArmed && !currentState.isRunning) {
+                    _splits.clear()
+                    startTimeNanos = null  // Will be set on first crossing
+                    _uiState.update {
+                        it.copy(
+                            isRunning = true,
+                            currentTime = 0.0,
+                            waitingForStart = true,
+                            splits = emptyList()
+                        )
+                    }
+                }
             }
-            _splits.clear()
-            startTimeNanos = null  // Will be set on first crossing
         }
     }
 
     fun stopTiming() {
-        if (_uiState.value.isRunning) {
-            val endTime = System.nanoTime()
-            val elapsed = if (startTimeNanos != null) {
-                (endTime - startTimeNanos!!) / 1_000_000_000.0
-            } else {
-                0.0
-            }
+        viewModelScope.launch {
+            timingMutex.withLock {
+                val currentState = _uiState.value
+                if (currentState.isRunning) {
+                    val endTime = System.nanoTime()
+                    val elapsed = startTimeNanos?.let { start ->
+                        (endTime - start) / 1_000_000_000.0
+                    } ?: 0.0
 
-            _uiState.update {
-                it.copy(
-                    isRunning = false,
-                    waitingForStart = false,
-                    currentTime = elapsed,
-                    splits = _splits.toList()
-                )
+                    _uiState.update {
+                        it.copy(
+                            isRunning = false,
+                            waitingForStart = false,
+                            currentTime = elapsed,
+                            splits = _splits.toList()
+                        )
+                    }
+                }
             }
         }
     }
 
     fun resetTiming() {
-        if (!_uiState.value.isRunning) {
-            _uiState.update {
-                it.copy(
-                    currentTime = 0.0,
-                    splits = emptyList(),
-                    waitingForStart = false
-                )
+        viewModelScope.launch {
+            timingMutex.withLock {
+                val currentState = _uiState.value
+                if (!currentState.isRunning) {
+                    _splits.clear()
+                    startTimeNanos = null
+                    lastCrossingTimeNanos = null
+                    _uiState.update {
+                        it.copy(
+                            currentTime = 0.0,
+                            splits = emptyList(),
+                            waitingForStart = false
+                        )
+                    }
+                }
             }
-            _splits.clear()
-            startTimeNanos = null
-            lastCrossingTimeNanos = null
         }
     }
 
@@ -176,38 +205,44 @@ class BasicTimingViewModel @Inject constructor(
 
     /**
      * Called when a crossing is detected by the gate engine.
+     * Uses mutex to prevent race conditions with UI controls.
      */
     private fun onCrossingDetected(timestampNanos: Long) {
-        val state = _uiState.value
+        viewModelScope.launch {
+            timingMutex.withLock {
+                val currentState = _uiState.value
 
-        if (!state.isRunning) {
-            // Not in timing mode - ignore
-            return
-        }
+                if (!currentState.isRunning) {
+                    // Not in timing mode - ignore
+                    return@withLock
+                }
 
-        if (state.waitingForStart) {
-            // This is a start crossing - begin timing
-            startTimeNanos = timestampNanos
-            _uiState.update {
-                it.copy(
-                    waitingForStart = false,
-                    currentTime = 0.0
-                )
+                if (currentState.waitingForStart) {
+                    // This is a start crossing - begin timing
+                    startTimeNanos = timestampNanos
+                    _uiState.update {
+                        it.copy(
+                            waitingForStart = false,
+                            currentTime = 0.0
+                        )
+                    }
+                } else {
+                    // This is a finish/split crossing
+                    startTimeNanos?.let { start ->
+                        val elapsed = (timestampNanos - start) / 1_000_000_000.0
+                        _splits.add(elapsed)
+                        _uiState.update {
+                            it.copy(
+                                currentTime = elapsed,
+                                splits = _splits.toList()
+                            )
+                        }
+                    }
+                }
+
+                lastCrossingTimeNanos = timestampNanos
             }
-        } else if (startTimeNanos != null) {
-            // This is a finish/split crossing
-            val elapsed = (timestampNanos - startTimeNanos!!) / 1_000_000_000.0
-            _splits.add(elapsed)
-
-            _uiState.update {
-                it.copy(
-                    currentTime = elapsed,
-                    splits = _splits.toList()
-                )
-            }
         }
-
-        lastCrossingTimeNanos = timestampNanos
     }
 
     override fun onCleared() {

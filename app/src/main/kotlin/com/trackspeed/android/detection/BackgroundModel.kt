@@ -116,7 +116,10 @@ class BackgroundModel {
         }
 
         return BooleanArray(luminanceColumn.size) { row ->
-            if (row >= frameHeight) return@BooleanArray false
+            // Bounds checking for both input column and calibrated arrays
+            if (row >= frameHeight || row >= medians.size || row >= thresholds.size) {
+                return@BooleanArray false
+            }
 
             val pixel = (luminanceColumn[row].toInt() and 0xFF).toFloat()
             abs(pixel - medians[row]) > thresholds[row]

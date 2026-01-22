@@ -1,6 +1,7 @@
 package com.trackspeed.android.detection
 
 import android.os.Build
+import android.util.Log
 import com.trackspeed.android.camera.FrameProcessor
 import com.trackspeed.android.camera.HighSpeedCameraManager
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,13 +31,18 @@ import javax.inject.Singleton
 class GateEngine @Inject constructor(
     private val frameProcessor: FrameProcessor
 ) {
+    companion object {
+        private const val TAG = "GateEngine"
+        private const val DEBUG_UPDATE_INTERVAL_MS = 50L // Max 20Hz for debug info
+    }
+
     // Detection components
     private val backgroundModel = BackgroundModel()
     private var crossingDetector = CrossingDetector()
 
     // Pose bounds (updated externally by PoseService at 30Hz)
-    @Volatile
-    private var torsoBounds: TorsoBounds? = null
+    // Using AtomicReference for thread-safe access between pose thread (30Hz) and camera thread (240Hz)
+    private val torsoBoundsRef = AtomicReference<TorsoBounds?>(null)
 
     // State
     private val _engineState = MutableStateFlow(EngineState.NOT_CALIBRATED)
@@ -54,6 +61,9 @@ class GateEngine @Inject constructor(
 
     // Frame counter
     private var frameCount = 0L
+
+    // Throttle debug info updates
+    private var lastDebugUpdateTime = 0L
 
     enum class EngineState {
         NOT_CALIBRATED,
@@ -79,31 +89,39 @@ class GateEngine @Inject constructor(
     /**
      * Process a camera frame through the detection pipeline.
      * Should be called for every frame at 240fps.
+     *
+     * THREAD SAFETY: This method is called from the camera's image processing thread.
+     * All internal state access is either thread-safe or confined to this thread.
      */
     fun processFrame(frameData: HighSpeedCameraManager.FrameData) {
-        frameCount++
+        try {
+            frameCount++
 
-        // Process frame to extract strips
-        val processed = frameProcessor.processFrame(frameData)
+            // Process frame to extract strips
+            val processed = frameProcessor.processFrame(frameData)
 
-        when (_engineState.value) {
-            EngineState.NOT_CALIBRATED -> {
-                // Waiting for calibration to start
+            when (_engineState.value) {
+                EngineState.NOT_CALIBRATED -> {
+                    // Waiting for calibration to start
+                }
+
+                EngineState.CALIBRATING -> {
+                    processCalibrationFrame(processed)
+                }
+
+                EngineState.WAITING_FOR_CLEAR,
+                EngineState.ARMED,
+                EngineState.CAPTURING -> {
+                    processDetectionFrame(processed)
+                }
+
+                EngineState.PAUSED -> {
+                    // Detection suspended
+                }
             }
-
-            EngineState.CALIBRATING -> {
-                processCalibrationFrame(processed)
-            }
-
-            EngineState.WAITING_FOR_CLEAR,
-            EngineState.ARMED,
-            EngineState.CAPTURING -> {
-                processDetectionFrame(processed)
-            }
-
-            EngineState.PAUSED -> {
-                // Detection suspended
-            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Frame processing error at frame $frameCount", e)
+            // Don't crash - skip this frame and continue
         }
     }
 
@@ -118,13 +136,16 @@ class GateEngine @Inject constructor(
     }
 
     private fun processDetectionFrame(frame: com.trackspeed.android.camera.ProcessedFrame) {
+        // Get thread-safe copy of torso bounds
+        val currentTorsoBounds = torsoBoundsRef.get()
+
         // 1. Get foreground masks via background subtraction
         val leftMask = backgroundModel.getForegroundMask(frame.strips.left)
         val centerMask = backgroundModel.getForegroundMask(frame.strips.center)
         val rightMask = backgroundModel.getForegroundMask(frame.strips.right)
 
         // 2. Calculate chest band
-        val band = ContiguousRunFilter.calculateChestBand(torsoBounds, frame.height)
+        val band = ContiguousRunFilter.calculateChestBand(currentTorsoBounds, frame.height)
 
         // 3. Analyze three strips for torso-like shape
         val threeStripResult = ContiguousRunFilter.analyzeThreeStrips(
@@ -139,7 +160,7 @@ class GateEngine @Inject constructor(
             occupancy = occupancy,
             timestamp = frame.timestamp,
             frameIndex = frame.frameIndex,
-            torsoBounds = torsoBounds,
+            torsoBounds = currentTorsoBounds,
             threeStripResult = threeStripResult
         )
 
@@ -176,21 +197,25 @@ class GateEngine @Inject constructor(
             backgroundModel.adaptBackground(frame.samplingBand)
         }
 
-        // 9. Update debug info
-        _debugInfo.value = DetectionDebugInfo(
-            rLeft = threeStripResult.leftOccupancy,
-            rCenter = threeStripResult.centerOccupancy,
-            rRight = threeStripResult.rightOccupancy,
-            runLeft = threeStripResult.leftRun,
-            runCenter = threeStripResult.centerRun,
-            runRight = threeStripResult.rightRun,
-            torsoTop = torsoBounds?.yTop,
-            torsoBottom = torsoBounds?.yBottom,
-            chestBandTop = band.top,
-            chestBandBottom = band.bottom,
-            state = crossingDetector.state,
-            isTorsoLike = threeStripResult.isTorsoLike
-        )
+        // 9. Update debug info (throttled to 20Hz to reduce UI load)
+        val now = System.currentTimeMillis()
+        if (now - lastDebugUpdateTime > DEBUG_UPDATE_INTERVAL_MS) {
+            lastDebugUpdateTime = now
+            _debugInfo.value = DetectionDebugInfo(
+                rLeft = threeStripResult.leftOccupancy,
+                rCenter = threeStripResult.centerOccupancy,
+                rRight = threeStripResult.rightOccupancy,
+                runLeft = threeStripResult.leftRun,
+                runCenter = threeStripResult.centerRun,
+                runRight = threeStripResult.rightRun,
+                torsoTop = currentTorsoBounds?.yTop,
+                torsoBottom = currentTorsoBounds?.yBottom,
+                chestBandTop = band.top,
+                chestBandBottom = band.bottom,
+                state = crossingDetector.state,
+                isTorsoLike = threeStripResult.isTorsoLike
+            )
+        }
     }
 
     /**
@@ -223,9 +248,12 @@ class GateEngine @Inject constructor(
     /**
      * Update torso bounds from pose detection.
      * Call this from PoseService at 30Hz.
+     *
+     * THREAD SAFETY: This method can be called from any thread (pose detection thread).
+     * Uses AtomicReference for safe publication to the camera processing thread.
      */
     fun updateTorsoBounds(bounds: TorsoBounds?) {
-        torsoBounds = bounds
+        torsoBoundsRef.set(bounds)
     }
 
     /**
@@ -252,8 +280,9 @@ class GateEngine @Inject constructor(
     fun reset() {
         backgroundModel.reset()
         crossingDetector.reset()
-        torsoBounds = null
+        torsoBoundsRef.set(null)
         frameCount = 0
+        lastDebugUpdateTime = 0
         _engineState.value = EngineState.NOT_CALIBRATED
         _calibrationProgress.value = 0f
         _debugInfo.value = null

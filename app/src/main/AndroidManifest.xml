@@ -28,6 +28,17 @@
     <!-- Vibration -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Keep screen on during timing -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Notifications (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Foreground service for background timing -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA"
+        tools:targetApi="34" />
+
     <application
         android:name=".TrackSpeedApp"
         android:allowBackup="true"

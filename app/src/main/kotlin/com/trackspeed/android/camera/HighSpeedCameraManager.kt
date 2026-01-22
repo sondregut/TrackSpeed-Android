@@ -196,8 +196,11 @@ class HighSpeedCameraManager @Inject constructor(
      */
     @SuppressLint("MissingPermission")
     fun openCamera(previewSurface: Surface? = null, callback: FrameCallback) {
+        // Close any existing camera/threads first to prevent leaks
+        closeCamera()
+
         val cameraId = selectedCameraId ?: run {
-            _cameraState.value = CameraState.Error("Camera not initialized")
+            _cameraState.value = CameraState.Error("Camera not initialized. Call initialize() first.")
             return
         }
 
