@@ -1,11 +1,15 @@
 # TrackSpeed Android
 
-Native Android sprint timing app that pairs with iOS Speed Swift app for cross-platform multi-device timing.
+Native Android port of the iOS **Speed Swift** app. Enables cross-platform multi-device sprint timing where iOS and Android devices can pair together.
+
+## Repositories
+
+- **This repo (Android)**: https://github.com/sondregut/TrackSpeed-Android
+- **iOS app (Speed Swift)**: `/Users/sondre/Documents/App/speed-swift/SprintTimer/`
 
 ## Project Context
 
-- **iOS Reference**: `/Users/sondre/Documents/App/speed-swift/SprintTimer/`
-- **Supabase Project**: `sprint-timer-race` (ID: `hkvrttatbpjwzuuckbqj`)
+- **Supabase Project**: `sprint-timer-race` (ID: `hkvrttatbpjwzuuckbqj`) - shared with iOS
 - **Documentation**: `./docs/` contains PRD, tech specs, and protocols
 
 ## Tech Stack
