@@ -84,6 +84,7 @@ class HighSpeedCameraManager @Inject constructor(
         val luminanceBuffer: ByteArray,
         val width: Int,
         val height: Int,
+        val rowStride: Int,  // CRITICAL: For stride-aware ROI extraction
         val timestampNanos: Long,
         val frameIndex: Long
     )
@@ -415,6 +416,7 @@ class HighSpeedCameraManager @Inject constructor(
                 luminanceBuffer = luminanceBuffer,
                 width = width,
                 height = height,
+                rowStride = yRowStride,
                 timestampNanos = timestamp,
                 frameIndex = frameCount
             )
@@ -476,7 +478,8 @@ class HighSpeedCameraManager @Inject constructor(
             CameraInfo(
                 resolution = size,
                 fps = _currentFps.value,
-                isHighSpeed = isHighSpeedSupported
+                isHighSpeed = isHighSpeedSupported,
+                isExperimentalMode = isExperimentalMode
             )
         }
     }
@@ -484,6 +487,178 @@ class HighSpeedCameraManager @Inject constructor(
     data class CameraInfo(
         val resolution: Size,
         val fps: Int,
-        val isHighSpeed: Boolean
+        val isHighSpeed: Boolean,
+        val isExperimentalMode: Boolean = false
     )
+
+    // ═══════════════════════════════════════════════════════════════
+    // EXPERIMENTAL MODE (60fps, 720p, fast shutter)
+    // ═══════════════════════════════════════════════════════════════
+
+    private var isExperimentalMode = false
+
+    /**
+     * Initialize camera for experimental mode (60fps, 720p).
+     * This is optimized for thermal efficiency and long sessions.
+     */
+    fun initializeExperimentalMode(): Boolean {
+        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+
+        try {
+            for (cameraId in cameraManager.cameraIdList) {
+                val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+                val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
+
+                if (facing != CameraCharacteristics.LENS_FACING_BACK) continue
+
+                val configMap = characteristics.get(
+                    CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP
+                ) ?: continue
+
+                // Find 720p or closest smaller size
+                val outputSizes = configMap.getOutputSizes(ImageFormat.YUV_420_888)
+                val targetSize = outputSizes.firstOrNull { it.width == 1280 && it.height == 720 }
+                    ?: outputSizes.filter { it.width <= 1280 && it.height <= 720 }
+                        .maxByOrNull { it.width * it.height }
+                    ?: outputSizes.firstOrNull()
+
+                if (targetSize != null) {
+                    selectedCameraId = cameraId
+                    selectedSize = targetSize
+                    selectedFpsRange = Range(60, 60)
+                    isHighSpeedSupported = false
+                    isExperimentalMode = true
+                    _currentFps.value = 60
+                    Log.i(TAG, "Experimental mode: $cameraId, ${targetSize.width}x${targetSize.height} @ 60fps")
+                    return true
+                }
+            }
+
+            Log.e(TAG, "No suitable camera found for experimental mode")
+            return false
+
+        } catch (e: CameraAccessException) {
+            Log.e(TAG, "Camera access error during experimental initialization", e)
+            return false
+        }
+    }
+
+    /**
+     * Apply experimental capture settings (fast shutter, locked exposure).
+     * Call this after session is configured.
+     */
+    fun applyExperimentalCaptureSettings(requestBuilder: CaptureRequest.Builder) {
+        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        val cameraId = selectedCameraId ?: return
+
+        try {
+            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+
+            // 1. Set 60fps
+            requestBuilder.set(
+                CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+                Range(60, 60)
+            )
+
+            // 2. Try to set fast shutter (1/1000s = 1ms = 1,000,000ns)
+            val exposureRange = characteristics.get(
+                CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE
+            )
+            if (exposureRange != null) {
+                val targetExposure = 1_000_000L  // 1ms
+                val clampedExposure = targetExposure.coerceIn(
+                    exposureRange.lower,
+                    exposureRange.upper
+                )
+
+                // ═══════════════════════════════════════════════════════════════
+                // SAMSUNG DEVICE FIX: CONTROL_MODE_OFF required for manual exposure
+                // ═══════════════════════════════════════════════════════════════
+                val isSamsungDevice = android.os.Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+                if (isSamsungDevice) {
+                    Log.i(TAG, "Samsung device detected - setting CONTROL_MODE_OFF")
+                    requestBuilder.set(
+                        CaptureRequest.CONTROL_MODE,
+                        CaptureRequest.CONTROL_MODE_OFF
+                    )
+                }
+
+                // Disable AE and set manual exposure
+                requestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+                requestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, clampedExposure)
+
+                // Set ISO to mid-high value
+                val isoRange = characteristics.get(
+                    CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE
+                )
+                if (isoRange != null) {
+                    val targetISO = (isoRange.lower + isoRange.upper) / 2
+                    requestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, targetISO)
+                }
+
+                Log.i(TAG, "Set exposure to ${clampedExposure/1_000_000.0}ms")
+            } else {
+                // Fallback: lock AE
+                requestBuilder.set(CaptureRequest.CONTROL_AE_LOCK, true)
+                Log.w(TAG, "Manual exposure not available, locking AE")
+            }
+
+            // 3. Lock white balance
+            requestBuilder.set(CaptureRequest.CONTROL_AWB_LOCK, true)
+
+            // 4. Lock focus (or set to infinity)
+            val focusRange = characteristics.get(
+                CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE
+            )
+            if (focusRange != null && focusRange > 0) {
+                requestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
+                requestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0f)  // Infinity
+            }
+
+            // 5. Disable stabilization (reduces processing, avoids delay)
+            requestBuilder.set(
+                CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+                CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
+            )
+            try {
+                requestBuilder.set(
+                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF
+                )
+            } catch (e: IllegalArgumentException) {
+                // OIS not supported on this device
+            }
+
+            Log.i(TAG, "Experimental capture settings applied")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to apply experimental settings", e)
+        }
+    }
+
+    /**
+     * Start capture with experimental mode settings.
+     */
+    fun startExperimentalCapture(session: CameraCaptureSession) {
+        val camera = cameraDevice ?: return
+
+        try {
+            val requestBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
+                addTarget(imageReader!!.surface)
+                previewSurface?.let { addTarget(it) }
+            }
+
+            // Apply experimental settings
+            applyExperimentalCaptureSettings(requestBuilder)
+
+            session.setRepeatingRequest(requestBuilder.build(), null, cameraHandler)
+
+            _cameraState.value = CameraState.Capturing
+            Log.i(TAG, "Experimental capture started at 60fps")
+
+        } catch (e: CameraAccessException) {
+            Log.e(TAG, "Failed to start experimental capture", e)
+            _cameraState.value = CameraState.Error("Capture start failed: ${e.message}")
+        }
+    }
 }

@@ -4,15 +4,33 @@ import android.os.Build
 import android.util.Log
 import com.trackspeed.android.camera.FrameProcessor
 import com.trackspeed.android.camera.HighSpeedCameraManager
+import com.trackspeed.android.detection.experimental.ExperimentalCrossingDetector
+import com.trackspeed.android.detection.experimental.ExperimentalCrossingEvent
+import com.trackspeed.android.detection.experimental.ExperimentalFrameData
+import com.trackspeed.android.detection.experimental.ExperimentalState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * Detection mode selection.
+ */
+enum class DetectionMode {
+    /** 240fps precision mode with pose detection and background model */
+    PRECISION,
+    /** 60fps experimental mode with blob tracking and IMU recovery */
+    EXPERIMENTAL
+}
 
 /**
  * Gate engine coordinator.
@@ -25,16 +43,52 @@ import javax.inject.Singleton
  * 5. Sub-frame interpolation
  * 6. Rolling shutter correction
  *
+ * Supports two detection modes:
+ * - PRECISION: 240fps with pose detection (original algorithm)
+ * - EXPERIMENTAL: 60fps blob tracking with IMU auto-recovery
+ *
  * Reference: docs/architecture/DETECTION_ALGORITHM.md Section 9
+ * Reference: docs/architecture/EXPERIMENTAL_MODE_KOTLIN.md
  */
 @Singleton
 class GateEngine @Inject constructor(
-    private val frameProcessor: FrameProcessor
+    private val frameProcessor: FrameProcessor,
+    private val experimentalDetector: ExperimentalCrossingDetector
 ) {
     companion object {
         private const val TAG = "GateEngine"
         private const val DEBUG_UPDATE_INTERVAL_MS = 50L // Max 20Hz for debug info
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MODE SELECTION
+    // ═══════════════════════════════════════════════════════════════
+
+    private val _detectionMode = MutableStateFlow(DetectionMode.EXPERIMENTAL) // Default to experimental
+    val detectionMode: StateFlow<DetectionMode> = _detectionMode.asStateFlow()
+
+    // Coroutine scope for collecting experimental detector events
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    init {
+        // Forward experimental detector crossing events to unified crossing events
+        scope.launch {
+            experimentalDetector.crossingEvents.collect { experimentalEvent ->
+                val event = CrossingEvent(
+                    timestamp = experimentalEvent.timestamp,
+                    frameIndex = experimentalEvent.frameIndex,
+                    occupancy = 0f, // Not used in experimental mode
+                    interpolationOffsetMs = experimentalEvent.interpolationOffsetMs,
+                    isTorsoLike = true // Blob tracking implies torso-like
+                )
+                _crossingEvents.tryEmit(event)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PRECISION MODE COMPONENTS (240fps)
+    // ═══════════════════════════════════════════════════════════════
 
     // Detection components
     private val backgroundModel = BackgroundModel()
@@ -43,6 +97,10 @@ class GateEngine @Inject constructor(
     // Pose bounds (updated externally by PoseService at 30Hz)
     // Using AtomicReference for thread-safe access between pose thread (30Hz) and camera thread (240Hz)
     private val torsoBoundsRef = AtomicReference<TorsoBounds?>(null)
+
+    // ═══════════════════════════════════════════════════════════════
+    // SHARED STATE
+    // ═══════════════════════════════════════════════════════════════
 
     // State
     private val _engineState = MutableStateFlow(EngineState.NOT_CALIBRATED)
@@ -288,8 +346,105 @@ class GateEngine @Inject constructor(
         _debugInfo.value = null
     }
 
-    fun isCalibrated(): Boolean = backgroundModel.state == BackgroundModel.State.CALIBRATED
-    fun isArmed(): Boolean = crossingDetector.isArmed()
+    fun isCalibrated(): Boolean {
+        return when (_detectionMode.value) {
+            DetectionMode.PRECISION -> backgroundModel.state == BackgroundModel.State.CALIBRATED
+            DetectionMode.EXPERIMENTAL -> experimentalDetector.state.value != ExperimentalState.MOVING
+        }
+    }
+
+    fun isArmed(): Boolean {
+        return when (_detectionMode.value) {
+            DetectionMode.PRECISION -> crossingDetector.isArmed()
+            DetectionMode.EXPERIMENTAL -> {
+                val state = experimentalDetector.state.value
+                state == ExperimentalState.ACQUIRE || state == ExperimentalState.TRACKING
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MODE SWITCHING
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Set the detection mode.
+     *
+     * @param mode PRECISION (240fps) or EXPERIMENTAL (60fps)
+     */
+    fun setDetectionMode(mode: DetectionMode) {
+        if (_detectionMode.value == mode) return
+
+        Log.i(TAG, "Switching detection mode: ${_detectionMode.value} → $mode")
+
+        // Stop current mode
+        when (_detectionMode.value) {
+            DetectionMode.PRECISION -> {
+                // Nothing special to stop
+            }
+            DetectionMode.EXPERIMENTAL -> {
+                experimentalDetector.stop()
+            }
+        }
+
+        // Reset state
+        _detectionMode.value = mode
+        _engineState.value = EngineState.NOT_CALIBRATED
+        _calibrationProgress.value = 0f
+
+        // Start new mode
+        when (mode) {
+            DetectionMode.PRECISION -> {
+                backgroundModel.reset()
+                crossingDetector.reset()
+            }
+            DetectionMode.EXPERIMENTAL -> {
+                experimentalDetector.start()
+            }
+        }
+    }
+
+    /**
+     * Process a frame for experimental mode (60fps).
+     * This is a separate entry point for experimental mode frames.
+     */
+    fun processExperimentalFrame(frameData: HighSpeedCameraManager.FrameData) {
+        if (_detectionMode.value != DetectionMode.EXPERIMENTAL) {
+            Log.w(TAG, "processExperimentalFrame called but mode is ${_detectionMode.value}")
+            return
+        }
+
+        // Convert to experimental frame data format
+        val experimentalFrameData = ExperimentalFrameData(
+            luminanceBuffer = frameData.luminanceBuffer,
+            width = frameData.width,
+            height = frameData.height,
+            rowStride = frameData.rowStride,
+            timestampNanos = frameData.timestampNanos
+        )
+
+        experimentalDetector.processFrame(experimentalFrameData)
+
+        // Sync engine state from experimental detector
+        _engineState.value = when (experimentalDetector.state.value) {
+            ExperimentalState.MOVING -> EngineState.NOT_CALIBRATED
+            ExperimentalState.STABILIZING -> EngineState.CALIBRATING
+            ExperimentalState.ACQUIRE -> EngineState.WAITING_FOR_CLEAR
+            ExperimentalState.TRACKING -> EngineState.ARMED
+            ExperimentalState.TRIGGERED,
+            ExperimentalState.COOLDOWN -> EngineState.CAPTURING
+        }
+    }
+
+    /**
+     * Get debug info for experimental mode.
+     */
+    fun getExperimentalDebugInfo() = experimentalDetector.debugInfo
+
+    /**
+     * Get experimental detector state.
+     */
+    fun getExperimentalState() = experimentalDetector.state
 }
 
 /**
