@@ -15,6 +15,9 @@ interface AthleteDao {
     @Query("SELECT * FROM athletes ORDER BY name")
     fun getAllAthletes(): Flow<List<AthleteEntity>>
 
+    @Query("SELECT * FROM athletes WHERE id = :id")
+    suspend fun getAthleteById(id: String): AthleteEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(athlete: AthleteEntity)
 
@@ -23,4 +26,7 @@ interface AthleteDao {
 
     @Delete
     suspend fun delete(athlete: AthleteEntity)
+
+    @Query("SELECT COUNT(*) FROM athletes")
+    fun getAthleteCount(): Flow<Int>
 }
