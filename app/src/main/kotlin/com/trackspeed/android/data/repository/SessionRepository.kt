@@ -29,6 +29,10 @@ class SessionRepository @Inject constructor(
         return sessionDao.getAllSessions()
     }
 
+    fun getRecentSessions(limit: Int = 3): Flow<List<TrainingSessionEntity>> {
+        return sessionDao.getRecentSessions(limit)
+    }
+
     fun getRunsForSession(sessionId: String): Flow<List<RunEntity>> {
         return runDao.getRunsForSession(sessionId)
     }

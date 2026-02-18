@@ -2,7 +2,6 @@ package com.trackspeed.android.ui.screens.profile
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,30 +18,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material.icons.outlined.Straighten
-import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,33 +51,30 @@ import com.trackspeed.android.ui.theme.TrackSpeedTheme
 private val PureBlack = Color(0xFF000000)
 private val CardBg = Color(0xFF2C2C2E)
 private val TextSecondary = Color(0xFF8E8E93)
-private val AccentBlue = Color(0xFF0A84FF)
 private val AccentGreen = Color(0xFF30D158)
 private val ProGreen = Color(0xFF00E676)
 
 @Composable
 fun ProfileScreen(
     onPaywallClick: () -> Unit = {},
+    onAthletesClick: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     ProfileScreenContent(
         uiState = uiState,
-        onPaywallClick = onPaywallClick
+        onPaywallClick = onPaywallClick,
+        onAthletesClick = onAthletesClick
     )
 }
 
 @Composable
 private fun ProfileScreenContent(
     uiState: ProfileUiState,
-    onPaywallClick: () -> Unit = {}
+    onPaywallClick: () -> Unit = {},
+    onAthletesClick: () -> Unit = {}
 ) {
-    var selectedDistance by remember { mutableStateOf("60m") }
-    var selectedStartType by remember { mutableStateOf("Flying") }
-    var selectedSpeedUnit by remember { mutableStateOf("m/s") }
-    var darkModeEnabled by remember { mutableStateOf(true) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -295,90 +282,49 @@ private fun ProfileScreenContent(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // -- Settings --
-        SectionHeader("Settings")
+        // -- Athletes --
+        SectionHeader("Athletes")
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Card(
+            onClick = onAthletesClick,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = CardBg)
         ) {
-            Column {
-                // Distance preference
-                SettingsRow(
-                    icon = Icons.Outlined.Straighten,
-                    label = "Distance",
-                    content = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf("40yd", "60m", "100m").forEach { d ->
-                                CompactChip(
-                                    label = d,
-                                    selected = selectedDistance == d,
-                                    onClick = { selectedDistance = d }
-                                )
-                            }
-                        }
-                    }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Groups,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = TextSecondary
                 )
-
-                SettingsDivider()
-
-                // Start type preference
-                SettingsRow(
-                    icon = Icons.Outlined.Timer,
-                    label = "Start type",
-                    content = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf("Flying", "Standing").forEach { st ->
-                                CompactChip(
-                                    label = st,
-                                    selected = selectedStartType == st,
-                                    onClick = { selectedStartType = st }
-                                )
-                            }
-                        }
-                    }
-                )
-
-                SettingsDivider()
-
-                // Speed unit
-                SettingsRow(
-                    icon = Icons.Outlined.Speed,
-                    label = "Speed unit",
-                    content = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf("m/s", "km/h", "mph").forEach { unit ->
-                                CompactChip(
-                                    label = unit,
-                                    selected = selectedSpeedUnit == unit,
-                                    onClick = { selectedSpeedUnit = unit }
-                                )
-                            }
-                        }
-                    }
-                )
-
-                SettingsDivider()
-
-                // Dark mode toggle
-                SettingsRow(
-                    icon = Icons.Outlined.DarkMode,
-                    label = "Dark mode",
-                    content = {
-                        Switch(
-                            checked = darkModeEnabled,
-                            onCheckedChange = { darkModeEnabled = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = AccentGreen,
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = Color(0xFF48484A)
-                            )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Manage Athletes",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White
+                    )
+                    if (uiState.athleteCount > 0) {
+                        Text(
+                            text = "${uiState.athleteCount} athlete${if (uiState.athleteCount != 1) "s" else ""}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
                         )
                     }
+                }
+                Icon(
+                    imageVector = Icons.Outlined.ChevronRight,
+                    contentDescription = null,
+                    tint = Color(0xFF48484A),
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -494,40 +440,6 @@ private fun PersonalBestRow(
 }
 
 @Composable
-private fun SettingsRow(
-    icon: ImageVector,
-    label: String,
-    content: @Composable () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f, fill = false)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = TextSecondary
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.White
-            )
-        }
-        content()
-    }
-}
-
-@Composable
 private fun AboutRow(
     icon: ImageVector?,
     label: String,
@@ -564,37 +476,6 @@ private fun AboutRow(
             color = TextSecondary
         )
     }
-}
-
-@Composable
-private fun CompactChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 12.sp
-            )
-        },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = AccentBlue,
-            selectedLabelColor = Color.White,
-            containerColor = Color(0xFF3A3A3C),
-            labelColor = TextSecondary
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            borderColor = Color.Transparent,
-            selectedBorderColor = Color.Transparent,
-            enabled = true,
-            selected = selected
-        )
-    )
 }
 
 @Composable

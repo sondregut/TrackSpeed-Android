@@ -35,4 +35,7 @@ interface TrainingSessionDao {
 
     @Query("SELECT COUNT(*) FROM training_sessions")
     fun getTotalSessionCount(): Flow<Int>
+
+    @Query("SELECT * FROM training_sessions ORDER BY date DESC LIMIT :limit")
+    fun getRecentSessions(limit: Int = 3): Flow<List<TrainingSessionEntity>>
 }

@@ -3,6 +3,7 @@ package com.trackspeed.android.ui.screens.profile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.billing.SubscriptionManager
+import com.trackspeed.android.data.local.dao.AthleteDao
 import com.trackspeed.android.data.repository.SessionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,15 +33,25 @@ data class ProfileUiState(
     val totalRuns: Int = 0,
     val bestTimeSeconds: Double? = null,
     val personalBests: List<PersonalBest> = emptyList(),
-    val isProUser: Boolean = false
+    val isProUser: Boolean = false,
+    val athleteCount: Int = 0
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
-    private val subscriptionManager: SubscriptionManager
+    private val subscriptionManager: SubscriptionManager,
+    private val athleteDao: AthleteDao
 ) : ViewModel() {
+
+    private val athleteCount: StateFlow<Int> =
+        athleteDao.getAthleteCount()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = 0
+            )
 
     private val totalSessions: StateFlow<Int> =
         sessionRepository.getTotalSessionCount()
@@ -92,19 +103,24 @@ class ProfileViewModel @Inject constructor(
 
     val uiState: StateFlow<ProfileUiState> =
         combine(
-            totalSessions,
-            totalRuns,
-            bestOverallTime,
-            personalBests,
-            subscriptionManager.isProUser
-        ) { values ->
-            ProfileUiState(
-                totalSessions = values[0] as Int,
-                totalRuns = values[1] as Int,
-                bestTimeSeconds = values[2] as Double?,
-                personalBests = @Suppress("UNCHECKED_CAST") (values[3] as List<PersonalBest>),
-                isProUser = values[4] as Boolean
-            )
+            combine(
+                totalSessions,
+                totalRuns,
+                bestOverallTime,
+                personalBests,
+                subscriptionManager.isProUser
+            ) { values ->
+                ProfileUiState(
+                    totalSessions = values[0] as Int,
+                    totalRuns = values[1] as Int,
+                    bestTimeSeconds = values[2] as Double?,
+                    personalBests = @Suppress("UNCHECKED_CAST") (values[3] as List<PersonalBest>),
+                    isProUser = values[4] as Boolean
+                )
+            },
+            athleteCount
+        ) { state, count ->
+            state.copy(athleteCount = count)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

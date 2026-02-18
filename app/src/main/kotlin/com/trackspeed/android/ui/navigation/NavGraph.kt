@@ -18,15 +18,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.trackspeed.android.ui.screens.athletes.AthleteFormScreen
+import com.trackspeed.android.ui.screens.athletes.AthleteListScreen
 import com.trackspeed.android.ui.screens.home.HomeScreen
 import com.trackspeed.android.ui.screens.history.SessionDetailScreen
 import com.trackspeed.android.ui.screens.history.SessionHistoryScreen
 import com.trackspeed.android.ui.screens.onboarding.OnboardingScreen
 import com.trackspeed.android.ui.screens.onboarding.OnboardingViewModel
-import com.trackspeed.android.ui.screens.settings.SettingsScreen
-import com.trackspeed.android.ui.screens.race.RaceModeScreen
-import com.trackspeed.android.ui.screens.sync.ClockSyncScreen
 import com.trackspeed.android.ui.screens.paywall.PaywallScreen
+import com.trackspeed.android.ui.screens.race.RaceModeScreen
+import com.trackspeed.android.ui.screens.settings.SettingsScreen
+import com.trackspeed.android.ui.screens.setup.SessionSetupScreen
+import com.trackspeed.android.ui.screens.sync.ClockSyncScreen
 import com.trackspeed.android.ui.screens.timing.BasicTimingScreen
 
 sealed class Screen(val route: String) {
@@ -44,6 +47,22 @@ sealed class Screen(val route: String) {
     data object History : Screen("history")
     data object Settings : Screen("settings")
     data object Paywall : Screen("paywall")
+
+    data object SessionSetup : Screen("session_setup?distance={distance}&startType={startType}") {
+        fun createRoute(distance: Double? = null, startType: String? = null): String {
+            val params = mutableListOf<String>()
+            if (distance != null) params.add("distance=$distance")
+            if (startType != null) params.add("startType=$startType")
+            return if (params.isEmpty()) "session_setup" else "session_setup?${params.joinToString("&")}"
+        }
+    }
+
+    data object AthleteList : Screen("athlete_list")
+
+    data object AthleteForm : Screen("athlete_form?athleteId={athleteId}") {
+        fun createRoute(athleteId: String? = null) =
+            if (athleteId != null) "athlete_form?athleteId=$athleteId" else "athlete_form"
+    }
 
     data object Results : Screen("results/{crossingId}") {
         fun createRoute(crossingId: String) = "results/$crossingId"
@@ -98,7 +117,7 @@ fun TrackSpeedNavHost(
         composable(Screen.Home.route) {
             HomeScreen(
                 onBasicModeClick = {
-                    navController.navigate(Screen.BasicTiming.createRoute())
+                    navController.navigate(Screen.SessionSetup.createRoute())
                 },
                 onRaceModeClick = {
                     navController.navigate(Screen.RaceMode.route)
@@ -116,10 +135,13 @@ fun TrackSpeedNavHost(
                     navController.navigate(Screen.SessionDetail.createRoute(sessionId))
                 },
                 onTemplateClick = { distance, startType ->
-                    navController.navigate(Screen.BasicTiming.createRoute(distance, startType))
+                    navController.navigate(Screen.SessionSetup.createRoute(distance, startType))
                 },
                 onPaywallClick = {
                     navController.navigate(Screen.Paywall.route)
+                },
+                onAthletesClick = {
+                    navController.navigate(Screen.AthleteList.route)
                 }
             )
         }
@@ -190,6 +212,49 @@ fun TrackSpeedNavHost(
         composable(Screen.Paywall.route) {
             PaywallScreen(
                 onClose = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = Screen.SessionSetup.route,
+            arguments = listOf(
+                navArgument("distance") { type = NavType.FloatType; defaultValue = 0f },
+                navArgument("startType") { type = NavType.StringType; defaultValue = "" }
+            )
+        ) {
+            SessionSetupScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onStartSession = { distance, startType, _ ->
+                    navController.navigate(Screen.BasicTiming.createRoute(distance, startType)) {
+                        popUpTo(Screen.SessionSetup.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.AthleteList.route) {
+            AthleteListScreen(
+                onAthleteClick = { athleteId ->
+                    navController.navigate(Screen.AthleteForm.createRoute(athleteId))
+                },
+                onAddClick = {
+                    navController.navigate(Screen.AthleteForm.createRoute())
+                }
+            )
+        }
+
+        composable(
+            route = Screen.AthleteForm.route,
+            arguments = listOf(
+                navArgument("athleteId") { type = NavType.StringType; defaultValue = "" }
+            )
+        ) {
+            AthleteFormScreen(
+                onNavigateBack = {
                     navController.popBackStack()
                 }
             )

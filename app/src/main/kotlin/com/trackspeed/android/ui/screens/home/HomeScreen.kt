@@ -35,13 +35,21 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.billing.SubscriptionManager
+import com.trackspeed.android.data.local.entities.TrainingSessionEntity
+import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.ui.screens.history.SessionHistoryScreen
 import com.trackspeed.android.ui.screens.profile.ProfileScreen
 import com.trackspeed.android.ui.screens.templates.TemplatesScreen
 import com.trackspeed.android.ui.theme.TrackSpeedTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 private val CardBackground = Color(0xFF2C2C2E)
@@ -50,9 +58,18 @@ private val AccentGreen = Color(0xFF00E676)
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    subscriptionManager: SubscriptionManager
+    subscriptionManager: SubscriptionManager,
+    sessionRepository: SessionRepository
 ) : ViewModel() {
     val isProUser: StateFlow<Boolean> = subscriptionManager.isProUser
+
+    val recentSessions: StateFlow<List<TrainingSessionEntity>> =
+        sessionRepository.getRecentSessions(3)
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList()
+            )
 }
 
 private enum class HomeTab(val label: String, val icon: ImageVector) {
@@ -72,9 +89,11 @@ fun HomeScreen(
     onSessionClick: (String) -> Unit = {},
     onTemplateClick: (Double, String) -> Unit = { _, _ -> },
     onPaywallClick: () -> Unit = {},
+    onAthletesClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val isProUser by viewModel.isProUser.collectAsStateWithLifecycle()
+    val recentSessions by viewModel.recentSessions.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(HomeTab.HOME) }
 
     Scaffold(
@@ -121,13 +140,15 @@ fun HomeScreen(
         ) {
             when (selectedTab) {
                 HomeTab.HOME -> HomeContent(
-                    onSoloModeClick = onBasicModeClick,
-                    onAccelerationClick = onBasicModeClick,
-                    onSprintClick = onBasicModeClick,
-                    onTakeOffClick = onBasicModeClick,
+                    onSoloModeClick = { onTemplateClick(60.0, "standing") },
+                    onAccelerationClick = { onTemplateClick(10.0, "standing") },
+                    onSprintClick = { onTemplateClick(60.0, "standing") },
+                    onTakeOffClick = { onTemplateClick(20.0, "flying") },
                     onCustomSessionClick = onBasicModeClick,
                     onJoinSessionClick = if (isProUser) onClockSyncClick else onPaywallClick,
                     onSeeAllClick = { selectedTab = HomeTab.HISTORY },
+                    onSessionClick = onSessionClick,
+                    recentSessions = recentSessions,
                     isProUser = isProUser
                 )
                 HomeTab.TEMPLATES -> TemplatesScreen(
@@ -137,7 +158,8 @@ fun HomeScreen(
                     onSessionClick = onSessionClick
                 )
                 HomeTab.PROFILE -> ProfileScreen(
-                    onPaywallClick = onPaywallClick
+                    onPaywallClick = onPaywallClick,
+                    onAthletesClick = onAthletesClick
                 )
             }
         }
@@ -153,6 +175,8 @@ private fun HomeContent(
     onCustomSessionClick: () -> Unit,
     onJoinSessionClick: () -> Unit,
     onSeeAllClick: () -> Unit,
+    onSessionClick: (String) -> Unit = {},
+    recentSessions: List<TrainingSessionEntity> = emptyList(),
     isProUser: Boolean = false
 ) {
     Column(
@@ -287,23 +311,33 @@ private fun HomeContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Placeholder for recent sessions
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
+        if (recentSessions.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = CardBackground)
             ) {
-                Text(
-                    text = "No recent sessions",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF8E8E93)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No recent sessions",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF8E8E93)
+                    )
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                recentSessions.forEach { session ->
+                    RecentSessionCard(
+                        session = session,
+                        onClick = { onSessionClick(session.id) }
+                    )
+                }
             }
         }
 
@@ -429,6 +463,56 @@ private fun FullWidthActionCard(
                 )
             }
 
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = Color(0xFF48484A),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecentSessionCard(
+    session: TrainingSessionEntity,
+    onClick: () -> Unit
+) {
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+    val distanceLabel = when {
+        session.distance % 1.0 == 0.0 -> "${session.distance.toInt()}m"
+        else -> "${session.distance}m"
+    }
+
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBackground)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = session.name ?: "$distanceLabel ${session.startType}",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${dateFormat.format(Date(session.date))} - $distanceLabel",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF8E8E93)
+                )
+            }
             Icon(
                 imageVector = Icons.Outlined.ChevronRight,
                 contentDescription = null,
