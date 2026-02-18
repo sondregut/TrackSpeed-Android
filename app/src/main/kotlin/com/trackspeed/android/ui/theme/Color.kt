@@ -12,20 +12,27 @@ val SecondaryDark = Color(0xFF00A843)
 
 val Tertiary = Color(0xFFFF6D00)        // Orange - for warnings
 
-// Backgrounds
-val BackgroundDark = Color(0xFF121212)
+// Backgrounds - near pure black like iOS TrackSpeed
+val BackgroundDark = Color(0xFF000000)
 val BackgroundLight = Color(0xFFFAFAFA)
-val SurfaceDark = Color(0xFF1E1E1E)
+val SurfaceDark = Color(0xFF1C1C1E)     // iOS-style dark card
 val SurfaceLight = Color(0xFFFFFFFF)
 
 // Text
 val OnBackgroundDark = Color(0xFFE0E0E0)
 val OnBackgroundLight = Color(0xFF212121)
 
+// Card backgrounds (translucent dark gray like iOS)
+val CardDark = Color(0xFF2C2C2E)
+
 // Timing display
 val TimerGreen = Color(0xFF00E676)      // Ready/armed
 val TimerRed = Color(0xFFFF5252)        // Not ready
 val TimerYellow = Color(0xFFFFD600)     // Calibrating
+
+// Status banner colors (matching iOS)
+val StatusRed = Color(0xFFE53935)       // Hold Still banner
+val StatusGreen = Color(0xFF43A047)     // Running banner
 
 // Athlete colors (matching iOS)
 val AthleteBlue = Color(0xFF2196F3)

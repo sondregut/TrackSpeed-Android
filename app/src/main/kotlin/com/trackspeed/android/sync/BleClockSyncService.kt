@@ -4,19 +4,20 @@ import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.bluetooth.le.*
 import android.content.Context
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
 import android.os.SystemClock
 import android.util.Log
+import com.trackspeed.android.protocol.TimingMessage
+import com.trackspeed.android.protocol.TimingMessageCodec
+import com.trackspeed.android.protocol.TimingPayload
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,9 +27,13 @@ import javax.inject.Singleton
  * Implements NTP-style ping-pong over BLE GATT for cross-platform
  * clock synchronization between Android and iOS devices.
  *
- * Uses compact binary format for low latency:
- * - PING: 10 bytes (type + seq + t1)
- * - PONG: 26 bytes (type + seq + t1 + t2 + t3)
+ * Uses JSON-encoded TimingMessage objects that match the iOS Speed Swift
+ * app's TimingMessage protocol exactly, enabling cross-platform BLE
+ * communication.
+ *
+ * Characteristic layout matches iOS BluetoothTransport:
+ * - TX (host -> joiner): NOTIFY + READ  (UUID ...7891)
+ * - RX (joiner -> host): WRITE + WRITE_WITHOUT_RESPONSE  (UUID ...7892)
  */
 @Singleton
 class BleClockSyncService @Inject constructor(
@@ -84,14 +89,19 @@ class BleClockSyncService @Inject constructor(
     // Sync state
     private var role: Role? = null
     private var syncCalculator: ClockSyncCalculator? = null
-    private val sequenceNumber = AtomicInteger(0)
-    private val pendingPings = mutableMapOf<Int, Long>()  // seqNo -> t1
+    private val sequenceNumber = AtomicLong(0)
+    private val pendingPings = mutableMapOf<String, Long>()  // pingId (UUID) -> t1 nanos
     private var syncJob: Job? = null
     private val handler = Handler(Looper.getMainLooper())
 
-    // Characteristics
-    private var pingCharacteristic: BluetoothGattCharacteristic? = null
-    private var pongCharacteristic: BluetoothGattCharacteristic? = null
+    // Device and session identity (stable across app runs)
+    private val deviceId: String by lazy { getOrCreateDeviceId() }
+    private var sessionId: String = UUID.randomUUID().toString().uppercase()
+
+    // Characteristics - names match iOS BluetoothTransport:
+    //   TX = host->joiner (NOTIFY+READ), RX = joiner->host (WRITE+WRITE_WITHOUT_RESPONSE)
+    private var txCharacteristic: BluetoothGattCharacteristic? = null
+    private var rxCharacteristic: BluetoothGattCharacteristic? = null
 
     /**
      * Start as server (advertises, responds to pings).
@@ -148,6 +158,7 @@ class BleClockSyncService @Inject constructor(
         syncCalculator = null
         pendingPings.clear()
         connectedDevice = null
+        sessionId = UUID.randomUUID().toString().uppercase()
 
         _state.value = State.Idle
     }
@@ -157,25 +168,18 @@ class BleClockSyncService @Inject constructor(
     @SuppressLint("MissingPermission")
     private fun startGattServer() {
         gattServer = bluetoothManager.openGattServer(context, gattServerCallback)?.apply {
-            // Create service
+            // Create service with UUIDs matching iOS BluetoothTransport
             val service = BluetoothGattService(
                 ClockSyncConfig.SERVICE_UUID,
                 BluetoothGattService.SERVICE_TYPE_PRIMARY
             )
 
-            // Ping characteristic (client writes here)
-            pingCharacteristic = BluetoothGattCharacteristic(
+            // TX characteristic (host -> joiner): NOTIFY + READ
+            // iOS: properties: [.notify, .read], permissions: [.readable]
+            txCharacteristic = BluetoothGattCharacteristic(
                 ClockSyncConfig.PING_CHARACTERISTIC_UUID,
-                BluetoothGattCharacteristic.PROPERTY_WRITE,
-                BluetoothGattCharacteristic.PERMISSION_WRITE
-            )
-            service.addCharacteristic(pingCharacteristic)
-
-            // Pong characteristic (server writes/indicates here)
-            pongCharacteristic = BluetoothGattCharacteristic(
-                ClockSyncConfig.PONG_CHARACTERISTIC_UUID,
                 BluetoothGattCharacteristic.PROPERTY_NOTIFY or
-                        BluetoothGattCharacteristic.PROPERTY_INDICATE,
+                        BluetoothGattCharacteristic.PROPERTY_READ,
                 BluetoothGattCharacteristic.PERMISSION_READ
             ).apply {
                 // Add CCC descriptor for notifications
@@ -186,10 +190,20 @@ class BleClockSyncService @Inject constructor(
                 )
                 addDescriptor(descriptor)
             }
-            service.addCharacteristic(pongCharacteristic)
+            service.addCharacteristic(txCharacteristic)
+
+            // RX characteristic (joiner -> host): WRITE + WRITE_WITHOUT_RESPONSE
+            // iOS: properties: [.write, .writeWithoutResponse], permissions: [.writeable]
+            rxCharacteristic = BluetoothGattCharacteristic(
+                ClockSyncConfig.PONG_CHARACTERISTIC_UUID,
+                BluetoothGattCharacteristic.PROPERTY_WRITE or
+                        BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
+                BluetoothGattCharacteristic.PERMISSION_WRITE
+            )
+            service.addCharacteristic(rxCharacteristic)
 
             addService(service)
-            Log.i(TAG, "GATT server started with clock sync service")
+            Log.i(TAG, "GATT server started with clock sync service (JSON protocol v3)")
         }
     }
 
@@ -222,28 +236,53 @@ class BleClockSyncService @Inject constructor(
             offset: Int,
             value: ByteArray
         ) {
-            if (characteristic.uuid == ClockSyncConfig.PING_CHARACTERISTIC_UUID) {
-                // Record receive time immediately
+            if (characteristic.uuid == ClockSyncConfig.PONG_CHARACTERISTIC_UUID) {
+                // Record T2 (receive time) immediately on arrival
                 val t2 = SystemClock.elapsedRealtimeNanos()
 
-                // Parse ping message
-                val (seqNo, t1) = parsePingMessage(value)
-                Log.d(TAG, "Server: Received ping #$seqNo")
-
-                // Send response first
+                // Ack the write request first for minimum latency
                 if (responseNeeded) {
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
                 }
 
-                // Record send time and create pong
-                val t3 = SystemClock.elapsedRealtimeNanos()
-                val pongData = createPongMessage(seqNo, t1, t2, t3)
+                // Parse the incoming JSON TimingMessage
+                val message = try {
+                    TimingMessageCodec.decodeFromBytes(value)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Server: Failed to decode message: ${e.message}")
+                    return
+                }
 
-                // Send pong via notification
-                pongCharacteristic?.let { char ->
-                    char.value = pongData
-                    gattServer?.notifyCharacteristicChanged(device, char, false)
-                    Log.d(TAG, "Server: Sent pong #$seqNo")
+                // Handle sync ping
+                val payload = message.payload
+                if (payload is TimingPayload.SyncPing) {
+                    // Record T3 (send time) right before creating pong
+                    val t3 = SystemClock.elapsedRealtimeNanos()
+
+                    val pongPayload = TimingPayload.SyncPong(
+                        pingId = payload.pingId,
+                        t1Nanos = payload.t1Nanos,
+                        t2Nanos = t2,
+                        t3Nanos = t3,
+                        requesterId = payload.requesterId
+                    )
+                    val pongMessage = TimingMessage.create(
+                        seq = sequenceNumber.incrementAndGet(),
+                        senderId = deviceId,
+                        sessionId = sessionId,
+                        payload = pongPayload
+                    )
+                    val pongData = TimingMessageCodec.encodeToBytes(pongMessage)
+
+                    // Send pong via notification on TX characteristic
+                    txCharacteristic?.let { char ->
+                        char.value = pongData
+                        gattServer?.notifyCharacteristicChanged(device, char, false)
+                    }
+
+                    Log.d(TAG, "Server: Responded to syncPing (pingId=${payload.pingId.take(8)})")
+                } else {
+                    Log.d(TAG, "Server: Received non-ping message: ${payload::class.simpleName}")
                 }
             }
         }
@@ -389,7 +428,8 @@ class BleClockSyncService @Inject constructor(
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.i(TAG, "Client: Connected to server")
                     connectedDevice = gatt.device
-                    gatt.discoverServices()
+                    // Request large MTU for JSON messages (~250-400 bytes)
+                    gatt.requestMtu(ClockSyncConfig.PREFERRED_MTU)
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     Log.i(TAG, "Client: Disconnected from server")
@@ -397,6 +437,13 @@ class BleClockSyncService @Inject constructor(
                     _state.value = State.Error("Disconnected from server")
                 }
             }
+        }
+
+        @SuppressLint("MissingPermission")
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            Log.i(TAG, "Client: MTU changed to $mtu (status=$status)")
+            // Proceed with service discovery regardless of MTU result
+            gatt.discoverServices()
         }
 
         @SuppressLint("MissingPermission")
@@ -412,17 +459,20 @@ class BleClockSyncService @Inject constructor(
                 return
             }
 
-            pingCharacteristic = service.getCharacteristic(ClockSyncConfig.PING_CHARACTERISTIC_UUID)
-            pongCharacteristic = service.getCharacteristic(ClockSyncConfig.PONG_CHARACTERISTIC_UUID)
+            // TX characteristic (host -> joiner): we subscribe to notifications on this
+            // RX characteristic (joiner -> host): we write ping messages to this
+            txCharacteristic = service.getCharacteristic(ClockSyncConfig.PING_CHARACTERISTIC_UUID)
+            rxCharacteristic = service.getCharacteristic(ClockSyncConfig.PONG_CHARACTERISTIC_UUID)
 
-            if (pingCharacteristic == null || pongCharacteristic == null) {
+            if (txCharacteristic == null || rxCharacteristic == null) {
                 _state.value = State.Error("Required characteristics not found")
                 return
             }
 
-            // Enable notifications on pong characteristic
-            gatt.setCharacteristicNotification(pongCharacteristic, true)
-            val descriptor = pongCharacteristic?.getDescriptor(
+            // Enable notifications on TX characteristic (host -> joiner)
+            // This is where we receive pong responses
+            gatt.setCharacteristicNotification(txCharacteristic, true)
+            val descriptor = txCharacteristic?.getDescriptor(
                 java.util.UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
             )
             descriptor?.let {
@@ -450,8 +500,8 @@ class BleClockSyncService @Inject constructor(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic
         ) {
-            if (characteristic.uuid == ClockSyncConfig.PONG_CHARACTERISTIC_UUID) {
-                handlePongReceived(characteristic.value)
+            if (characteristic.uuid == ClockSyncConfig.PING_CHARACTERISTIC_UUID) {
+                handleMessageReceived(characteristic.value)
             }
         }
 
@@ -461,45 +511,137 @@ class BleClockSyncService @Inject constructor(
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray
         ) {
-            if (characteristic.uuid == ClockSyncConfig.PONG_CHARACTERISTIC_UUID) {
-                handlePongReceived(value)
+            if (characteristic.uuid == ClockSyncConfig.PING_CHARACTERISTIC_UUID) {
+                handleMessageReceived(value)
             }
         }
     }
 
     @SuppressLint("MissingPermission")
     private fun startSync() {
-        syncCalculator = ClockSyncCalculator(isFullSync = true)
-        pendingPings.clear()
-        sequenceNumber.set(0)
-
         _state.value = State.Syncing(0f)
-        Log.i(TAG, "Starting clock synchronization...")
+        Log.i(TAG, "Starting clock synchronization (${ClockSyncConfig.FULL_SYNC_SAMPLES} samples, JSON protocol)...")
 
         syncJob = CoroutineScope(Dispatchers.IO).launch {
-            repeat(ClockSyncConfig.FULL_SYNC_SAMPLES) { i ->
-                if (!isActive) return@launch
+            var lastResult: ClockSyncCalculator.SyncResult? = null
 
-                sendPing()
-                delay(ClockSyncConfig.FULL_SYNC_INTERVAL_MS)
+            // Auto-retry up to MAX_SYNC_RETRIES times
+            for (attempt in 1..ClockSyncConfig.MAX_SYNC_RETRIES) {
+                syncCalculator = ClockSyncCalculator(isFullSync = true)
+                pendingPings.clear()
 
-                // Update progress
-                val progress = (i + 1).toFloat() / ClockSyncConfig.FULL_SYNC_SAMPLES
-                _state.value = State.Syncing(progress)
+                Log.i(TAG, "Sync attempt $attempt/${ClockSyncConfig.MAX_SYNC_RETRIES}")
+
+                repeat(ClockSyncConfig.FULL_SYNC_SAMPLES) { i ->
+                    if (!isActive) return@launch
+
+                    sendPing()
+                    delay(ClockSyncConfig.FULL_SYNC_INTERVAL_MS)
+
+                    // Update progress
+                    val sampleProgress = (i + 1).toFloat() / ClockSyncConfig.FULL_SYNC_SAMPLES
+                    _state.value = State.Syncing(sampleProgress)
+                }
+
+                // Wait for last responses
+                delay(300)
+
+                // Calculate result
+                val result = syncCalculator?.calculateOffset()
+                lastResult = result
+
+                if (result != null && result.isAcceptable()) {
+                    _syncResult.value = result
+                    _state.value = State.Synced(result)
+                    Log.i(TAG, "Sync complete (attempt $attempt): " +
+                        "offset=${String.format("%.2f", result.offsetMs)}ms, " +
+                        "uncertainty=${String.format("%.2f", result.uncertaintyMs)}ms, " +
+                        "quality=${result.quality}, " +
+                        "samples=${result.samplesUsed}/${result.totalSamples}, " +
+                        "minRTT=${String.format("%.2f", result.minRttMs)}ms, " +
+                        "jitter=${String.format("%.2f", result.jitterMs)}ms")
+                    return@launch
+                }
+
+                Log.w(TAG, "Sync attempt $attempt failed: ${result?.quality ?: "no result"}, " +
+                    "samples=${result?.samplesUsed ?: 0}/${result?.totalSamples ?: 0}")
+
+                if (attempt < ClockSyncConfig.MAX_SYNC_RETRIES) {
+                    delay(ClockSyncConfig.RETRY_DELAY_MS)
+                }
             }
 
-            // Wait a bit for last responses
+            _state.value = State.Error(
+                "Sync failed after ${ClockSyncConfig.MAX_SYNC_RETRIES} attempts " +
+                "(quality: ${lastResult?.quality ?: "none"}, " +
+                "uncertainty: ${lastResult?.let { String.format("%.1f", it.uncertaintyMs) } ?: "?"}ms)"
+            )
+        }
+    }
+
+    /**
+     * Perform a mini-sync to refresh the clock offset during an active race.
+     * Uses fewer samples and wider RTT tolerance.
+     * Can be called periodically (e.g. every 60 seconds).
+     */
+    @SuppressLint("MissingPermission")
+    fun performMiniSync() {
+        if (connectedDevice == null || role != Role.Client) {
+            Log.w(TAG, "Cannot mini-sync: not connected as client")
+            return
+        }
+
+        val previousResult = _syncResult.value
+        Log.i(TAG, "Starting mini-sync (${ClockSyncConfig.MINI_SYNC_SAMPLES} samples)...")
+
+        syncJob?.cancel()
+        syncJob = CoroutineScope(Dispatchers.IO).launch {
+            val miniCalc = ClockSyncCalculator(isFullSync = false)
+
+            repeat(ClockSyncConfig.MINI_SYNC_SAMPLES) { i ->
+                if (!isActive) return@launch
+
+                // Create and send ping using JSON protocol
+                val pingId = UUID.randomUUID().toString().uppercase()
+                val t1 = SystemClock.elapsedRealtimeNanos()
+                pendingPings[pingId] = t1
+
+                val pingPayload = TimingPayload.SyncPing(
+                    pingId = pingId,
+                    t1Nanos = t1,
+                    requesterId = deviceId
+                )
+                val message = TimingMessage.create(
+                    seq = sequenceNumber.incrementAndGet(),
+                    senderId = deviceId,
+                    sessionId = sessionId,
+                    payload = pingPayload
+                )
+                val messageData = TimingMessageCodec.encodeToBytes(message)
+
+                rxCharacteristic?.let { char ->
+                    char.value = messageData
+                    char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    gattClient?.writeCharacteristic(char)
+                }
+
+                delay(ClockSyncConfig.MINI_SYNC_INTERVAL_MS)
+            }
+
             delay(200)
 
-            // Calculate result
-            val result = syncCalculator?.calculateOffset()
+            val result = miniCalc.calculateOffset()
             if (result != null && result.isAcceptable()) {
                 _syncResult.value = result
                 _state.value = State.Synced(result)
-                Log.i(TAG, "Sync complete: offset=${result.offsetMs}ms, quality=${result.quality}")
+                Log.i(TAG, "Mini-sync complete: offset=${String.format("%.2f", result.offsetMs)}ms, " +
+                    "quality=${result.quality}")
             } else {
-                _state.value = State.Error("Sync failed: insufficient quality")
-                Log.e(TAG, "Sync failed: ${result?.quality ?: "no result"}")
+                // Keep previous result if mini-sync fails
+                Log.w(TAG, "Mini-sync failed, keeping previous offset")
+                if (previousResult != null) {
+                    _syncResult.value = previousResult
+                }
             }
         }
     }
@@ -507,87 +649,72 @@ class BleClockSyncService @Inject constructor(
     @SuppressLint("MissingPermission")
     private fun sendPing() {
         val client = gattClient ?: return
-        val char = pingCharacteristic ?: return
+        val char = rxCharacteristic ?: return
 
-        val seqNo = sequenceNumber.incrementAndGet() and 0xFF
+        val pingId = UUID.randomUUID().toString().uppercase()
         val t1 = SystemClock.elapsedRealtimeNanos()
 
-        pendingPings[seqNo] = t1
-        char.value = createPingMessage(seqNo, t1)
+        pendingPings[pingId] = t1
+
+        val pingPayload = TimingPayload.SyncPing(
+            pingId = pingId,
+            t1Nanos = t1,
+            requesterId = deviceId
+        )
+        val message = TimingMessage.create(
+            seq = sequenceNumber.incrementAndGet(),
+            senderId = deviceId,
+            sessionId = sessionId,
+            payload = pingPayload
+        )
+        val messageData = TimingMessageCodec.encodeToBytes(message)
+
+        char.value = messageData
+        char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         client.writeCharacteristic(char)
 
-        Log.d(TAG, "Client: Sent ping #$seqNo")
+        Log.d(TAG, "Client: Sent syncPing (pingId=${pingId.take(8)})")
     }
 
-    private fun handlePongReceived(data: ByteArray) {
+    /**
+     * Handle an incoming JSON message received via BLE notification (on TX characteristic).
+     * Dispatches based on the payload type.
+     */
+    private fun handleMessageReceived(data: ByteArray) {
         val t4 = SystemClock.elapsedRealtimeNanos()
-        val (seqNo, t1, t2, t3) = parsePongMessage(data)
 
-        val expectedT1 = pendingPings.remove(seqNo)
-        if (expectedT1 == null || expectedT1 != t1) {
-            Log.w(TAG, "Unexpected or mismatched pong #$seqNo")
+        val message = try {
+            TimingMessageCodec.decodeFromBytes(data)
+        } catch (e: Exception) {
+            Log.e(TAG, "Client: Failed to decode message (${data.size} bytes): ${e.message}")
             return
         }
 
-        val sample = ClockSyncCalculator.SyncSample(t1, t2, t3, t4)
-        val accepted = syncCalculator?.addSample(sample) ?: false
+        when (val payload = message.payload) {
+            is TimingPayload.SyncPong -> {
+                val expectedT1 = pendingPings.remove(payload.pingId)
+                if (expectedT1 == null) {
+                    Log.w(TAG, "Client: Unexpected pong (pingId=${payload.pingId.take(8)})")
+                    return
+                }
+                if (expectedT1 != payload.t1Nanos) {
+                    Log.w(TAG, "Client: Mismatched t1 in pong (pingId=${payload.pingId.take(8)})")
+                    return
+                }
 
-        Log.d(TAG, "Client: Received pong #$seqNo, RTT=${sample.rtt / 1_000_000.0}ms, accepted=$accepted")
+                val sample = ClockSyncCalculator.SyncSample(
+                    payload.t1Nanos, payload.t2Nanos, payload.t3Nanos, t4
+                )
+                val accepted = syncCalculator?.addSample(sample) ?: false
+
+                Log.d(TAG, "Client: Received syncPong (pingId=${payload.pingId.take(8)}), " +
+                    "RTT=${String.format("%.2f", sample.rtt / 1_000_000.0)}ms, accepted=$accepted")
+            }
+            else -> {
+                Log.d(TAG, "Client: Received non-pong message: ${payload::class.simpleName}")
+            }
+        }
     }
-
-    // ==================== Binary Message Format ====================
-
-    /**
-     * Create ping message: [type:1B][seqNo:1B][t1:8B]
-     */
-    private fun createPingMessage(seqNo: Int, t1: Long): ByteArray {
-        return ByteBuffer.allocate(ClockSyncConfig.PING_MESSAGE_SIZE)
-            .order(ByteOrder.LITTLE_ENDIAN)
-            .put(ClockSyncConfig.MSG_TYPE_PING)
-            .put(seqNo.toByte())
-            .putLong(t1)
-            .array()
-    }
-
-    /**
-     * Parse ping message: returns (seqNo, t1)
-     */
-    private fun parsePingMessage(data: ByteArray): Pair<Int, Long> {
-        val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
-        val type = buffer.get()
-        val seqNo = buffer.get().toInt() and 0xFF
-        val t1 = buffer.getLong()
-        return Pair(seqNo, t1)
-    }
-
-    /**
-     * Create pong message: [type:1B][seqNo:1B][t1:8B][t2:8B][t3:8B]
-     */
-    private fun createPongMessage(seqNo: Int, t1: Long, t2: Long, t3: Long): ByteArray {
-        return ByteBuffer.allocate(ClockSyncConfig.PONG_MESSAGE_SIZE)
-            .order(ByteOrder.LITTLE_ENDIAN)
-            .put(ClockSyncConfig.MSG_TYPE_PONG)
-            .put(seqNo.toByte())
-            .putLong(t1)
-            .putLong(t2)
-            .putLong(t3)
-            .array()
-    }
-
-    /**
-     * Parse pong message: returns (seqNo, t1, t2, t3)
-     */
-    private fun parsePongMessage(data: ByteArray): PongData {
-        val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
-        val type = buffer.get()
-        val seqNo = buffer.get().toInt() and 0xFF
-        val t1 = buffer.getLong()
-        val t2 = buffer.getLong()
-        val t3 = buffer.getLong()
-        return PongData(seqNo, t1, t2, t3)
-    }
-
-    private data class PongData(val seqNo: Int, val t1: Long, val t2: Long, val t3: Long)
 
     // ==================== Cleanup ====================
 
@@ -599,8 +726,23 @@ class BleClockSyncService @Inject constructor(
         gattClient?.close()
         gattClient = null
 
-        pingCharacteristic = null
-        pongCharacteristic = null
+        txCharacteristic = null
+        rxCharacteristic = null
+    }
+
+    // ==================== Device Identity ====================
+
+    /**
+     * Get or create a stable device ID persisted in SharedPreferences.
+     * Matches iOS BluetoothTransport.localDeviceId pattern.
+     */
+    private fun getOrCreateDeviceId(): String {
+        val prefs = context.getSharedPreferences("trackspeed_ble", Context.MODE_PRIVATE)
+        return prefs.getString("device_id", null) ?: run {
+            val id = UUID.randomUUID().toString().uppercase()
+            prefs.edit().putString("device_id", id).apply()
+            id
+        }
     }
 
     /**

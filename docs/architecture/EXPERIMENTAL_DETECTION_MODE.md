@@ -1,6 +1,16 @@
 # Experimental Detection Mode - Android Design Document
 
-A new "Experimental" detection mode using vertical-blob motion detection at 60fps with automatic scene recovery. This is a third option alongside the existing Precision and Simple modes.
+> **STATUS: DESIGN ONLY -- NOT IMPLEMENTED**
+>
+> This document describes a 60fps blob tracking detection mode that was designed but never implemented in source code. The actual app uses **Photo Finish mode** (see `DETECTION_ALGORITHM.md`). This document is preserved for reference in case the experimental mode is implemented in the future.
+>
+> **Key differences from actual codebase:**
+> - References `HighSpeedCameraManager` which does not exist (the app uses `CameraManager` with standard sessions)
+> - References `CrossingDetector` and `Precision mode` which were never built
+> - References `ExperimentalCrossingDetector` and related classes that do not exist in the codebase
+> - The Photo Finish mode already implements many of the concepts described here (CCL blob detection, IMU stability gating, frame differencing) but with different architecture
+
+A new "Experimental" detection mode using vertical-blob motion detection at 60fps with automatic scene recovery. This was designed as a third option alongside the Photo Finish mode.
 
 ## Overview
 

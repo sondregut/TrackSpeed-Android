@@ -1,327 +1,158 @@
 # TrackSpeed Android - Development Roadmap
 
-**Last Updated:** January 2026
+**Last Updated:** February 2026
 
 ---
 
 ## Quick Reference
 
-| Phase | Duration | Status |
-|-------|----------|--------|
-| Phase 1: Project Setup | 1 week | Not Started |
-| Phase 2: Camera & Detection | 3 weeks | Not Started |
-| Phase 3: Communication | 2 weeks | Not Started |
-| Phase 4: UI | 2 weeks | Not Started |
-| Phase 5: Integration & Testing | 1 week | Not Started |
-
-**Total Estimated Duration:** 9 weeks
-
----
-
-## Phase 1: Project Setup (Week 1)
-
-### 1.1 Android Project Creation
-- [ ] Create new Android project in Android Studio
-  - Application name: TrackSpeed
-  - Package name: `com.trackspeed.android`
-  - Minimum SDK: API 26 (Android 8.0)
-  - Target SDK: API 34 (Android 14)
-  - Language: Kotlin
-  - Build: Kotlin DSL
-- [ ] Configure Gradle version catalogs
-- [ ] Set up module structure (app, core, feature modules if needed)
-
-### 1.2 Dependencies Setup
-- [ ] Add Jetpack Compose dependencies
-- [ ] Add Hilt for dependency injection
-- [ ] Add Room for local database
-- [ ] Add Camera2 API dependencies
-- [ ] Add ML Kit Pose Detection
-- [ ] Add Supabase Kotlin client
-- [ ] Add Kotlinx Serialization
-- [ ] Add Kotlin Coroutines
-
-### 1.3 Project Configuration
-- [ ] Configure ProGuard rules
-- [ ] Set up BuildConfig for Supabase credentials
-- [ ] Configure Android Manifest permissions
-- [ ] Set up signing configs for debug/release
-- [ ] Create .gitignore for Android project
-
-### 1.4 Base Architecture
-- [ ] Create package structure (ui, domain, data, engine, communication)
-- [ ] Set up Hilt modules (AppModule, DatabaseModule, etc.)
-- [ ] Create base ViewModel class
-- [ ] Set up Navigation Compose
-- [ ] Create theme (colors, typography, shapes)
-
-### Deliverables
-- [ ] Project builds successfully
-- [ ] Empty app runs on device/emulator
-- [ ] All dependencies resolved
+| Phase | Status |
+|-------|--------|
+| Phase 1: Project Setup | Completed |
+| Phase 2: Detection Engine | Completed |
+| Phase 3: Solo Timing UI | Completed |
+| Phase 4: Session History + Settings | Completed |
+| Phase 5: BLE Clock Sync | Completed (standalone, not wired to timing) |
+| Phase 6: Multi-Device Timing | Not Started |
+| Phase 7: Polish + Testing | Not Started |
 
 ---
 
-## Phase 2: Camera & Detection Engine (Weeks 2-4)
+## Completed Work
 
-### 2.1 Camera Manager (Week 2)
-- [ ] Implement CameraManager class
-  - [ ] Camera2 API setup
-  - [ ] Device capability detection (max FPS)
-  - [ ] High-speed capture session
-  - [ ] ImageReader configuration
-  - [ ] Preview surface binding
-- [ ] Implement frame callback pipeline
-- [ ] Add exposure/focus lock functionality
-- [ ] Create CameraPreview Compose component
-- [ ] Handle camera permissions
+### Phase 1: Project Setup (Done)
+- [x] Created Android project (Kotlin, Jetpack Compose, Material 3)
+- [x] Package: `com.trackspeed.android`, Min SDK 26
+- [x] Added dependencies: Compose, Hilt, Room, Camera2, Navigation
+- [x] Set up Hilt DI modules (DatabaseModule, SyncModule)
+- [x] Created Material 3 theme (colors, typography)
+- [x] Set up navigation graph with all routes
+- [x] Created Application class with @HiltAndroidApp
 
-### 2.2 Background Model (Week 2)
-- [ ] Port BackgroundModel from iOS
-  - [ ] Per-row median calculation
-  - [ ] MAD (Median Absolute Deviation) calculation
-  - [ ] Adaptive threshold computation
-  - [ ] Calibration frame collection (30 frames)
-  - [ ] Foreground mask generation
-  - [ ] Slow background adaptation
-- [ ] Unit tests for BackgroundModel
+### Phase 2: Detection Engine (Done)
+- [x] Ported `PhotoFinishDetector` from iOS `PhotoFinishDetector.swift`
+  - Frame differencing with adaptive noise calibration (MAD-based)
+  - Downsampling to 160x284 work resolution
+  - IMU stability gating (gyroscope at 0.35 rad/s threshold)
+  - 6-state detection state machine
+  - Velocity filtering (60 px/s minimum)
+  - Rearm hysteresis (exit zone + distance fraction)
+- [x] Implemented `ZeroAllocCCL` (row-run connected component labeling)
+  - Union-find with path compression
+  - Pre-allocated buffers for zero steady-state allocations
+  - Blob statistics (bbox, centroid, area, heightFrac)
+- [x] Implemented `RollingShutterCalculator`
+  - Device-agnostic readout duration estimates
+  - Compensation calculation based on detection row
+- [x] Implemented `GateEngine` coordinator
+  - Wraps PhotoFinishDetector
+  - Exposes StateFlow for engine state, detection state, crossing events
+  - Gate position management
+  - IMU monitoring lifecycle
+- [x] Implemented `CameraManager` using Camera2 API
+  - Standard sessions at 30-120fps (NOT high-speed)
+  - Auto-exposure (point and shoot mode)
+  - Focus locked at ~1.5-2.5m range
+  - Front/back camera switching
+  - YUV_420_888 frame extraction
+  - FPS statistics
 
-### 2.3 Crossing Detector (Week 3)
-- [ ] Port CrossingDetector state machine
-  - [ ] State enum (WAITING_FOR_CLEAR, ARMED, CHEST_CROSSING, POSTROLL, COOLDOWN)
-  - [ ] Threshold configuration (enter, confirm, exit)
-  - [ ] Frame-by-frame state transitions
-  - [ ] Sub-frame interpolation
-- [ ] Implement ContiguousRunFilter
-  - [ ] Longest run calculation
-  - [ ] Minimum run validation
-- [ ] Unit tests for CrossingDetector
+### Phase 3: Solo Timing UI (Done)
+- [x] `BasicTimingScreen` -- Full camera preview with timing controls
+- [x] Camera preview composable with `SurfaceView`
+- [x] Draggable gate line overlay
+- [x] Timer display (live updating at 10Hz)
+- [x] Start/Stop/Reset controls
+- [x] Lap list with grayscale thumbnail capture at each crossing
+- [x] Detection state indicator overlay
+- [x] Audio beep + haptic feedback on crossing (`CrossingFeedback`)
+- [x] Front/back camera switch button
 
-### 2.4 Pose Service (Week 3)
-- [ ] Implement PoseService with ML Kit
-  - [ ] Pose detector initialization
-  - [ ] Image processing pipeline
-  - [ ] Shoulder/hip landmark extraction
-  - [ ] Normalized torso bounds calculation
-  - [ ] EMA smoothing
-- [ ] Thread-safe TorsoBoundsStore
-- [ ] Integration with frame processing
+### Phase 4: Session History + Settings (Done)
+- [x] Room database (v1) with TrainingSession, Run, Athlete entities
+- [x] `SessionRepository` with thumbnail JPEG storage
+- [x] Home screen with bottom navigation (Home/History/Settings)
+- [x] Session history list view
+- [x] Session detail screen
+- [x] Settings screen (distance, start type, speed unit, dark mode, sensitivity)
+- [x] Navigation graph with all routes
 
-### 2.5 Composite Buffer (Week 4)
-- [ ] Implement CompositeBuffer
-  - [ ] Ring buffer for slit data
-  - [ ] Timestamp tracking
-  - [ ] Trigger frame marking
-  - [ ] Bitmap export
-  - [ ] PNG file export
-- [ ] Photo-finish visualization
+### Phase 5: BLE Clock Sync (Done - Standalone)
+- [x] `BleClockSyncService` -- BLE GATT server/client
+- [x] `ClockSyncCalculator` -- NTP-style offset calculation
+  - 100 samples at 20Hz
+  - Lowest 20% RTT filtering
+  - Median offset calculation
+  - Quality tier assessment
+- [x] `ClockSyncManager` -- Orchestration
+- [x] `ClockSyncScreen` -- UI for sync process
+- [x] Clock sync config constants matching iOS
 
-### 2.6 Gate Engine (Week 4)
-- [ ] Implement GateEngine orchestrator
-  - [ ] Component coordination
-  - [ ] State management
-  - [ ] Calibration flow
-  - [ ] Armed state
-  - [ ] Crossing detection flow
-- [ ] Frame processing pipeline
-  - [ ] Column extraction
-  - [ ] Background subtraction
-  - [ ] Occupancy calculation
-  - [ ] Pose-filtered detection
-- [ ] Integration tests
-
-### Deliverables
-- [ ] Single-phone timing works
-- [ ] Background calibration successful
-- [ ] Crossings detected accurately
-- [ ] Photo-finish images generated
-- [ ] Detection accuracy validated
+**Note:** Clock sync is implemented and tested standalone, but not yet wired into the multi-device timing flow.
 
 ---
 
-## Phase 3: Communication Layer (Weeks 5-6)
+## Remaining Work
 
-### 3.1 Transport Abstraction (Week 5)
-- [ ] Define Transport interface
-- [ ] Define TimingMessage sealed class
-- [ ] Implement JSON serialization for messages
-- [ ] Implement binary format for clock sync
+### Phase 6: Multi-Device Timing (Not Started)
 
-### 3.2 BLE Transport (Week 5)
-- [ ] Implement BLE advertising (peripheral mode)
-  - [ ] GATT server setup
-  - [ ] Service and characteristic creation
-  - [ ] Advertising start/stop
-- [ ] Implement BLE scanning (central mode)
-  - [ ] Device discovery
-  - [ ] Service filtering
-  - [ ] Connection management
-- [ ] Implement GATT operations
-  - [ ] Read/Write characteristics
-  - [ ] Notifications/Indications
-  - [ ] MTU negotiation
-- [ ] Handle BLE permissions (Android 12+)
+#### 6.1 Transport Layer
+- [ ] Define `Transport` interface
+- [ ] Implement `TimingMessage` sealed class (match iOS format exactly)
+- [ ] JSON serialization for general messages (snake_case fields)
+- [ ] Binary format for BLE clock sync
 
-### 3.3 Clock Sync Service (Week 5)
-- [ ] Implement NTP-style clock sync
-  - [ ] Ping/Pong message exchange
-  - [ ] T1/T2/T3/T4 timestamp handling
-  - [ ] Offset calculation
-  - [ ] RTT calculation
-  - [ ] Uncertainty estimation
-- [ ] Multi-sample averaging
-- [ ] Outlier rejection
-- [ ] Quality tier assessment
-- [ ] Unit tests for sync algorithm
+#### 6.2 BLE Pairing
+- [ ] BLE advertising (peripheral mode)
+- [ ] BLE scanning (central mode)
+- [ ] Device discovery and connection
+- [ ] Handle Android 12+ BLE permissions
 
-### 3.4 Supabase Transport (Week 6)
-- [ ] Implement Supabase Realtime integration
-  - [ ] Channel subscription
-  - [ ] Broadcast sending
-  - [ ] Presence tracking
-- [ ] Session code generation/validation
-- [ ] Reconnection handling
+#### 6.3 Supabase Integration
+- [ ] Set up Supabase client with shared credentials
+- [ ] Implement Realtime channel subscription for race events
+- [ ] Insert race events from local crossings
+- [ ] Session code generation for device pairing
 
-### 3.5 Race Session Manager (Week 6)
-- [ ] Implement RaceSession class
-  - [ ] Session state machine
-  - [ ] Device management
-  - [ ] Role assignment
-  - [ ] Event distribution
-- [ ] Split time calculation
-- [ ] Uncertainty propagation
+#### 6.4 Race Session Manager
+- [ ] Session state machine (host/join flow)
+- [ ] Device role assignment (start/finish)
+- [ ] Cross-device event distribution
+- [ ] Split time calculation with uncertainty propagation
 
-### Deliverables
-- [ ] BLE pairing works (Android ↔ Android)
-- [ ] Clock sync achieves < 5ms accuracy
-- [ ] Supabase events transmit correctly
-- [ ] Two-phone timing works (Android only)
+#### 6.5 Race Mode UI
+- [ ] Replace `RaceModePlaceholder` with full UI
+- [ ] Device pairing screen (BLE scan + session codes)
+- [ ] Sync status screen (clock sync progress)
+- [ ] Race timing screen (multi-device status, waiting state, results)
 
----
+### Phase 7: Polish + Testing (Not Started)
 
-## Phase 4: User Interface (Weeks 7-8)
-
-### 4.1 Core Components (Week 7)
-- [ ] CameraPreview composable
-- [ ] GateLineOverlay (draggable)
-- [ ] BubbleLevel indicator
-- [ ] TimeDisplay (large monospace)
-- [ ] PhotoFinishViewer (horizontal scroll)
-- [ ] StatusIndicator (Ready/Not Ready)
-- [ ] ConnectionStatus badge
-
-### 4.2 Home Screen (Week 7)
-- [ ] Mode selection (Basic / Race)
-- [ ] Recent sessions preview
-- [ ] Quick start buttons
-- [ ] Settings access
-
-### 4.3 Basic Timing Flow (Week 7)
-- [ ] BasicTimingScreen
-  - [ ] Mode explanation
-  - [ ] Start calibration button
-- [ ] CalibrationScreen
-  - [ ] Camera preview with gate line
-  - [ ] Calibration progress
-  - [ ] Status feedback
-- [ ] ActiveTimingScreen
-  - [ ] Full-screen camera
-  - [ ] Status overlay
-  - [ ] Cancel button
-- [ ] ResultsScreen
-  - [ ] Large time display
-  - [ ] Photo-finish viewer
-  - [ ] Again / Done buttons
-
-### 4.4 Race Mode Flow (Week 8)
-- [ ] RaceModeScreen
-  - [ ] Mode explanation
-  - [ ] Create/Join options
-- [ ] DevicePairingScreen
-  - [ ] BLE scanning
-  - [ ] Session code entry
-  - [ ] Device list
-  - [ ] Connection status
-- [ ] SyncStatusScreen
-  - [ ] Clock sync progress
-  - [ ] Quality indicator
-- [ ] RaceTimingScreen
-  - [ ] Multi-device status
-  - [ ] Waiting state
-  - [ ] Results display
-
-### 4.5 History & Settings (Week 8)
-- [ ] HistoryScreen
-  - [ ] Session list
-  - [ ] Date grouping
-  - [ ] Search/filter
-- [ ] SessionDetailScreen
-  - [ ] Runs list
-  - [ ] Individual run details
-  - [ ] Photo-finish access
-- [ ] SettingsScreen
-  - [ ] User preferences
-  - [ ] Account (if applicable)
-  - [ ] About / Help
-
-### 4.6 Navigation (Week 8)
-- [ ] Implement NavGraph
-- [ ] Deep linking (if needed)
-- [ ] Back stack management
-- [ ] Screen transitions
-
-### Deliverables
-- [ ] All screens implemented
-- [ ] Navigation works correctly
-- [ ] UI matches design specs
-- [ ] Responsive to different screen sizes
-
----
-
-## Phase 5: Integration & Testing (Week 9)
-
-### 5.1 Cross-Platform Testing
-- [ ] Test Android ↔ iOS BLE pairing
+#### 7.1 Cross-Platform Testing
+- [ ] Test Android-to-iOS BLE pairing
 - [ ] Verify message format compatibility
-- [ ] Validate clock sync across platforms
-- [ ] Test timing accuracy cross-platform
+- [ ] Validate clock sync accuracy cross-platform
+- [ ] Test split time calculation
 
-### 5.2 iOS App Updates
-- [ ] Add BLE GATT server to iOS app
-- [ ] Ensure TimingMessage format matches
-- [ ] Test iOS as central, Android as peripheral
-- [ ] Test Android as central, iOS as peripheral
-
-### 5.3 Device Testing
-- [ ] Test on Pixel 8 Pro (240fps)
-- [ ] Test on Samsung S24 (240fps)
-- [ ] Test on Pixel 6 (120fps)
-- [ ] Test on mid-range device (60fps)
+#### 7.2 Device Testing
+- [ ] Test on Pixel 8 Pro (120fps)
+- [ ] Test on Samsung S24 (120fps)
+- [ ] Test on Pixel 6 (60fps)
+- [ ] Test on mid-range device (30fps)
 - [ ] Document device compatibility
 
-### 5.4 Performance Optimization
-- [ ] Profile frame processing
+#### 7.3 Performance
+- [ ] Profile frame processing latency
 - [ ] Optimize memory usage
-- [ ] Test battery consumption
-- [ ] Fix thermal throttling issues
+- [ ] Test battery consumption over 1hr session
+- [ ] Fix any thermal throttling issues
 
-### 5.5 Bug Fixes & Polish
+#### 7.4 Bug Fixes + Polish
 - [ ] Fix discovered bugs
 - [ ] Improve error handling
 - [ ] Add loading states
-- [ ] Polish animations
+- [ ] Polish animations and transitions
 - [ ] Accessibility improvements
-
-### 5.6 Documentation
-- [ ] Update README
-- [ ] Code documentation
-- [ ] User guide (if needed)
-
-### Deliverables
-- [ ] Cross-platform timing works
-- [ ] All major bugs fixed
-- [ ] Performance meets targets
-- [ ] Ready for beta testing
 
 ---
 
@@ -329,8 +160,8 @@
 
 ### v1.1 - Enhanced Features
 - [ ] Multiple start methods (touch release, audio gun, voice)
-- [ ] Athlete management
-- [ ] Session cloud sync
+- [ ] Athlete management (profiles, colors)
+- [ ] Session cloud sync via Supabase
 - [ ] Data export (CSV/JSON)
 
 ### v1.2 - Multi-Gate
@@ -339,62 +170,42 @@
 - [ ] Split analysis dashboard
 
 ### v1.3 - Premium
-- [ ] RevenueCat integration
 - [ ] Subscription tiers
 - [ ] Extended history
 - [ ] Advanced analytics
 
-### v2.0 - Advanced
-- [ ] Video recording
-- [ ] Replay with overlay
-- [ ] Apple Watch / Wear OS companion
-- [ ] Coaching insights
-
 ---
 
-## Technical Debt & Known Issues
+## Technical Debt + Known Issues
 
 ### To Address
-- [ ] (Add items as discovered)
+- [ ] FrameProcessor.kt is a stub -- all processing is in PhotoFinishDetector
+- [ ] Experimental 60fps detection mode was designed (docs exist) but never implemented
+- [ ] No unit tests yet for detection engine
+- [ ] Supabase credentials not yet configured in BuildConfig
 
-### Won't Fix (MVP)
-- [ ] (Add items as decided)
+### Design Decisions
+- Photo Finish mode was chosen over the original Precision mode design because:
+  1. It matches the actual iOS app behavior (ported from PhotoFinishDetector.swift)
+  2. No ML Kit dependency required
+  3. Works with standard Camera2 sessions (no high-speed capture needed)
+  4. Simpler calibration (automatic warmup vs. manual 30-frame background collection)
 
 ---
 
 ## Dependencies on iOS Team
 
-1. **BLE GATT Server** - iOS needs to implement GATT server mode
-2. **Message Format** - Both teams must agree on JSON schema
-3. **UUID Constants** - Share BLE service/characteristic UUIDs
-4. **Testing** - Need iOS device for cross-platform testing
-
----
-
-## Risk Register
-
-| Risk | Mitigation | Status |
-|------|------------|--------|
-| Device doesn't support 240fps | Detect capability, graceful degradation | Open |
-| BLE connection unstable | Implement reconnection, cloud fallback | Open |
-| ML Kit too slow | Separate thread, skip frames | Open |
-| Clock sync drift | Periodic re-sync, quality monitoring | Open |
-
----
-
-## Meeting Notes / Decisions
-
-### [Date] - Initial Planning
-- Decided on native Android (not KMP) for MVP
-- BLE + Supabase hybrid for communication
-- JSON for messages, binary for clock sync
+1. **Message Format** -- Both platforms must agree on JSON schema (snake_case)
+2. **BLE UUIDs** -- Share BLE service/characteristic UUIDs
+3. **Testing** -- Need iOS device for cross-platform testing
+4. **Supabase Schema** -- Coordinate any table changes
 
 ---
 
 ## Resources
 
 - **iOS Reference Code:** `/Users/sondre/Documents/App/speed-swift/SprintTimer/`
-- **PRD:** `./docs/requirements/PRD.md`
-- **Tech Spec:** `./docs/architecture/TECH_SPEC.md`
-- **Architecture:** `./docs/architecture/ARCHITECTURE.md`
-- **Protocol:** `./docs/protocols/CROSS_PLATFORM_PROTOCOL.md`
+- **Detection Algorithm:** `./docs/architecture/DETECTION_ALGORITHM.md`
+- **Clock Sync Spec:** `./docs/protocols/CLOCK_SYNC_DETAILS.md`
+- **Backend Strategy:** `./docs/architecture/BACKEND_STRATEGY.md`
+- **GitHub Repo:** https://github.com/sondregut/TrackSpeed-Android

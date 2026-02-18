@@ -4,6 +4,14 @@
 **Last Updated:** January 2026
 **Platform:** Android (Kotlin)
 
+> **STATUS: DESIGN ONLY -- NOT IMPLEMENTED**
+>
+> This document provides a detailed Kotlin implementation guide for an experimental 60fps blob-tracking detection mode that was designed but never built. None of the classes described here (ExperimentalCrossingDetector, IMUShakeDetector, MotionMaskEngine, ConnectedComponentLabeler, BlobTracker) exist in the codebase.
+>
+> The actual app uses **Photo Finish mode** (see `DETECTION_ALGORITHM.md`) which implements similar concepts (CCL blob detection, IMU gating, frame differencing) using `PhotoFinishDetector`, `ZeroAllocCCL`, and `GateEngine`. Many ideas from this document informed the Photo Finish implementation.
+>
+> References to `HighSpeedCameraManager` should be read as `CameraManager` if adapting this design.
+
 This document provides the complete Kotlin implementation for the Experimental detection mode, a 60fps blob-tracking approach with automatic scene recovery.
 
 ### Changelog

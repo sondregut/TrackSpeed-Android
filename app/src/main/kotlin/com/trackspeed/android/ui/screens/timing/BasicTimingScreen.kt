@@ -1,40 +1,98 @@
 package com.trackspeed.android.ui.screens.timing
 
 import android.Manifest
-import android.view.SurfaceHolder
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.trackspeed.android.camera.HighSpeedCameraManager
+import com.trackspeed.android.camera.CameraManager
+import com.trackspeed.android.detection.PhotoFinishDetector
 import com.trackspeed.android.ui.components.CameraPreview
 import com.trackspeed.android.ui.components.CameraPreviewPlaceholder
+import com.trackspeed.android.ui.components.ExpandedThumbnail
+import com.trackspeed.android.ui.components.ThumbnailViewerDialog
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Color constants matching iOS TrackSpeed design
+private val ScreenBackground = Color(0xFF000000)
+private val CardBackground = Color(0xFF2C2C2E)
+private val TimerBlue = Color(0xFF5B9BD5)
+private val PracticeGreen = Color(0xFF34C759)
+private val StatusRed = Color(0xFFFF3B30)
+private val StatusGreen = Color(0xFF30D158)
+private val TextPrimary = Color.White
+private val TextSecondary = Color(0xFF8E8E93)
+private val TextTertiary = Color(0xFF636366)
+private val DarkGray = Color(0xFF3A3A3C)
+private val TabSelectedColor = Color.White
+private val TabUnselectedColor = Color(0xFF8E8E93)
+
 @Composable
 fun BasicTimingScreen(
     onNavigateBack: () -> Unit,
+    distance: Double = 60.0,
+    startType: String = "standing",
     viewModel: BasicTimingViewModel = hiltViewModel()
 ) {
+    // Pass distance and startType to ViewModel on first composition
+    LaunchedEffect(distance, startType) {
+        viewModel.setSessionConfig(distance, startType)
+    }
+
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    var expandedThumbnail by remember { mutableStateOf<ExpandedThumbnail?>(null) }
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var showFullscreenCamera by remember { mutableStateOf(false) }
+
+    // Fullscreen thumbnail viewer
+    ThumbnailViewerDialog(
+        thumbnail = expandedThumbnail,
+        onDismiss = { expandedThumbnail = null }
+    )
+
+    // Note: showFullscreenCamera is used below to expand the camera preview area
+
+    // Show snackbar when session saved
+    LaunchedEffect(uiState.sessionSaved) {
+        if (uiState.sessionSaved) {
+            snackbarHostState.showSnackbar("Session saved!")
+            viewModel.onSessionSavedConsumed()
+        }
+    }
 
     // Permission launcher
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -50,211 +108,1307 @@ fun BasicTimingScreen(
         permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Basic Timing") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
+    if (showFullscreenCamera) {
+        // Fullscreen camera mode - replaces entire layout so camera surface transfers
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .background(Color.Black)
+                .systemBarsPadding()
         ) {
-            // Camera preview (takes most of the screen)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                when (val state = uiState.cameraState) {
-                    is HighSpeedCameraManager.CameraState.Capturing -> {
-                        CameraPreview(
-                            gatePosition = uiState.gatePosition,
-                            onGatePositionChanged = viewModel::setGatePosition,
-                            fps = uiState.fps,
-                            isCalibrating = uiState.isCalibrating,
-                            isArmed = uiState.isArmed,
-                            onSurfaceReady = { holder ->
-                                viewModel.onSurfaceReady(holder.surface)
-                            },
-                            onSurfaceDestroyed = {
-                                viewModel.onSurfaceDestroyed()
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    is HighSpeedCameraManager.CameraState.Error -> {
-                        CameraPreviewPlaceholder(
-                            message = state.message,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    else -> {
-                        CameraPreviewPlaceholder(
-                            message = if (uiState.hasPermission) "Opening camera..." else "Camera permission required",
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
+            if (uiState.hasPermission) {
+                CameraPreview(
+                    gatePosition = uiState.gatePosition,
+                    onGatePositionChanged = viewModel::setGatePosition,
+                    fps = uiState.fps,
+                    detectionState = uiState.detectionState,
+                    sensorOrientation = uiState.sensorOrientation,
+                    isFrontCamera = uiState.isFrontCamera,
+                    onSurfaceReady = { surface ->
+                        viewModel.onSurfaceReady(surface)
+                    },
+                    onSurfaceDestroyed = {
+                        viewModel.onSurfaceDestroyed()
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
             }
 
-            // Timer display
-            TimerDisplay(
-                time = uiState.currentTime,
-                splits = uiState.splits,
+            // Close button at top
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            )
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .background(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .clickable { showFullscreenCamera = false }
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = "Tap to close",
+                    color = Color.White.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
 
-            // Control buttons
-            ControlButtons(
-                isRunning = uiState.isRunning,
-                canStart = uiState.isArmed && !uiState.isRunning,
-                onStart = viewModel::startTiming,
-                onStop = viewModel::stopTiming,
-                onReset = viewModel::resetTiming,
+            // Timer overlay at bottom
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp)
+                    .background(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = formatTime(uiState.currentTime),
+                    color = TimerBlue,
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        }
+    } else {
+        // Normal timing layout
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(ScreenBackground)
+                .systemBarsPadding()
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // 1. Custom Top Bar
+                TopBar(
+                    distance = uiState.distance,
+                    startType = uiState.startType,
+                    onSettingsClick = { /* TODO: settings */ },
+                    onEndClick = onNavigateBack
+                )
+
+                // 2. Tab Row
+                TimingTabRow(
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it }
+                )
+
+                if (selectedTab == 0) {
+                    // Record tab content
+                    RecordTabContent(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        onThumbnailClick = { expandedThumbnail = it },
+                        onCameraClick = { showFullscreenCamera = true },
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    // Results tab
+                    ResultsTabContent(
+                        uiState = uiState,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // Bottom button area
+                BottomButtonBar(
+                    uiState = uiState,
+                    onStart = viewModel::startTiming,
+                    onStop = viewModel::stopTiming,
+                    onReset = viewModel::resetTiming,
+                    onSave = viewModel::saveSession,
+                    onNavigateBack = onNavigateBack
+                )
+            }
+
+            // Snackbar host
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
     }
 }
 
+// -- 1. Custom Top Bar: Practice pill + Settings + End button --
+
 @Composable
-private fun TimerDisplay(
-    time: Double,
-    splits: List<Double>,
+private fun TopBar(
+    distance: Double,
+    startType: String,
+    onSettingsClick: () -> Unit,
+    onEndClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val pillLabel = formatDistanceLabel(distance)
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Practice pill badge with distance
+        Row(
+            modifier = Modifier
+                .background(
+                    color = PracticeGreen.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Sync,
+                contentDescription = null,
+                tint = PracticeGreen,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = pillLabel,
+                color = PracticeGreen,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.SemiBold
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Settings gear icon
+        IconButton(
+            onClick = onSettingsClick,
+            modifier = Modifier
+                .size(36.dp)
+                .background(
+                    color = DarkGray,
+                    shape = CircleShape
+                )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = "Settings",
+                tint = TextSecondary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // End button pill
+        Box(
+            modifier = Modifier
+                .background(
+                    color = StatusRed,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .clickable { onEndClick() }
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "End",
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
+    }
+}
+
+// -- 2. Tab Row --
+
+@Composable
+private fun TimingTabRow(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(top = 4.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        // Record tab
+        TabPill(
+            label = "Record",
+            icon = Icons.Default.PlayArrow,
+            isSelected = selectedTab == 0,
+            onClick = { onTabSelected(0) },
+            modifier = Modifier.weight(1f)
+        )
+
+        // Results tab
+        TabPill(
+            label = "Results",
+            icon = Icons.AutoMirrored.Filled.List,
+            isSelected = selectedTab == 1,
+            onClick = { onTabSelected(1) },
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun TabPill(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .padding(horizontal = 4.dp)
+            .background(
+                color = if (isSelected) DarkGray else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (isSelected) TabSelectedColor else TabUnselectedColor,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = label,
+                color = if (isSelected) TabSelectedColor else TabUnselectedColor,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                )
+            )
+        }
+    }
+}
+
+// -- Record Tab Content --
+
+@Composable
+private fun RecordTabContent(
+    uiState: BasicTimingUiState,
+    viewModel: BasicTimingViewModel,
+    onThumbnailClick: (ExpandedThumbnail) -> Unit,
+    onCameraClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth()
+    ) {
+        // 3. Status Banner (full width)
+        StatusBanner(uiState = uiState)
+
+        // 4. Timer + Camera Row
+        TimerCameraRow(
+            uiState = uiState,
+            viewModel = viewModel,
+            onCameraClick = onCameraClick
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 5. Practice Section Header
+        PracticeSectionHeader(
+            distance = uiState.distance,
+            lapCount = uiState.laps.count { it.lapNumber > 0 }
+        )
+
+        // 6. Laps List (takes remaining space)
+        LapsList(
+            laps = uiState.laps,
+            speedUnit = uiState.speedUnit,
+            onThumbnailClick = onThumbnailClick,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        )
+    }
+}
+
+// -- 3. Status Banner --
+
+@Composable
+private fun StatusBanner(
+    uiState: BasicTimingUiState,
+    modifier: Modifier = Modifier
+) {
+    val bannerInfo = getStatusBannerInfo(uiState)
+
+    if (bannerInfo != null) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .background(bannerInfo.backgroundColor)
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = bannerInfo.icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = bannerInfo.text,
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            )
+        }
+    }
+}
+
+private data class BannerInfo(
+    val text: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val backgroundColor: Color
+)
+
+@Composable
+private fun getStatusBannerInfo(uiState: BasicTimingUiState): BannerInfo? {
+    return when {
+        uiState.detectionState == PhotoFinishDetector.State.UNSTABLE ->
+            BannerInfo("HOLD STILL", Icons.Default.Vibration, StatusRed)
+
+        uiState.detectionState == PhotoFinishDetector.State.ATHLETE_TOO_FAR ->
+            BannerInfo("TOO FAR", Icons.AutoMirrored.Filled.DirectionsRun, Color(0xFFFF9500))
+
+        uiState.isRunning && !uiState.waitingForStart ->
+            BannerInfo("RUNNING", Icons.Default.FiberManualRecord, StatusGreen)
+
+        uiState.isRunning && uiState.waitingForStart ->
+            BannerInfo("READY", Icons.Default.FiberManualRecord, StatusGreen)
+
+        !uiState.isRunning && uiState.isArmed && uiState.laps.isEmpty() ->
+            BannerInfo("READY", Icons.Default.FiberManualRecord, StatusGreen)
+
+        !uiState.isRunning && uiState.laps.isNotEmpty() ->
+            BannerInfo("STOPPED", Icons.Default.Pause, Color(0xFF636366))
+
+        else -> null
+    }
+}
+
+// -- 4. Timer + Camera Row --
+
+@Composable
+private fun TimerCameraRow(
+    uiState: BasicTimingUiState,
+    viewModel: BasicTimingViewModel,
+    onCameraClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val lapCount = uiState.laps.count { it.lapNumber > 0 }
+    val runNumber = lapCount + 1
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Left side: Timer info (~55%)
+        Column(
+            modifier = Modifier
+                .weight(0.55f)
+                .padding(vertical = 4.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Run number label
+            Text(
+                text = "Run #$runNumber",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Large time display
+            Text(
+                text = formatTime(uiState.currentTime),
+                color = TimerBlue,
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 48.sp
+                )
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Speed row
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Speed",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = formatSpeed(uiState.currentSpeedMs, uiState.speedUnit),
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Distance row
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Distance",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = formatDistanceValue(uiState.distance),
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        }
+
+        // Right side: Camera preview (~45%)
+        val cameraBorderColor = when {
+            uiState.detectionState == PhotoFinishDetector.State.UNSTABLE -> StatusRed
+            uiState.isRunning && !uiState.waitingForStart -> StatusGreen
+            uiState.detectionState == PhotoFinishDetector.State.READY -> StatusGreen
+            uiState.isArmed -> StatusGreen
+            else -> StatusRed
+        }
+
+        Box(
+            modifier = Modifier
+                .weight(0.45f)
+                .height(200.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .border(
+                    width = 3.dp,
+                    color = cameraBorderColor,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .clickable { onCameraClick() }
+        ) {
+            when {
+                uiState.cameraState is CameraManager.CameraState.Error -> {
+                    CameraPreviewPlaceholder(
+                        message = (uiState.cameraState as CameraManager.CameraState.Error).message,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                uiState.hasPermission -> {
+                    CameraPreview(
+                        gatePosition = uiState.gatePosition,
+                        onGatePositionChanged = viewModel::setGatePosition,
+                        fps = uiState.fps,
+                        detectionState = uiState.detectionState,
+                        sensorOrientation = uiState.sensorOrientation,
+                        isFrontCamera = uiState.isFrontCamera,
+                        onSurfaceReady = { surface ->
+                            viewModel.onSurfaceReady(surface)
+                        },
+                        onSurfaceDestroyed = {
+                            viewModel.onSurfaceDestroyed()
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                else -> {
+                    CameraPreviewPlaceholder(
+                        message = "Camera permission required",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+
+            // Camera icon overlay in top-left
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .size(28.dp)
+                    .background(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(6.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CameraAlt,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+// -- 5. Practice Section Header --
+
+@Composable
+private fun PracticeSectionHeader(
+    distance: Double,
+    lapCount: Int,
+    modifier: Modifier = Modifier
+) {
+    val sectionLabel = formatDistanceLabel(distance)
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Sync,
+            contentDescription = null,
+            tint = PracticeGreen,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = sectionLabel,
+            color = TextPrimary,
+            style = MaterialTheme.typography.titleSmall.copy(
+                fontWeight = FontWeight.SemiBold
+            )
+        )
+        Text(
+            text = " \u00B7 ${if (lapCount == 0) "0" else lapCount.toString()} lap${if (lapCount != 1) "s" else ""}",
+            color = TextSecondary,
+            style = MaterialTheme.typography.titleSmall
+        )
+    }
+}
+
+// -- 6. Laps List --
+
+@Composable
+private fun LapsList(
+    laps: List<SoloLapResult>,
+    speedUnit: String,
+    onThumbnailClick: (ExpandedThumbnail) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val actualLaps = laps.filter { it.lapNumber > 0 }
+
+    if (actualLaps.isEmpty() && laps.none { it.lapNumber == 0 }) {
+        // Empty state
+        Box(
+            modifier = modifier,
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.DirectionsRun,
+                    contentDescription = null,
+                    tint = TextTertiary,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "No laps yet",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Run through the gate to start recording",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    } else {
+        val listState = rememberLazyListState()
+        val reversedLaps = remember(laps) { laps.reversed() }
+
+        // Auto-scroll to top when new lap arrives
+        LaunchedEffect(laps.size) {
+            if (laps.isNotEmpty()) {
+                listState.animateScrollToItem(0)
+            }
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 4.dp)
+        ) {
+            items(
+                items = reversedLaps,
+                key = { it.lapNumber }
+            ) { lap ->
+                LapCard(
+                    lap = lap,
+                    speedUnit = speedUnit,
+                    onThumbnailClick = onThumbnailClick
+                )
+            }
+        }
+    }
+}
+
+// -- Lap Card --
+
+@Composable
+private fun LapCard(
+    lap: SoloLapResult,
+    speedUnit: String,
+    onThumbnailClick: (ExpandedThumbnail) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isStart = lap.lapNumber == 0
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                color = CardBackground,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Thumbnail
+        Box(
+            modifier = Modifier
+                .width(50.dp)
+                .height(66.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .border(
+                    width = 1.dp,
+                    color = TextTertiary.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .then(
+                    if (lap.thumbnail != null) {
+                        Modifier.clickable {
+                            onThumbnailClick(
+                                ExpandedThumbnail(
+                                    bitmap = lap.thumbnail,
+                                    gatePosition = lap.gatePosition
+                                )
+                            )
+                        }
+                    } else Modifier
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (lap.thumbnail != null) {
+                Image(
+                    bitmap = lap.thumbnail.asImageBitmap(),
+                    contentDescription = "Crossing frame",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                // Gate line overlay on thumbnail
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val x = size.width * lap.gatePosition
+                    drawLine(
+                        color = Color.Red.copy(alpha = 0.8f),
+                        start = Offset(x, 0f),
+                        end = Offset(x, size.height),
+                        strokeWidth = 2f
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.White.copy(alpha = 0.05f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (isStart) "GO" else "--",
+                        color = TextTertiary,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+            }
+        }
+
+        // Middle: title + subtitle + speed
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = if (isStart) "Start" else "Lap ${lap.lapNumber}",
+                color = TextPrimary,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold
+                )
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = if (isStart) "Timer started" else "Total: ${formatTime(lap.totalTimeSeconds)}",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall
+            )
+            if (!isStart && lap.speedMs > 0.0) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = formatSpeed(lap.speedMs, speedUnit),
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+
+        // Right: time
+        Text(
+            text = if (isStart) "0.00" else formatTime(lap.lapTimeSeconds),
+            color = if (isStart) TextTertiary else TextPrimary,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        )
+    }
+}
+
+// -- Results Tab Content --
+
+@Composable
+private fun ResultsTabContent(
+    uiState: BasicTimingUiState,
+    modifier: Modifier = Modifier
+) {
+    val actualLaps = remember(uiState.laps) {
+        uiState.laps.filter { it.lapNumber > 0 }
+    }
+
+    if (actualLaps.isEmpty()) {
+        // Empty state
+        Box(
+            modifier = modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.List,
+                    contentDescription = null,
+                    tint = TextTertiary,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "No results yet",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Complete some laps to see your stats",
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    } else {
+        val bestLapTime = actualLaps.minOf { it.lapTimeSeconds }
+        val averageLapTime = actualLaps.map { it.lapTimeSeconds }.average()
+        val totalTime = actualLaps.last().totalTimeSeconds
+        val lapCount = actualLaps.size
+        val distance = uiState.distance
+        val bestSpeed = if (distance > 0 && bestLapTime > 0) distance / bestLapTime else null
+        val maxLapTime = actualLaps.maxOf { it.lapTimeSeconds }
+
+        LazyColumn(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
+            // Summary stats card
+            item(key = "summary") {
+                ResultsSummaryCard(
+                    bestLapTime = bestLapTime,
+                    averageLapTime = averageLapTime,
+                    totalTime = totalTime,
+                    lapCount = lapCount,
+                    bestSpeed = bestSpeed,
+                    distance = distance
+                )
+            }
+
+            // Section header
+            item(key = "header") {
+                Text(
+                    text = "Lap Comparison",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            // Lap comparison rows
+            items(
+                items = actualLaps,
+                key = { it.lapNumber }
+            ) { lap ->
+                LapComparisonRow(
+                    lap = lap,
+                    bestLapTime = bestLapTime,
+                    maxLapTime = maxLapTime,
+                    distance = distance
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultsSummaryCard(
+    bestLapTime: Double,
+    averageLapTime: Double,
+    totalTime: Double,
+    lapCount: Int,
+    bestSpeed: Double?,
+    distance: Double,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
+            .fillMaxWidth()
             .background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(16.dp)
+                color = CardBackground,
+                shape = RoundedCornerShape(12.dp)
             )
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Main time display
+        // Title row
         Text(
-            text = formatTime(time),
-            style = MaterialTheme.typography.displayLarge.copy(
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 56.sp
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "Session Summary",
+            color = TextPrimary,
+            style = MaterialTheme.typography.titleSmall.copy(
+                fontWeight = FontWeight.Bold
+            )
         )
 
-        // Splits (if any)
-        if (splits.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(8.dp))
+        // Stats grid: 2 columns
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Left column
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatItem(
+                    label = "Best",
+                    value = formatTime(bestLapTime),
+                    valueColor = StatusGreen
+                )
+                StatItem(
+                    label = "Total Time",
+                    value = formatTime(totalTime),
+                    valueColor = TextPrimary
+                )
+            }
 
-            splits.forEachIndexed { index, split ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Split ${index + 1}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            // Right column
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatItem(
+                    label = "Average",
+                    value = formatTime(averageLapTime),
+                    valueColor = TimerBlue
+                )
+                StatItem(
+                    label = "Laps",
+                    value = lapCount.toString(),
+                    valueColor = TextPrimary
+                )
+            }
+        }
+
+        // Best speed row (if distance is known)
+        if (bestSpeed != null && distance > 0) {
+            HorizontalDivider(
+                color = TextTertiary.copy(alpha = 0.3f),
+                thickness = 0.5.dp
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Best Speed",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = String.format(java.util.Locale.US, "%.2f m/s", bestSpeed),
+                    color = StatusGreen,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = formatTime(split),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ControlButtons(
-    isRunning: Boolean,
-    canStart: Boolean,
+private fun StatItem(
+    label: String,
+    value: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            color = TextSecondary,
+            style = MaterialTheme.typography.bodySmall
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = value,
+            color = valueColor,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        )
+    }
+}
+
+@Composable
+private fun LapComparisonRow(
+    lap: SoloLapResult,
+    bestLapTime: Double,
+    maxLapTime: Double,
+    distance: Double,
+    modifier: Modifier = Modifier
+) {
+    val isBest = lap.lapTimeSeconds == bestLapTime
+    val delta = lap.lapTimeSeconds - bestLapTime
+    val speed = if (distance > 0 && lap.lapTimeSeconds > 0) distance / lap.lapTimeSeconds else null
+
+    // Bar width fraction: best lap = full bar, slowest = minimum bar
+    // Faster time (lower seconds) = longer bar
+    val timeRange = maxLapTime - bestLapTime
+    val barFraction = if (timeRange > 0.001) {
+        (1.0 - (lap.lapTimeSeconds - bestLapTime) / timeRange)
+            .toFloat()
+            .coerceIn(0.15f, 1f)
+    } else {
+        1f // All laps are the same time
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                color = CardBackground,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Lap number badge
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .background(
+                    color = if (isBest) StatusGreen.copy(alpha = 0.2f) else DarkGray,
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "${lap.lapNumber}",
+                color = if (isBest) StatusGreen else TextSecondary,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
+
+        // Middle: bar graph + speed
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // Speed bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .background(
+                        color = DarkGray,
+                        shape = RoundedCornerShape(3.dp)
+                    )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(fraction = barFraction)
+                        .background(
+                            color = if (isBest) StatusGreen else TimerBlue.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(3.dp)
+                        )
+                )
+            }
+
+            // Speed + delta row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = if (speed != null) {
+                        String.format(java.util.Locale.US, "%.2f m/s", speed)
+                    } else {
+                        "-- m/s"
+                    },
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.labelSmall
+                )
+                if (!isBest) {
+                    Text(
+                        text = String.format(java.util.Locale.US, "+%.2fs", delta),
+                        color = StatusRed.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace
+                        )
+                    )
+                } else {
+                    Text(
+                        text = "BEST",
+                        color = StatusGreen,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+            }
+        }
+
+        // Right: lap time
+        Text(
+            text = formatTime(lap.lapTimeSeconds),
+            color = if (isBest) StatusGreen else TextPrimary,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        )
+    }
+}
+
+// -- 7. Bottom Button Bar --
+
+@Composable
+private fun BottomButtonBar(
+    uiState: BasicTimingUiState,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onReset: () -> Unit,
+    onSave: () -> Unit,
+    onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Reset button
-        OutlinedButton(
-            onClick = onReset,
-            enabled = !isRunning,
-            modifier = Modifier.weight(1f)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Reset")
-        }
+    val hasActualLaps = uiState.laps.count { it.lapNumber > 0 } >= 1
 
-        // Start/Stop button
-        Button(
-            onClick = if (isRunning) onStop else onStart,
-            enabled = if (isRunning) true else canStart,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isRunning) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.primary
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 16.dp, top = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        when {
+            // Running with laps: show Cancel Run
+            uiState.isRunning && hasActualLaps -> {
+                PillButton(
+                    text = "Cancel Run",
+                    backgroundColor = StatusRed,
+                    onClick = onStop
+                )
+            }
+
+            // Running, waiting for start or just started: show Pause
+            uiState.isRunning -> {
+                PillButton(
+                    text = "Pause",
+                    backgroundColor = DarkGray,
+                    onClick = onStop
+                )
+            }
+
+            // Stopped with laps: save + restart options
+            !uiState.isRunning && uiState.laps.isNotEmpty() -> {
+                if (hasActualLaps) {
+                    PillButton(
+                        text = "Save Session",
+                        backgroundColor = TimerBlue,
+                        onClick = onSave
+                    )
                 }
-            ),
-            modifier = Modifier.weight(1f)
-        ) {
-            Icon(
-                imageVector = if (isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(if (isRunning) "Stop" else "Start")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    PillButton(
+                        text = "Restart",
+                        backgroundColor = StatusGreen,
+                        onClick = onReset,
+                        modifier = Modifier.weight(1f)
+                    )
+                    PillButton(
+                        text = "Exit",
+                        backgroundColor = DarkGray,
+                        onClick = onNavigateBack,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            // Initial state: show Start
+            else -> {
+                PillButton(
+                    text = "Start",
+                    backgroundColor = StatusGreen,
+                    onClick = onStart
+                )
+            }
         }
     }
 }
 
+@Composable
+private fun PillButton(
+    text: String,
+    backgroundColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .background(
+                color = backgroundColor,
+                shape = RoundedCornerShape(25.dp)
+            )
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold
+            )
+        )
+    }
+}
+
+// -- Utilities --
+
+private fun formatDistanceLabel(distance: Double): String {
+    val distanceStr = if (distance == 36.576) {
+        "40yd"
+    } else if (distance == distance.toLong().toDouble()) {
+        "${distance.toLong()}m"
+    } else {
+        "${distance}m"
+    }
+    return "$distanceStr Practice"
+}
+
+private fun formatDistanceValue(distance: Double): String {
+    return if (distance == 36.576) {
+        "40 yd"
+    } else if (distance == distance.toLong().toDouble()) {
+        "${distance.toLong()}m"
+    } else {
+        "${distance}m"
+    }
+}
+
 private fun formatTime(seconds: Double): String {
-    if (seconds <= 0) return "0.000"
+    if (seconds <= 0) return "0.00"
 
     val totalMs = (seconds * 1000).toLong()
     val mins = totalMs / 60000
     val secs = (totalMs % 60000) / 1000
-    val ms = totalMs % 1000
+    val hundredths = (totalMs % 1000) / 10
 
     return if (mins > 0) {
-        String.format("%d:%02d.%03d", mins, secs, ms)
+        String.format("%d:%02d.%02d", mins, secs, hundredths)
     } else {
-        String.format("%d.%03d", secs, ms)
+        String.format("%d.%02d", secs, hundredths)
     }
+}
+
+private fun formatSpeed(speedMs: Double, speedUnit: String): String {
+    if (speedMs <= 0.0) return "-- $speedUnit"
+
+    val convertedSpeed = when (speedUnit) {
+        "km/h" -> speedMs * 3.6
+        "mph" -> speedMs * 2.23694
+        else -> speedMs  // m/s is the base unit
+    }
+
+    return String.format(java.util.Locale.US, "%.2f %s", convertedSpeed, speedUnit)
 }

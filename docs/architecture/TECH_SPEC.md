@@ -1,7 +1,9 @@
 # TrackSpeed Android - Technical Specification
 
-**Version:** 1.0
-**Last Updated:** January 2026
+**Version:** 2.0
+**Last Updated:** February 2026
+
+> **Note:** This replaces v1.0 which described a Precision mode architecture (240fps + background model + ML Kit pose detection) that was never implemented. The actual app uses Photo Finish mode (30-120fps + frame differencing + CCL blob detection), ported from the iOS PhotoFinishDetector.swift.
 
 ---
 
@@ -10,44 +12,36 @@
 ### 1.1 High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        PRESENTATION LAYER                        │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │   Compose   │  │   Compose   │  │   Compose   │              │
-│  │    Screens  │  │  Components │  │   ViewModels│              │
-│  └─────────────┘  └─────────────┘  └─────────────┘              │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                         DOMAIN LAYER                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │   Use Cases │  │   Entities  │  │ Repositories│              │
-│  │             │  │             │  │ (Interfaces)│              │
-│  └─────────────┘  └─────────────┘  └─────────────┘              │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                          DATA LAYER                              │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │  Camera  │  │   Room   │  │ Supabase │  │   BLE    │        │
-│  │ Manager  │  │    DB    │  │  Client  │  │ Manager  │        │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                        CORE/ENGINE LAYER                         │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    DETECTION ENGINE                       │   │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐          │   │
-│  │  │ Background │  │  Crossing  │  │    Pose    │          │   │
-│  │  │   Model    │  │  Detector  │  │  Service   │          │   │
-│  │  └────────────┘  └────────────┘  └────────────┘          │   │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐          │   │
-│  │  │ Composite  │  │Contiguous  │  │   Clock    │          │   │
-│  │  │  Buffer    │  │RunFilter   │  │   Sync     │          │   │
-│  │  └────────────┘  └────────────┘  └────────────┘          │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
++---------------------------------------------------------------------+
+|                        PRESENTATION LAYER                            |
+|  +---------------+  +---------------+  +---------------+            |
+|  |   Compose     |  |   Compose     |  |   Compose     |            |
+|  |    Screens    |  |  Components   |  |   ViewModels  |            |
+|  +---------------+  +---------------+  +---------------+            |
++---------------------------------------------------------------------+
+                              |
++---------------------------------------------------------------------+
+|                          DATA LAYER                                  |
+|  +------------+  +------------+  +------------+  +------------+     |
+|  |  Camera    |  |   Room     |  | Supabase   |  |   BLE      |     |
+|  |  Manager   |  |    DB      |  |  Client    |  |  Sync      |     |
+|  +------------+  +------------+  +------------+  +------------+     |
++---------------------------------------------------------------------+
+                              |
++---------------------------------------------------------------------+
+|                       CORE/ENGINE LAYER                               |
+|  +------------------------------------------------------------+    |
+|  |                   DETECTION ENGINE                           |    |
+|  |  +-----------------+  +------------------+                   |    |
+|  |  | PhotoFinish     |  |  ZeroAllocCCL    |                   |    |
+|  |  | Detector        |  |  (blob labeling) |                   |    |
+|  |  +-----------------+  +------------------+                   |    |
+|  |  +-----------------+  +------------------+                   |    |
+|  |  | RollingShutter  |  |  GateEngine      |                   |    |
+|  |  | Calculator      |  |  (coordinator)   |                   |    |
+|  |  +-----------------+  +------------------+                   |    |
+|  +------------------------------------------------------------+    |
++---------------------------------------------------------------------+
 ```
 
 ### 1.2 Technology Stack
@@ -57,124 +51,73 @@
 | Language | Kotlin 1.9+ | Coroutines, Flow |
 | UI | Jetpack Compose | Material 3 |
 | DI | Hilt | Dagger-based |
-| Camera | Camera2 API | For manual control |
-| ML | ML Kit Pose Detection | Google's pose API |
+| Camera | Camera2 API | Standard sessions, 30-120fps |
 | Local DB | Room | SQLite wrapper |
 | Networking | Ktor / OkHttp | HTTP client |
 | Backend | Supabase Kotlin | Auth, DB, Realtime |
 | BLE | Android BLE API | BluetoothGatt |
 | Async | Coroutines + Flow | Structured concurrency |
-| Image | Bitmap / RenderScript | Image processing |
+| Image | Bitmap | Grayscale thumbnail capture |
 | Build | Gradle (Kotlin DSL) | Version catalogs |
+
+**Not used:** ML Kit, CameraX, RenderScript, high-speed Camera2 sessions.
 
 ---
 
-## 2. Module Structure
+## 2. Actual Module Structure
 
 ```
 app/
-├── src/main/
-│   ├── kotlin/com/trackspeed/android/
-│   │   ├── TrackSpeedApp.kt              # Application class
-│   │   ├── MainActivity.kt               # Single activity
-│   │   │
-│   │   ├── di/                           # Dependency Injection
-│   │   │   ├── AppModule.kt
-│   │   │   ├── CameraModule.kt
-│   │   │   ├── DatabaseModule.kt
-│   │   │   └── NetworkModule.kt
-│   │   │
-│   │   ├── ui/                           # Presentation Layer
-│   │   │   ├── theme/
-│   │   │   │   ├── Theme.kt
-│   │   │   │   ├── Color.kt
-│   │   │   │   └── Typography.kt
-│   │   │   ├── navigation/
-│   │   │   │   └── NavGraph.kt
-│   │   │   ├── screens/
-│   │   │   │   ├── home/
-│   │   │   │   ├── basic/
-│   │   │   │   ├── race/
-│   │   │   │   ├── calibration/
-│   │   │   │   ├── timing/
-│   │   │   │   ├── results/
-│   │   │   │   ├── history/
-│   │   │   │   └── settings/
-│   │   │   └── components/
-│   │   │       ├── CameraPreview.kt
-│   │   │       ├── GateLineOverlay.kt
-│   │   │       ├── BubbleLevel.kt
-│   │   │       ├── TimeDisplay.kt
-│   │   │       └── PhotoFinishViewer.kt
-│   │   │
-│   │   ├── domain/                       # Domain Layer
-│   │   │   ├── model/
-│   │   │   │   ├── Session.kt
-│   │   │   │   ├── Run.kt
-│   │   │   │   ├── Crossing.kt
-│   │   │   │   ├── Athlete.kt
-│   │   │   │   └── TimingMessage.kt
-│   │   │   ├── repository/
-│   │   │   │   ├── SessionRepository.kt
-│   │   │   │   └── UserRepository.kt
-│   │   │   └── usecase/
-│   │   │       ├── StartTimingSession.kt
-│   │   │       ├── ProcessCrossing.kt
-│   │   │       └── SyncClocks.kt
-│   │   │
-│   │   ├── data/                         # Data Layer
-│   │   │   ├── local/
-│   │   │   │   ├── db/
-│   │   │   │   │   ├── TrackSpeedDatabase.kt
-│   │   │   │   │   ├── dao/
-│   │   │   │   │   └── entity/
-│   │   │   │   └── storage/
-│   │   │   │       └── ImageStorage.kt
-│   │   │   ├── remote/
-│   │   │   │   ├── SupabaseClient.kt
-│   │   │   │   └── api/
-│   │   │   └── repository/
-│   │   │       └── SessionRepositoryImpl.kt
-│   │   │
-│   │   ├── engine/                       # Core Detection Engine
-│   │   │   ├── camera/
-│   │   │   │   ├── CameraManager.kt
-│   │   │   │   ├── FrameProcessor.kt
-│   │   │   │   └── CameraCapability.kt
-│   │   │   ├── detection/
-│   │   │   │   ├── BackgroundModel.kt
-│   │   │   │   ├── CrossingDetector.kt
-│   │   │   │   ├── ContiguousRunFilter.kt
-│   │   │   │   └── DetectionState.kt
-│   │   │   ├── pose/
-│   │   │   │   ├── PoseService.kt
-│   │   │   │   └── TorsoBoundsStore.kt
-│   │   │   ├── composite/
-│   │   │   │   └── CompositeBuffer.kt
-│   │   │   └── GateEngine.kt             # Orchestrator
-│   │   │
-│   │   ├── communication/                # Multi-Device Layer
-│   │   │   ├── transport/
-│   │   │   │   ├── Transport.kt          # Interface
-│   │   │   │   ├── BleTransport.kt
-│   │   │   │   └── SupabaseTransport.kt
-│   │   │   ├── sync/
-│   │   │   │   └── ClockSyncService.kt
-│   │   │   └── session/
-│   │   │       └── RaceSession.kt
-│   │   │
-│   │   └── util/
-│   │       ├── Extensions.kt
-│   │       ├── TimeUtils.kt
-│   │       └── PermissionUtils.kt
-│   │
-│   └── res/
-│       ├── values/
-│       ├── drawable/
-│       └── raw/                          # Audio files
-│
-├── build.gradle.kts
-└── proguard-rules.pro
+  src/main/
+    kotlin/com/trackspeed/android/
+      TrackSpeedApp.kt                  # @HiltAndroidApp
+      MainActivity.kt                   # Single activity, Compose host
+
+      detection/                        # Core detection engine
+        PhotoFinishDetector.kt          # Main detector (955 lines)
+        ZeroAllocCCL.kt                 # CCL with union-find (257 lines)
+        RollingShutterCalculator.kt     # Rolling shutter correction (59 lines)
+        GateEngine.kt                   # Singleton coordinator (180 lines)
+
+      camera/
+        CameraManager.kt               # Camera2 at 30-120fps (456 lines)
+        FrameProcessor.kt              # Stub (14 lines, processing in detector)
+
+      audio/
+        CrossingFeedback.kt            # Beep + vibration (57 lines)
+
+      sync/
+        BleClockSyncService.kt         # BLE GATT clock sync
+        ClockSyncCalculator.kt         # NTP-style offset calculation
+        ClockSyncConfig.kt             # Sync parameters
+        ClockSyncManager.kt            # Sync orchestration
+
+      data/
+        local/
+          TrackSpeedDatabase.kt        # Room DB v1
+          entities/                    # TrainingSession, Run, Athlete
+          dao/                         # DAOs for each entity
+        repository/
+          SessionRepository.kt         # Session + run persistence with thumbnails
+
+      di/
+        DatabaseModule.kt              # Room + DAO providers
+        SyncModule.kt                  # Clock sync providers
+
+      ui/
+        theme/                         # Material 3 colors, type, theme
+        navigation/NavGraph.kt         # All routes
+        components/CameraPreview.kt    # SurfaceView + gate line overlay
+        screens/
+          home/HomeScreen.kt           # Bottom nav (Home/History/Settings)
+          timing/                      # BasicTimingScreen + ViewModel
+          history/                     # Session list + detail screens
+          settings/SettingsScreen.kt   # Preferences
+          sync/ClockSyncScreen.kt      # BLE sync UI
+
+    res/
+      values/
+      drawable/
 ```
 
 ---
@@ -183,387 +126,140 @@ app/
 
 ### 3.1 Camera Manager
 
-**Purpose:** Manage Camera2 API for high-speed capture
+**Purpose:** Manage Camera2 API for standard-speed capture (30-120fps)
+
+The CameraManager uses standard Camera2 sessions (NOT high-speed sessions). It operates in "point and shoot" mode with auto-exposure, matching the iOS CameraManager.swift behavior.
 
 ```kotlin
+@Singleton
 class CameraManager @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
-    // Camera state
-    private var cameraDevice: CameraDevice? = null
-    private var captureSession: CameraCaptureSession? = null
-    private var imageReader: ImageReader? = null
-
-    // Configuration
-    data class CameraConfig(
-        val targetFps: Int = 240,
-        val resolution: Size = Size(1280, 720),
-        val cameraId: String = "0" // Back camera
-    )
-
-    // Public API
-    suspend fun initialize(config: CameraConfig): Result<Unit>
-    suspend fun startCapture(onFrame: (Image, Long) -> Unit): Result<Unit>
-    suspend fun stopCapture()
-    fun lockExposure()
-    fun lockFocus()
-    fun release()
-
-    // Capability detection
-    fun getMaxFps(cameraId: String): Int
-    fun getSupportedResolutions(cameraId: String): List<Size>
-}
-```
-
-**Key Implementation Details:**
-
-```kotlin
-// High-speed capture setup
-private fun createHighSpeedSession() {
-    val outputConfig = OutputConfiguration(imageReader!!.surface)
-    val sessionConfig = SessionConfiguration(
-        SessionConfiguration.SESSION_HIGH_SPEED,
-        listOf(outputConfig),
-        executor,
-        stateCallback
-    )
-    cameraDevice?.createCaptureSession(sessionConfig)
-}
-
-// Frame rate configuration
-private fun buildCaptureRequest(): CaptureRequest {
-    return cameraDevice?.createCaptureRequest(
-        CameraDevice.TEMPLATE_RECORD
-    )?.apply {
-        addTarget(imageReader!!.surface)
-        set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(targetFps, targetFps))
-        set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
-    }?.build()!!
-}
-```
-
-### 3.2 Background Model
-
-**Purpose:** Model empty lane for foreground detection
-
-```kotlin
-class BackgroundModel {
-    // Per-row statistics
-    private lateinit var medians: FloatArray      // Median luminance per row
-    private lateinit var mads: FloatArray         // MAD per row
-    private lateinit var thresholds: FloatArray   // Adaptive threshold per row
-
-    // Configuration
     companion object {
-        const val CALIBRATION_FRAMES = 30
-        const val MIN_THRESHOLD = 10f
-        const val MAD_MULTIPLIER = 3.5f
-        const val ADAPTATION_RATE = 0.002f  // Slow adaptation
+        private val TARGET_FPS_ORDER = intArrayOf(120, 60, 30)
     }
 
-    // State
-    var isCalibrated: Boolean = false
-        private set
-
-    // Public API
-    fun addCalibrationFrame(luminanceColumn: ByteArray)
-    fun finishCalibration()
-    fun getForegroundMask(luminanceColumn: ByteArray): BooleanArray
-    fun adaptBackground(luminanceColumn: ByteArray)  // Slow adaptation
-    fun reset()
+    // Prefers highest FPS up to 120, with at least 720p resolution
+    fun initialize(useFrontCamera: Boolean = false): Boolean
+    fun openCamera(previewSurface: Surface?, callback: FrameCallback)
+    fun switchCamera(previewSurface: Surface?, callback: FrameCallback)
+    fun closeCamera()
+    fun getAchievedFps(): Int
+    fun getSensorOrientation(): Int
 }
 ```
 
-**Algorithm:**
+**Key implementation details:**
+- Uses `CameraDevice.TEMPLATE_RECORD` for capture requests
+- Auto-exposure (`CONTROL_AE_MODE_ON`) -- lets Android handle brightness
+- Focus locked at ~1.5-2.5m range (`CONTROL_AF_MODE_OFF` with calculated distance)
+- Video stabilization disabled (need raw frames)
+- HDR disabled (causes frame drops)
+- YUV_420_888 format, 3-image buffer via ImageReader
+- Separate HandlerThreads for camera and image processing
+
+### 3.2 PhotoFinishDetector
+
+**Purpose:** Per-frame detection using frame differencing + CCL blob analysis
+
+This is the main detection class. It processes every camera frame and determines if an athlete is crossing the gate line. Ported from iOS `PhotoFinishDetector.swift`.
 
 ```kotlin
-fun finishCalibration() {
-    // For each row, calculate median and MAD from calibration frames
-    for (row in 0 until height) {
-        val values = calibrationFrames.map { it[row].toFloat() }
-        medians[row] = values.median()
-        mads[row] = values.mad(medians[row])
-        thresholds[row] = max(MIN_THRESHOLD, MAD_MULTIPLIER * mads[row])
+class PhotoFinishDetector {
+    companion object {
+        // Work resolution
+        const val WORK_W = 160
+        const val WORK_H = 284
+
+        // IMU
+        const val GYRO_THRESHOLD = 0.35f
+        const val STABLE_DURATION_TO_ARM_S = 0.5f
+
+        // Detection
+        const val DEFAULT_DIFF_THRESHOLD = 14
+        const val MIN_BLOB_HEIGHT_FOR_CROSSING = 0.33f
+        const val MIN_VELOCITY_PX_PER_SEC = 60.0f
+        const val COOLDOWN_DURATION_S = 0.3f
+
+        // Rearm hysteresis
+        const val HYSTERESIS_DISTANCE_FRACTION = 0.25f
+        const val EXIT_ZONE_FRACTION = 0.35f
+
+        // Trajectory
+        const val TRAJECTORY_BUFFER_SIZE = 6
     }
-    isCalibrated = true
-}
 
-fun getForegroundMask(luminanceColumn: ByteArray): BooleanArray {
-    return BooleanArray(height) { row ->
-        abs(luminanceColumn[row].toFloat() - medians[row]) > thresholds[row]
-    }
-}
-```
-
-### 3.3 Crossing Detector
-
-**Purpose:** State machine for crossing detection with hysteresis
-
-```kotlin
-class CrossingDetector {
-    // State machine
     enum class State {
-        WAITING_FOR_CLEAR,  // Waiting for lane to be empty
-        ARMED,              // Ready to detect crossing
-        CHEST_CROSSING,     // Torso entering gate
-        POSTROLL,           // Capturing frames after trigger
-        COOLDOWN            // Preventing double trigger
+        UNSTABLE, NO_ATHLETE, ATHLETE_TOO_FAR,
+        READY, TRIGGERED, COOLDOWN
     }
 
-    // Thresholds (with hysteresis)
-    data class Thresholds(
-        val enterOccupancy: Float = 0.22f,    // First contact
-        val confirmOccupancy: Float = 0.35f,  // Confirm crossing
-        val exitOccupancy: Float = 0.15f,     // Clear detection
-        val confirmFrames: Int = 2,            // Frames to confirm
-        val postrollFrames: Int = 50,          // ~200ms at 240fps
-        val cooldownFrames: Int = 120          // ~500ms at 240fps
-    )
-
-    // Current state
-    var state: State = State.WAITING_FOR_CLEAR
-        private set
-
-    // Crossing result
-    data class CrossingResult(
-        val timestamp: Long,           // Nanoseconds
-        val triggerFrameIndex: Int,
-        val occupancyAtTrigger: Float,
-        val interpolatedOffsetMs: Double
-    )
-
-    // Public API
     fun processFrame(
-        occupancy: Float,
-        timestamp: Long,
-        frameIndex: Int,
-        previousOccupancy: Float
-    ): CrossingResult?
-
-    fun reset()
-    fun arm()
+        yPlane: ByteArray, width: Int, height: Int,
+        rowStride: Int, frameNumber: Long, ptsNanos: Long
+    ): DetectionResult
 }
 ```
 
-**State Machine:**
+### 3.3 ZeroAllocCCL
 
-```
-                    occupancy < exit
-    ┌─────────────────────────────────┐
-    │                                 │
-    ▼                                 │
-┌───────────────┐    arm()    ┌───────────────┐
-│ WAITING_FOR   │────────────▶│     ARMED     │
-│    CLEAR      │             │               │
-└───────────────┘             └───────┬───────┘
-        ▲                             │ occupancy >= enter
-        │                             ▼
-        │                     ┌───────────────┐
-        │                     │    CHEST      │
-        │                     │   CROSSING    │
-        │                     └───────┬───────┘
-        │                             │ confirmed (2 frames)
-        │                             ▼
-        │  cooldown done      ┌───────────────┐
-        │◀────────────────────│   POSTROLL    │
-        │                     │  (50 frames)  │
-        │                     └───────┬───────┘
-        │                             │
-        │                             ▼
-        │                     ┌───────────────┐
-        └─────────────────────│   COOLDOWN    │
-                              │ (120 frames)  │
-                              └───────────────┘
-```
-
-### 3.4 Pose Service
-
-**Purpose:** Human pose detection for torso tracking
+**Purpose:** Connected component labeling with zero steady-state allocations
 
 ```kotlin
-class PoseService @Inject constructor(
-    private val context: Context
-) {
-    // ML Kit pose detector
-    private val poseDetector: PoseDetector = PoseDetection.getClient(
-        PoseDetectorOptions.Builder()
-            .setDetectorMode(PoseDetectorOptions.STREAM_MODE)
-            .build()
+class ZeroAllocCCL(width: Int, height: Int, maxLabels: Int = 4096) {
+    // Pre-allocated: equivalence table, label stats, run buffers
+    // Row-run labeling with union-find and path compression
+
+    data class CCLBlob(
+        val bboxMinX: Int, val bboxMinY: Int,
+        val bboxWidth: Int, val bboxHeight: Int,
+        val centroidX: Float, val centroidY: Float,
+        val areaPixels: Int, val heightFrac: Float
     )
 
-    // Torso bounds (thread-safe)
-    private val _torsoBounds = MutableStateFlow<TorsoBounds?>(null)
-    val torsoBounds: StateFlow<TorsoBounds?> = _torsoBounds.asStateFlow()
-
-    data class TorsoBounds(
-        val yTop: Float,      // Normalized 0-1, top of torso
-        val yBottom: Float,   // Normalized 0-1, bottom of torso
-        val confidence: Float
-    )
-
-    // EMA smoothing
-    private var smoothedTop: Float? = null
-    private var smoothedBottom: Float? = null
-    private val alpha = 0.3f
-
-    // Public API
-    suspend fun processImage(image: InputImage): TorsoBounds?
-    fun reset()
+    fun label(mask: ByteArray): List<CCLBlob>
 }
 ```
 
-**Implementation:**
+### 3.4 RollingShutterCalculator
+
+**Purpose:** Compensate for rolling shutter timing offset
 
 ```kotlin
-suspend fun processImage(image: InputImage): TorsoBounds? {
-    return suspendCoroutine { continuation ->
-        poseDetector.process(image)
-            .addOnSuccessListener { pose ->
-                val leftShoulder = pose.getPoseLandmark(PoseLandmark.LEFT_SHOULDER)
-                val rightShoulder = pose.getPoseLandmark(PoseLandmark.RIGHT_SHOULDER)
-                val leftHip = pose.getPoseLandmark(PoseLandmark.LEFT_HIP)
-                val rightHip = pose.getPoseLandmark(PoseLandmark.RIGHT_HIP)
-
-                if (listOf(leftShoulder, rightShoulder, leftHip, rightHip)
-                        .all { it != null && it.inFrameLikelihood > 0.2f }) {
-
-                    val shoulderY = (leftShoulder!!.position.y + rightShoulder!!.position.y) / 2
-                    val hipY = (leftHip!!.position.y + rightHip!!.position.y) / 2
-
-                    // Normalize to 0-1
-                    val normalizedTop = shoulderY / image.height
-                    val normalizedBottom = hipY / image.height
-
-                    // EMA smoothing
-                    smoothedTop = smoothedTop?.let { alpha * normalizedTop + (1 - alpha) * it }
-                        ?: normalizedTop
-                    smoothedBottom = smoothedBottom?.let { alpha * normalizedBottom + (1 - alpha) * it }
-                        ?: normalizedBottom
-
-                    val bounds = TorsoBounds(smoothedTop!!, smoothedBottom!!, 0.9f)
-                    _torsoBounds.value = bounds
-                    continuation.resume(bounds)
-                } else {
-                    continuation.resume(null)
-                }
-            }
-            .addOnFailureListener { continuation.resume(null) }
-    }
+object RollingShutterCalculator {
+    // Readout duration estimates by camera type and FPS
+    fun getReadoutDuration(isFrontCamera: Boolean, fps: Double): Double
+    fun calculateCompensationNanos(
+        isFrontCamera: Boolean, fps: Double, chestYNormalized: Float
+    ): Long
 }
 ```
 
-### 3.5 Composite Buffer
+### 3.5 GateEngine (Coordinator)
 
-**Purpose:** Generate photo-finish composite images
-
-```kotlin
-class CompositeBuffer(
-    private val height: Int,
-    private val maxWidth: Int = 6000  // Max ~25 seconds at 240fps
-) {
-    // Ring buffer for slit data
-    private val buffer: ByteArray = ByteArray(height * maxWidth)
-    private var writeIndex = 0
-    private var frameCount = 0
-
-    // Trigger information
-    var triggerFrameIndex: Int = -1
-        private set
-
-    // Public API
-    fun addSlit(luminanceColumn: ByteArray, timestamp: Long)
-    fun markTrigger()
-    fun export(): Bitmap
-    fun reset()
-
-    // Export as PNG
-    fun exportToPng(file: File)
-}
-```
-
-### 3.6 Gate Engine (Orchestrator)
-
-**Purpose:** Coordinate all detection components
+**Purpose:** Coordinate detection components and expose reactive state
 
 ```kotlin
+@Singleton
 class GateEngine @Inject constructor(
-    private val cameraManager: CameraManager,
-    private val backgroundModel: BackgroundModel,
-    private val crossingDetector: CrossingDetector,
-    private val poseService: PoseService,
-    private val compositeBuffer: CompositeBuffer
+    @ApplicationContext private val context: Context
 ) {
-    // State
-    sealed class EngineState {
-        object Idle : EngineState()
-        object Calibrating : EngineState()
-        object Armed : EngineState()
-        object Detecting : EngineState()
-        data class CrossingDetected(val result: CrossingResult) : EngineState()
-        data class Error(val message: String) : EngineState()
-    }
+    enum class EngineState { IDLE, ARMED, DETECTING }
 
-    private val _state = MutableStateFlow<EngineState>(EngineState.Idle)
-    val state: StateFlow<EngineState> = _state.asStateFlow()
+    // Public state flows
+    val engineState: StateFlow<EngineState>
+    val detectionState: StateFlow<PhotoFinishDetector.State>
+    val crossingEvents: SharedFlow<CrossingEvent>
+    val gatePosition: StateFlow<Float>
+    val fpsDisplay: StateFlow<Double>
 
-    // Gate configuration
-    var gatePosition: Float = 0.5f  // 0-1, horizontal position in frame
-
-    // Frame processing
-    private var frameIndex = 0
-    private var lastOccupancy = 0f
-
-    // Public API
-    suspend fun startCalibration()
-    suspend fun finishCalibration()
-    suspend fun arm()
-    suspend fun stop()
+    fun configure(fps: Double, isFrontCamera: Boolean)
     fun setGatePosition(position: Float)
-
-    // Internal processing
-    private fun processFrame(image: Image, timestamp: Long)
-}
-```
-
-**Processing Pipeline:**
-
-```kotlin
-private fun processFrame(image: Image, timestamp: Long) {
-    // 1. Extract 1-pixel column at gate position
-    val column = extractColumn(image, gatePosition)
-
-    // 2. Add to composite buffer
-    compositeBuffer.addSlit(column, timestamp)
-
-    // 3. Get foreground mask from background model
-    val foregroundMask = backgroundModel.getForegroundMask(column)
-
-    // 4. Get current torso bounds (updated at 30Hz by pose service)
-    val torsoBounds = poseService.torsoBounds.value
-
-    // 5. Calculate occupancy within torso band
-    val occupancy = if (torsoBounds != null) {
-        calculateOccupancy(foregroundMask, torsoBounds)
-    } else {
-        calculateFullOccupancy(foregroundMask)
-    }
-
-    // 6. Run crossing detector state machine
-    val result = crossingDetector.processFrame(
-        occupancy = occupancy,
-        timestamp = timestamp,
-        frameIndex = frameIndex,
-        previousOccupancy = lastOccupancy
-    )
-
-    // 7. Handle crossing result
-    if (result != null) {
-        compositeBuffer.markTrigger()
-        _state.value = EngineState.CrossingDetected(result)
-    }
-
-    lastOccupancy = occupancy
-    frameIndex++
+    fun processFrame(yPlane: ByteArray, width: Int, height: Int,
+                     rowStride: Int, frameNumber: Long, ptsNanos: Long)
+    fun startMotionUpdates()
+    fun stopMotionUpdates()
+    fun reset()
 }
 ```
 
@@ -571,163 +267,36 @@ private fun processFrame(image: Image, timestamp: Long) {
 
 ## 4. Communication Layer
 
-### 4.1 Transport Interface
+### 4.1 BLE Clock Sync Service
+
+The BLE clock sync uses an NTP-style protocol for sub-5ms timing accuracy between devices.
 
 ```kotlin
-interface Transport {
-    val connectionState: StateFlow<ConnectionState>
-    val incomingMessages: Flow<TimingMessage>
+class BleClockSyncService(private val context: Context) {
+    // GATT service for clock sync
+    // 100 ping/pong samples at 20Hz
+    // Keep lowest 20% RTT, use median offset
 
-    enum class ConnectionState {
-        DISCONNECTED,
-        CONNECTING,
-        CONNECTED,
-        ERROR
-    }
-
-    suspend fun connect(peerId: String): Result<Unit>
-    suspend fun disconnect()
-    suspend fun send(message: TimingMessage): Result<Unit>
-    suspend fun broadcast(message: TimingMessage): Result<Unit>
-}
-```
-
-### 4.2 BLE Transport
-
-```kotlin
-class BleTransport @Inject constructor(
-    private val context: Context
-) : Transport {
-    // GATT UUIDs (must match iOS)
-    companion object {
-        val SERVICE_UUID = UUID.fromString("12345678-1234-1234-1234-123456789abc")
-        val TIMING_CHAR_UUID = UUID.fromString("12345678-1234-1234-1234-123456789abd")
-    }
-
-    // BLE components
-    private var bluetoothGatt: BluetoothGatt? = null
-    private var bluetoothGattServer: BluetoothGattServer? = null
-
-    // Modes
-    enum class Mode { PERIPHERAL, CENTRAL }
-
-    // Public API
-    suspend fun startAdvertising()
-    suspend fun startScanning(): Flow<BluetoothDevice>
-    override suspend fun connect(peerId: String): Result<Unit>
-    override suspend fun send(message: TimingMessage): Result<Unit>
-}
-```
-
-### 4.3 Clock Sync Service
-
-```kotlin
-class ClockSyncService @Inject constructor(
-    private val transport: Transport
-) {
-    // NTP-style sync
     data class SyncResult(
-        val offsetNanos: Long,      // Clock offset
-        val rttNanos: Long,         // Round-trip time
-        val uncertaintyMs: Double   // Estimated uncertainty
+        val offsetNanos: Long,
+        val uncertaintyMs: Double,
+        val quality: SyncQuality
     )
 
-    // Sync state
-    private val _syncState = MutableStateFlow<SyncState>(SyncState.NotSynced)
-    val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
-
-    sealed class SyncState {
-        object NotSynced : SyncState()
-        object Syncing : SyncState()
-        data class Synced(val result: SyncResult) : SyncState()
-    }
-
-    // Quality tiers
-    enum class SyncQuality {
-        EXCELLENT,  // < 3ms
-        GOOD,       // 3-5ms
-        FAIR,       // 5-10ms
-        POOR        // > 10ms
-    }
-
-    // Public API
-    suspend fun startSync(peerDeviceId: String): Result<SyncResult>
-    fun getCurrentOffset(): Long
-    fun getQuality(): SyncQuality
+    enum class SyncQuality { EXCELLENT, GOOD, FAIR, POOR, BAD }
 }
 ```
 
-**NTP Algorithm:**
+### 4.2 Timing Message Protocol
+
+Messages must match the iOS app format exactly (snake_case JSON fields) for cross-platform compatibility.
+
+### 4.3 Clock Reference
 
 ```kotlin
-suspend fun performSyncRound(): SyncResult {
-    // T1: Send PING
-    val t1 = SystemClock.elapsedRealtimeNanos()
-    transport.send(TimingMessage.ClockSync.Ping(t1))
-
-    // Wait for PONG
-    val pong = transport.incomingMessages
-        .filterIsInstance<TimingMessage.ClockSync.Pong>()
-        .first()
-
-    // T4: Receive PONG
-    val t4 = SystemClock.elapsedRealtimeNanos()
-    val t2 = pong.receiveTime
-    val t3 = pong.sendTime
-
-    // Calculate offset and RTT
-    val rtt = (t4 - t1) - (t3 - t2)
-    val offset = ((t2 - t1) + (t3 - t4)) / 2
-
-    return SyncResult(
-        offsetNanos = offset,
-        rttNanos = rtt,
-        uncertaintyMs = rtt / 2_000_000.0
-    )
-}
-```
-
-### 4.4 Timing Message Protocol
-
-```kotlin
-sealed class TimingMessage {
-    // Clock synchronization
-    sealed class ClockSync : TimingMessage() {
-        data class Ping(val t1: Long) : ClockSync()
-        data class Pong(val t1: Long, val receiveTime: Long, val sendTime: Long) : ClockSync()
-    }
-
-    // Session management
-    data class GateReady(val role: GateRole, val deviceId: String) : TimingMessage()
-    data class SessionStart(val sessionId: String) : TimingMessage()
-    data class SessionEnd(val sessionId: String) : TimingMessage()
-
-    // Timing events
-    data class StartEvent(
-        val timestamp: Long,
-        val deviceId: String,
-        val clockOffset: Long
-    ) : TimingMessage()
-
-    data class FinishEvent(
-        val timestamp: Long,
-        val deviceId: String,
-        val clockOffset: Long
-    ) : TimingMessage()
-
-    // Keep-alive
-    object Heartbeat : TimingMessage()
-
-    // Serialization
-    fun toByteArray(): ByteArray
-    companion object {
-        fun fromByteArray(bytes: ByteArray): TimingMessage
-    }
-}
-
-enum class GateRole {
-    START, FINISH, INTERMEDIATE
-}
+// Android: Use elapsedRealtimeNanos() for all timing
+val timestamp = SystemClock.elapsedRealtimeNanos()
+// NOT System.nanoTime() - can jump on suspend
 ```
 
 ---
@@ -739,260 +308,127 @@ enum class GateRole {
 ```kotlin
 @Database(
     entities = [
-        SessionEntity::class,
+        TrainingSessionEntity::class,
         RunEntity::class,
-        CrossingEntity::class,
         AthleteEntity::class
     ],
     version = 1
 )
-@TypeConverters(Converters::class)
 abstract class TrackSpeedDatabase : RoomDatabase() {
-    abstract fun sessionDao(): SessionDao
+    abstract fun trainingSessionDao(): TrainingSessionDao
     abstract fun runDao(): RunDao
-    abstract fun crossingDao(): CrossingDao
     abstract fun athleteDao(): AthleteDao
 }
 ```
 
-### 5.2 Entities
+### 5.2 Session Repository
 
 ```kotlin
-@Entity(tableName = "sessions")
-data class SessionEntity(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val date: Long,  // Epoch millis
-    val distance: Double?,
-    val startType: String,
-    val notes: String?
-)
-
-@Entity(
-    tableName = "runs",
-    foreignKeys = [ForeignKey(
-        entity = SessionEntity::class,
-        parentColumns = ["id"],
-        childColumns = ["sessionId"],
-        onDelete = ForeignKey.CASCADE
-    )]
-)
-data class RunEntity(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val sessionId: String,
-    val startTime: Long,
-    val splitTimeMs: Double?,
-    val athleteId: String?
-)
-
-@Entity(
-    tableName = "crossings",
-    foreignKeys = [ForeignKey(
-        entity = RunEntity::class,
-        parentColumns = ["id"],
-        childColumns = ["runId"],
-        onDelete = ForeignKey.CASCADE
-    )]
-)
-data class CrossingEntity(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val runId: String,
-    val timestamp: Long,
-    val triggerImagePath: String?,
-    val compositeImagePath: String?,
-    val crossingOffsetMs: Double?,
-    val frameCount: Int,
-    val triggerFrameIndex: Int,
-    val triggerOccupancy: Float,
-    val capturedFps: Double,
-    val gatePosition: Double?
-)
-
-@Entity(tableName = "athletes")
-data class AthleteEntity(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val name: String,
-    val color: Int  // ARGB color
-)
-```
-
-### 5.3 DAOs
-
-```kotlin
-@Dao
-interface SessionDao {
-    @Query("SELECT * FROM sessions ORDER BY date DESC")
-    fun getAllSessions(): Flow<List<SessionEntity>>
-
-    @Query("SELECT * FROM sessions WHERE id = :id")
-    suspend fun getSession(id: String): SessionEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(session: SessionEntity)
-
-    @Delete
-    suspend fun delete(session: SessionEntity)
-}
-
-@Dao
-interface CrossingDao {
-    @Query("SELECT * FROM crossings WHERE runId = :runId ORDER BY timestamp")
-    fun getCrossingsForRun(runId: String): Flow<List<CrossingEntity>>
-
-    @Insert
-    suspend fun insert(crossing: CrossingEntity)
+class SessionRepository @Inject constructor(
+    private val sessionDao: TrainingSessionDao,
+    private val runDao: RunDao,
+    private val context: Context
+) {
+    // Saves session + runs + JPEG thumbnails
+    suspend fun saveSession(name: String?, distance: Double,
+                           startType: String, laps: List<SoloLapResult>)
+    fun getAllSessions(): Flow<List<TrainingSessionEntity>>
 }
 ```
+
+Thumbnails are stored as JPEG files in the app's internal storage at `{filesDir}/thumbnails/{timestamp}.jpg`.
 
 ---
 
 ## 6. Supabase Integration
 
-### 6.1 Client Setup
+### 6.1 Shared Backend
 
-```kotlin
-object SupabaseClient {
-    val client = createSupabaseClient(
-        supabaseUrl = BuildConfig.SUPABASE_URL,
-        supabaseKey = BuildConfig.SUPABASE_ANON_KEY
-    ) {
-        install(Auth)
-        install(Postgrest)
-        install(Realtime)
-        install(Storage)
-    }
-}
-```
+The app shares the Supabase backend with the iOS app (project `sprint-timer-race`). See `docs/architecture/BACKEND_STRATEGY.md` for full details.
 
-### 6.2 Race Events Table (Existing)
+### 6.2 Tables
 
-```kotlin
-@Serializable
-data class RaceEventDto(
-    val id: String? = null,
-    @SerialName("session_id") val sessionId: String,
-    @SerialName("event_type") val eventType: String,  // "start" or "finish"
-    @SerialName("crossing_time_nanos") val crossingTimeNanos: Long,
-    @SerialName("device_id") val deviceId: String,
-    @SerialName("device_name") val deviceName: String?,
-    @SerialName("image_path") val imagePath: String?,
-    @SerialName("clock_offset_nanos") val clockOffsetNanos: Long?,
-    @SerialName("uncertainty_ms") val uncertaintyMs: Double?,
-    @SerialName("created_at") val createdAt: String? = null
-)
-
-// Insert race event
-suspend fun insertRaceEvent(event: RaceEventDto) {
-    client.postgrest["race_events"].insert(event)
-}
-
-// Subscribe to race events
-fun subscribeToRaceEvents(sessionId: String): Flow<RaceEventDto> {
-    return client.realtime
-        .channel("race_events:session_id=eq.$sessionId")
-        .postgresChangeFlow<RaceEventDto>(schema = "public")
-        .map { it.record }
-}
-```
+- `race_events` -- Real-time cross-device timing events
+- `sessions` -- Training session metadata
+- `runs` -- Individual timing runs
+- `crossings` -- Gate crossing details
+- `pairing_requests` -- Session code pairing
 
 ---
 
 ## 7. Threading Model
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      MAIN THREAD                             │
-│  • UI rendering (Compose)                                    │
-│  • User input handling                                       │
-│  • Navigation                                                │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+|                      MAIN THREAD                              |
+|  - UI rendering (Compose)                                     |
+|  - User input handling                                        |
+|  - Navigation                                                 |
++-------------------------------------------------------------+
 
-┌─────────────────────────────────────────────────────────────┐
-│                   CAMERA THREAD (HIGH PRIORITY)              │
-│  • Frame capture callbacks                                   │
-│  • Column extraction                                         │
-│  • Background subtraction                                    │
-│  • Occupancy calculation                                     │
-│  • Crossing detection state machine                          │
-│  • Composite buffer updates                                  │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+|                  CAMERA THREAD (HandlerThread)                |
+|  - Camera2 session management                                 |
+|  - Capture request submission                                 |
++-------------------------------------------------------------+
 
-┌─────────────────────────────────────────────────────────────┐
-│                    POSE THREAD (MEDIUM PRIORITY)             │
-│  • ML Kit pose detection (~30Hz)                             │
-│  • Torso bounds calculation                                  │
-│  • EMA smoothing                                             │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+|                  IMAGE THREAD (HandlerThread)                 |
+|  - ImageReader callbacks                                      |
+|  - Frame extraction (Y-plane luminance)                       |
+|  - PhotoFinishDetector.processFrame() execution               |
+|  - CCL blob detection                                         |
+|  - Gate crossing detection                                    |
++-------------------------------------------------------------+
 
-┌─────────────────────────────────────────────────────────────┐
-│                    IO THREAD (LOW PRIORITY)                  │
-│  • Room database operations                                  │
-│  • Image file I/O                                            │
-│  • Supabase network calls                                    │
-│  • BLE operations                                            │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+|                   IO COROUTINE DISPATCHER                     |
+|  - Room database operations                                   |
+|  - Image file I/O (thumbnail JPEG storage)                    |
+|  - Supabase network calls                                     |
++-------------------------------------------------------------+
 ```
 
-**Coroutine Dispatchers:**
-
-```kotlin
-object AppDispatchers {
-    val Camera = newSingleThreadContext("CameraThread")
-    val Pose = newSingleThreadContext("PoseThread")
-    val IO = Dispatchers.IO
-    val Main = Dispatchers.Main
-}
-```
+Note: There is no separate pose thread -- the Photo Finish mode does not use ML Kit or any pose detection.
 
 ---
 
 ## 8. Build Configuration
 
-### 8.1 Gradle Dependencies
+### 8.1 Key Dependencies
 
 ```kotlin
-// build.gradle.kts (app)
+// build.gradle.kts (app) - actual dependencies
 dependencies {
-    // Kotlin
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
     // Compose
-    implementation(platform("androidx.compose:compose-bom:2024.01.00"))
-    implementation("androidx.compose.ui:ui")
+    implementation(platform("androidx.compose:compose-bom:..."))
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("androidx.navigation:navigation-compose:2.7.6")
+    implementation("androidx.navigation:navigation-compose:...")
 
-    // Camera
-    implementation("androidx.camera:camera-camera2:1.3.1")
-    implementation("androidx.camera:camera-lifecycle:1.3.1")
-
-    // ML Kit
-    implementation("com.google.mlkit:pose-detection:18.0.0-beta3")
+    // Camera2 (direct API, not CameraX)
+    // No separate camera library needed -- uses android.hardware.camera2
 
     // Room
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-runtime:...")
+    implementation("androidx.room:room-ktx:...")
+    ksp("androidx.room:room-compiler:...")
 
     // Hilt
-    implementation("com.google.dagger:hilt-android:2.50")
-    ksp("com.google.dagger:hilt-compiler:2.50")
-    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    implementation("com.google.dagger:hilt-android:...")
+    ksp("com.google.dagger:hilt-compiler:...")
+    implementation("androidx.hilt:hilt-navigation-compose:...")
 
-    // Supabase
-    implementation(platform("io.github.jan-tennert.supabase:bom:2.0.4"))
+    // Supabase (scaffolded, not yet active)
+    implementation(platform("io.github.jan-tennert.supabase:bom:..."))
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.github.jan-tennert.supabase:realtime-kt")
-    implementation("io.github.jan-tennert.supabase:storage-kt")
-    implementation("io.github.jan-tennert.supabase:gotrue-kt")
-    implementation("io.ktor:ktor-client-android:2.3.7")
 
     // Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:...")
 }
 ```
+
+**Not included:** ML Kit Pose Detection, CameraX, RenderScript.
 
 ### 8.2 Android Manifest Permissions
 
@@ -1014,28 +450,21 @@ dependencies {
 
 ## 9. Testing Strategy
 
-### 9.1 Unit Tests
+### 9.1 Unit Tests (To Be Written)
 
-- `BackgroundModelTest` - MAD calculation, threshold adaptation
-- `CrossingDetectorTest` - State machine transitions
-- `ClockSyncServiceTest` - NTP algorithm, offset calculation
-- `CompositeBufferTest` - Ring buffer, export
+- `PhotoFinishDetectorTest` -- State transitions, crossing detection logic
+- `ZeroAllocCCLTest` -- Blob labeling accuracy, union-find correctness
+- `ClockSyncCalculatorTest` -- NTP algorithm, offset calculation
+- `RollingShutterCalculatorTest` -- Compensation values
 
-### 9.2 Integration Tests
+### 9.2 Device Testing Matrix
 
-- Camera capture pipeline
-- BLE connection and messaging
-- Room database operations
-- Supabase sync
-
-### 9.3 Device Testing Matrix
-
-| Device | FPS | Priority |
-|--------|-----|----------|
-| Pixel 8 Pro | 240 | High |
-| Samsung S24 | 240 | High |
-| Pixel 6 | 120 | Medium |
-| Samsung A54 | 60 | Low |
+| Device | Expected FPS | Priority |
+|--------|-------------|----------|
+| Pixel 8 Pro | 120 | High |
+| Samsung S24 | 120 | High |
+| Pixel 6 | 60 | Medium |
+| Mid-range | 30 | Low |
 
 ---
 
@@ -1043,41 +472,42 @@ dependencies {
 
 | Metric | Target | Measurement |
 |--------|--------|-------------|
-| Frame processing | < 4ms | Systrace |
-| Memory (active) | < 400MB | Profiler |
-| Memory (idle) | < 100MB | Profiler |
-| Battery (1hr timing) | < 20% | Manual test |
+| Frame processing | < 8ms at 160x284 | Systrace |
+| Memory (active) | < 200MB | Profiler |
+| Memory (idle) | < 80MB | Profiler |
+| Battery (1hr timing) | < 15% | Manual test |
 | App startup | < 2s | Cold start |
-| Detection latency | < 10ms | End-to-end |
+| Detection latency | < 1 frame | End-to-end |
 
 ---
 
-## Appendix A: iOS Compatibility Notes
+## Appendix: Differences from v1.0 Specification
 
-### Timing Message Serialization
+The original v1.0 of this document described a "Precision mode" architecture that was designed but never implemented. Here is what changed:
 
-Both platforms must use identical serialization format. Recommended: JSON with camelCase keys.
+| Feature | v1.0 Spec (Not Built) | v2.0 Actual Implementation |
+|---------|----------------------|---------------------------|
+| Frame rate | 240fps high-speed | 30-120fps standard |
+| Camera session | High-speed session | Regular session |
+| Detection | Background model + occupancy | Frame differencing + CCL |
+| Pose detection | ML Kit at 30Hz | None |
+| Torso tracking | Shoulder/hip landmarks + EMA | Column density scan |
+| Gate analysis | 3 vertical strips | Full-frame blob analysis |
+| Threshold model | Per-row median + MAD background | Per-frame adaptive diff threshold |
+| State machine | 5-state (occupancy levels) | 6-state (velocity + size) |
+| Interpolation | Quadratic (3+ samples) | Linear regression (6 trajectory points) |
+| Dependencies | ML Kit, high-speed Camera2 | Standard Camera2 only |
+| Calibration | Required (30 frames, static scene) | Automatic (warmup noise calibration) |
+| Composite buffer | Ring buffer for photo-finish | Not implemented (thumbnails instead) |
 
-```json
-{
-  "type": "startEvent",
-  "timestamp": 1234567890123456789,
-  "deviceId": "ABC123",
-  "clockOffset": -5000000
-}
-```
+---
 
-### BLE GATT Service
+## Appendix: iOS Source File Reference
 
-| UUID | Type | Description |
-|------|------|-------------|
-| `12345678-...-abc` | Service | TrackSpeed Timing Service |
-| `12345678-...-abd` | Characteristic | Timing Messages (R/W/Notify) |
-| `12345678-...-abe` | Characteristic | Device Info (Read) |
-
-### Clock Reference
-
-- **Android:** `SystemClock.elapsedRealtimeNanos()`
-- **iOS:** `mach_absolute_time()` converted to nanoseconds
-
-Both use monotonic clocks that don't jump with system time changes.
+| Android Component | iOS Source File |
+|-------------------|-----------------|
+| `PhotoFinishDetector` | `PhotoFinishDetector.swift` |
+| `ZeroAllocCCL` | `ZeroAllocCCL.swift` |
+| `RollingShutterCalculator` | `RollingShutterCalculator.swift` |
+| `GateEngine` | `GateEngine.swift` |
+| `CameraManager` | `CameraManager.swift` (Point & Shoot mode) |

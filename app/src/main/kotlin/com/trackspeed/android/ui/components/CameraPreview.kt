@@ -1,7 +1,9 @@
 package com.trackspeed.android.ui.components
 
-import android.view.SurfaceHolder
-import android.view.SurfaceView
+import android.graphics.Matrix
+import android.graphics.SurfaceTexture
+import android.view.Surface
+import android.view.TextureView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -16,18 +18,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.trackspeed.android.detection.PhotoFinishDetector
+import android.util.Log
 
 /**
- * Camera preview with gate line overlay.
- *
- * Features:
- * - Live camera preview via SurfaceView
- * - Draggable gate line
- * - FPS display
- * - Detection state indicator
+ * Camera preview with gate line overlay using TextureView for proper portrait rotation.
  */
 @Composable
 fun CameraPreview(
@@ -35,34 +32,55 @@ fun CameraPreview(
     gatePosition: Float,
     onGatePositionChanged: (Float) -> Unit,
     fps: Int,
-    isCalibrating: Boolean,
-    isArmed: Boolean,
-    onSurfaceReady: (SurfaceHolder) -> Unit,
+    detectionState: PhotoFinishDetector.State,
+    sensorOrientation: Int = 90,
+    isFrontCamera: Boolean = false,
+    onSurfaceReady: (Surface) -> Unit,
     onSurfaceDestroyed: () -> Unit
 ) {
+    // Keep latest values accessible from TextureView callbacks
+    val currentSensorOrientation by rememberUpdatedState(sensorOrientation)
+    val currentIsFrontCamera by rememberUpdatedState(isFrontCamera)
+    val currentOnSurfaceReady by rememberUpdatedState(onSurfaceReady)
+    val currentOnSurfaceDestroyed by rememberUpdatedState(onSurfaceDestroyed)
+
     Box(modifier = modifier) {
-        // Camera SurfaceView
+        // Camera TextureView with rotation
         AndroidView(
             factory = { context ->
-                SurfaceView(context).apply {
-                    holder.addCallback(object : SurfaceHolder.Callback {
-                        override fun surfaceCreated(holder: SurfaceHolder) {
-                            onSurfaceReady(holder)
-                        }
-
-                        override fun surfaceChanged(
-                            holder: SurfaceHolder,
-                            format: Int,
+                TextureView(context).apply {
+                    surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                        override fun onSurfaceTextureAvailable(
+                            surfaceTexture: SurfaceTexture,
                             width: Int,
                             height: Int
                         ) {
-                            // Handle size changes if needed
+                            configureTransform(this@apply, width, height, currentSensorOrientation, currentIsFrontCamera)
+                            val surface = Surface(surfaceTexture)
+                            currentOnSurfaceReady(surface)
                         }
 
-                        override fun surfaceDestroyed(holder: SurfaceHolder) {
-                            onSurfaceDestroyed()
+                        override fun onSurfaceTextureSizeChanged(
+                            surfaceTexture: SurfaceTexture,
+                            width: Int,
+                            height: Int
+                        ) {
+                            configureTransform(this@apply, width, height, currentSensorOrientation, currentIsFrontCamera)
                         }
-                    })
+
+                        override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
+                            currentOnSurfaceDestroyed()
+                            return true
+                        }
+
+                        override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {}
+                    }
+                }
+            },
+            update = { textureView ->
+                // Re-apply transform when sensor orientation or camera changes
+                if (textureView.width > 0 && textureView.height > 0) {
+                    configureTransform(textureView, textureView.width, textureView.height, currentSensorOrientation, currentIsFrontCamera)
                 }
             },
             modifier = Modifier.fillMaxSize()
@@ -72,8 +90,7 @@ fun CameraPreview(
         GateLineOverlay(
             gatePosition = gatePosition,
             onGatePositionChanged = onGatePositionChanged,
-            isCalibrating = isCalibrating,
-            isArmed = isArmed,
+            detectionState = detectionState,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -87,8 +104,7 @@ fun CameraPreview(
 
         // Status indicator
         StatusIndicator(
-            isCalibrating = isCalibrating,
-            isArmed = isArmed,
+            detectionState = detectionState,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(16.dp)
@@ -96,20 +112,69 @@ fun CameraPreview(
     }
 }
 
+/**
+ * Configure the TextureView transform matrix to display the camera preview
+ * in the correct portrait orientation.
+ *
+ * Camera2 delivers frames in the sensor's native (landscape) orientation.
+ * SENSOR_ORIENTATION is the CW angle through which the output image needs to be
+ * rotated to be upright on the device screen in its natural (portrait) orientation.
+ *
+ * Order matters: rotate first, then scale to fix aspect ratio.
+ */
+private fun configureTransform(
+    textureView: TextureView,
+    viewWidth: Int,
+    viewHeight: Int,
+    sensorOrientation: Int,
+    isFrontCamera: Boolean
+) {
+    if (viewWidth == 0 || viewHeight == 0) return
+
+    val matrix = Matrix()
+    val centerX = viewWidth / 2f
+    val centerY = viewHeight / 2f
+
+    // Step 1: Rotate by sensorOrientation to make the image upright.
+    // Per Android docs, sensorOrientation is the CW rotation needed to display upright.
+    // Back camera: typically 90° CW, Front camera: typically 270° CW.
+    if (sensorOrientation != 0) {
+        matrix.postRotate(sensorOrientation.toFloat(), centerX, centerY)
+    }
+
+    // Step 2: Fix aspect ratio. TextureView stretches the camera buffer (landscape)
+    // to fill the view (portrait). After rotation, we need to scale to compensate.
+    if (sensorOrientation == 90 || sensorOrientation == 270) {
+        val scaleX = viewHeight.toFloat() / viewWidth
+        val scaleY = viewWidth.toFloat() / viewHeight
+        matrix.postScale(scaleX, scaleY, centerX, centerY)
+    }
+
+    // Step 3: Mirror for front camera (selfie mirror effect)
+    if (isFrontCamera) {
+        matrix.postScale(-1f, 1f, centerX, centerY)
+    }
+
+    Log.d("CameraPreview", "Transform: sensor=$sensorOrientation, view=${viewWidth}x${viewHeight}, front=$isFrontCamera")
+    textureView.setTransform(matrix)
+}
+
 @Composable
 private fun GateLineOverlay(
     gatePosition: Float,
     onGatePositionChanged: (Float) -> Unit,
-    isCalibrating: Boolean,
-    isArmed: Boolean,
+    detectionState: PhotoFinishDetector.State,
     modifier: Modifier = Modifier
 ) {
     var isDragging by remember { mutableStateOf(false) }
 
-    val lineColor = when {
-        isCalibrating -> Color.Yellow
-        isArmed -> Color.Green
-        else -> Color.Red
+    val lineColor = when (detectionState) {
+        PhotoFinishDetector.State.UNSTABLE -> Color.Yellow
+        PhotoFinishDetector.State.NO_ATHLETE -> Color.White
+        PhotoFinishDetector.State.ATHLETE_TOO_FAR -> Color(0xFFFF9800)
+        PhotoFinishDetector.State.READY -> Color.Green
+        PhotoFinishDetector.State.TRIGGERED -> Color.Red
+        PhotoFinishDetector.State.COOLDOWN -> Color.Red
     }
 
     val lineAlpha = if (isDragging) 1f else 0.8f
@@ -118,7 +183,6 @@ private fun GateLineOverlay(
         modifier = modifier
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
-                    // Tap to set gate position
                     val newPosition = (offset.x / size.width).coerceIn(0.05f, 0.95f)
                     onGatePositionChanged(newPosition)
                 }
@@ -145,7 +209,7 @@ private fun GateLineOverlay(
             strokeWidth = if (isDragging) 6f else 4f
         )
 
-        // Handle indicator (circle in center)
+        // Handle indicator
         val handleY = size.height / 2
         val handleRadius = if (isDragging) 24f else 16f
 
@@ -162,10 +226,8 @@ private fun GateLineOverlay(
             center = Offset(x, handleY)
         )
 
-        // Direction arrows when dragging
         if (isDragging) {
             val arrowSize = 12f
-            // Left arrow
             drawLine(
                 color = Color.White.copy(alpha = 0.6f),
                 start = Offset(x - 40f, handleY),
@@ -178,7 +240,6 @@ private fun GateLineOverlay(
                 end = Offset(x - 40f - arrowSize, handleY + arrowSize),
                 strokeWidth = 2f
             )
-            // Right arrow
             drawLine(
                 color = Color.White.copy(alpha = 0.6f),
                 start = Offset(x + 40f, handleY),
@@ -201,10 +262,10 @@ private fun FpsIndicator(
     modifier: Modifier = Modifier
 ) {
     val fpsColor = when {
-        fps >= 200 -> Color(0xFF4CAF50) // Green
-        fps >= 100 -> Color(0xFFFFEB3B) // Yellow
-        fps >= 60 -> Color(0xFFFF9800)  // Orange
-        else -> Color(0xFFF44336)        // Red
+        fps >= 100 -> Color(0xFF4CAF50)
+        fps >= 50 -> Color(0xFFFFEB3B)
+        fps >= 25 -> Color(0xFFFF9800)
+        else -> Color(0xFFF44336)
     }
 
     Box(
@@ -225,14 +286,16 @@ private fun FpsIndicator(
 
 @Composable
 private fun StatusIndicator(
-    isCalibrating: Boolean,
-    isArmed: Boolean,
+    detectionState: PhotoFinishDetector.State,
     modifier: Modifier = Modifier
 ) {
-    val (text, color) = when {
-        isCalibrating -> "CALIBRATING" to Color.Yellow
-        isArmed -> "ARMED" to Color.Green
-        else -> "NOT READY" to Color.Red
+    val (text, color) = when (detectionState) {
+        PhotoFinishDetector.State.UNSTABLE -> "HOLD STEADY" to Color.Yellow
+        PhotoFinishDetector.State.NO_ATHLETE -> "READY" to Color.Green
+        PhotoFinishDetector.State.ATHLETE_TOO_FAR -> "TOO FAR" to Color(0xFFFF9800)
+        PhotoFinishDetector.State.READY -> "READY" to Color.Green
+        PhotoFinishDetector.State.TRIGGERED -> "TRIGGERED" to Color.Red
+        PhotoFinishDetector.State.COOLDOWN -> "COOLDOWN" to Color.Red
     }
 
     Box(
@@ -247,7 +310,6 @@ private fun StatusIndicator(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Status dot
             Canvas(modifier = Modifier.size(8.dp)) {
                 drawCircle(color = color)
             }

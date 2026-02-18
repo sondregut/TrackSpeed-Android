@@ -23,6 +23,9 @@ android {
         // Supabase configuration - will be loaded from local.properties
         buildConfigField("String", "SUPABASE_URL", "\"https://hkvrttatbpjwzuuckbqj.supabase.co\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${findProperty("SUPABASE_ANON_KEY") ?: ""}\"")
+
+        // RevenueCat API key - loaded from local.properties
+        buildConfigField("String", "REVENUECAT_API_KEY", "\"${findProperty("REVENUECAT_API_KEY") ?: ""}\"")
     }
 
     buildTypes {
@@ -65,6 +68,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.foundation)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
@@ -93,13 +97,15 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
 
-    // ML Kit Pose Detection
-    implementation(libs.mlkit.pose.detection)
+    // DataStore
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Camera
+    // Camera (Camera2 only - no CameraX needed for Photo Finish mode)
     implementation(libs.camera.camera2)
-    implementation(libs.camera.lifecycle)
-    implementation(libs.camera.view)
+
+    // RevenueCat (subscriptions)
+    implementation(libs.revenuecat.purchases)
+    implementation(libs.revenuecat.purchases.ui)
 
     // Testing
     testImplementation(libs.junit)

@@ -58,6 +58,10 @@ class ClockSyncManager @Inject constructor(
     // Sync age tracking
     private var syncTimestampNanos: Long = 0L
 
+    // Mini-sync refresh job
+    private var miniSyncJob: Job? = null
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     init {
         // Map BLE service state to high-level sync state
         bleClockSyncService.state
@@ -85,7 +89,7 @@ class ClockSyncManager @Inject constructor(
                     is BleClockSyncService.State.Error -> SyncState.Error(bleState.message)
                 }
             }
-            .launchIn(kotlinx.coroutines.GlobalScope)
+            .launchIn(scope)
     }
 
     /**
@@ -111,10 +115,36 @@ class ClockSyncManager @Inject constructor(
     }
 
     /**
+     * Start periodic mini-sync to maintain accuracy during a race.
+     * Refreshes offset every 60 seconds using 30 quick pings.
+     */
+    fun startPeriodicRefresh() {
+        miniSyncJob?.cancel()
+        miniSyncJob = scope.launch {
+            while (isActive) {
+                delay(ClockSyncConfig.MINI_SYNC_REFRESH_INTERVAL_S * 1000)
+                if (isSynced()) {
+                    Log.i(TAG, "Performing periodic mini-sync refresh...")
+                    bleClockSyncService.performMiniSync()
+                }
+            }
+        }
+    }
+
+    /**
+     * Stop periodic refresh.
+     */
+    fun stopPeriodicRefresh() {
+        miniSyncJob?.cancel()
+        miniSyncJob = null
+    }
+
+    /**
      * Stop sync operations.
      */
     fun stop() {
         Log.i(TAG, "Stopping clock sync")
+        stopPeriodicRefresh()
         bleClockSyncService.stop()
         _syncState.value = SyncState.NotSynced
     }

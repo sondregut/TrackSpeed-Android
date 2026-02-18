@@ -1,227 +1,133 @@
 # iOS to Android Reference Map
 
-**Last Updated:** January 2026
+**Last Updated:** February 2026
 
-Quick reference for finding iOS source code when implementing Android equivalents.
+Quick reference for finding iOS source code counterparts for the Android implementation.
+
+> **Note:** This document was updated in v2.0 to reflect the actual Photo Finish mode implementation. The original version referenced Precision mode components (BackgroundModel, CrossingDetector, ContiguousRunFilter, PoseService, TorsoBoundsStore, CompositeBuffer) that were designed but never built in the Android app.
 
 ---
 
 ## Core Detection Engine
 
-| Android Component | iOS File | Key Lines | Notes |
-|-------------------|----------|-----------|-------|
-| `BackgroundModel` | `BackgroundModel.swift` | 12-41 (config), 208-222 (detection) | MAD-based thresholding |
-| `CrossingDetector` | `CrossingDetector.swift` | 12-45 (thresholds), 256-450 (state machine) | 5-state machine |
-| `ContiguousRunFilter` | `ContiguousRunFilter.swift` | 100-114 (3-strip), 305-358 (band calc) | Chest band filtering |
-| `PoseService` | `PoseService.swift` | Full file | ML Kit replaces Vision |
-| `TorsoBoundsStore` | `TorsoBoundsStore.swift` | Full file | Thread-safe, EMA smoothing |
-| `CompositeBuffer` | `CompositeBuffer.swift` | Full file | Ring buffer for photo-finish |
-| `GateEngine` | `GateEngine.swift` | Full file | Orchestrator |
+| Android Component | iOS File | Notes |
+|-------------------|----------|-------|
+| `PhotoFinishDetector` | `PhotoFinishDetector.swift` | Main detection logic: frame diff, CCL, velocity, crossing |
+| `ZeroAllocCCL` | `ZeroAllocCCL.swift` | Row-run CCL with union-find, zero steady-state allocations |
+| `RollingShutterCalculator` | `RollingShutterCalculator.swift` | Readout duration estimates, compensation calculation |
+| `GateEngine` | `GateEngine.swift` | Coordinator exposing reactive state |
 
 ---
 
 ## Camera System
 
-| Android Component | iOS File | Key Lines | Notes |
-|-------------------|----------|-----------|-------|
-| `CameraManager` | `CameraManager.swift` | Full file | Camera2 replaces AVFoundation |
-| Frame extraction | `CameraManager.swift` | YUV processing | Same pixel format |
-| Exposure/Focus lock | `CameraManager.swift` | Lock methods | Similar API concepts |
-| Thermal monitoring | `CameraManager.swift` | 102-133 | Use Android ThermalManager |
+| Android Component | iOS File | Notes |
+|-------------------|----------|-------|
+| `CameraManager` | `CameraManager.swift` | Camera2 replaces AVFoundation; Point & Shoot mode |
+| Frame extraction | `CameraManager.swift` | Y-plane luminance from YUV_420_888 |
+| Focus lock | `CameraManager.swift` | `CONTROL_AF_MODE_OFF` with calculated distance |
 
 ---
 
 ## Communication Layer
 
-| Android Component | iOS File | Key Lines | Notes |
-|-------------------|----------|-----------|-------|
-| `TimingMessage` | `TimingMessage.swift` | Full file | Must match exactly |
-| `ClockSyncService` | `ClockSyncService.swift` | 8-18 (convention), 33-83 (NTP), 92-134 (quality), 136-217 (drift) | Critical accuracy |
-| `MultipeerTransport` | `MultipeerTransport.swift` | Full file | BLE replaces Multipeer |
-| `SupabaseTransport` | `SupabaseBroadcastTransport.swift` | Full file | Supabase Kotlin |
-| `RaceSession` | `RaceSession.swift` | Full file | Session state machine |
+| Android Component | iOS File | Notes |
+|-------------------|----------|-------|
+| `BleClockSyncService` | `ClockSyncService.swift` | NTP-style BLE clock sync |
+| `ClockSyncCalculator` | `ClockSyncService.swift` | Offset and RTT calculation |
+| Timing messages | `TimingMessage.swift` | JSON format must match exactly |
+| Supabase transport (scaffolded) | `SupabaseBroadcastTransport.swift` | Cloud relay for race events |
 
 ---
 
 ## Data Models
 
-| Android Entity | iOS Model | File | Notes |
-|----------------|-----------|------|-------|
-| `SessionEntity` | `TrainingSession` | `Models/TrainingSession.swift` | Room replaces SwiftData |
-| `RunEntity` | `Run` | `Models/Run.swift` | Include splits JSON |
-| `CrossingEntity` | `PersistedCrossing` | Referenced in Run | Image paths |
-| `AthleteEntity` | `Athlete` | `Models/Athlete.swift` | Colors, PBs |
-| `RaceEventDto` | `RaceEvent` | `SupabaseService.swift` | Supabase table schema |
+| Android Entity | iOS Model | Notes |
+|----------------|-----------|-------|
+| `TrainingSessionEntity` | `TrainingSession` | Room replaces SwiftData |
+| `RunEntity` | `Run` | Include splits and thumbnails |
+| `AthleteEntity` | `Athlete` | Colors, personal bests |
+| Supabase DTOs (scaffolded) | `SupabaseService.swift` | Must match table schemas |
 
 ---
 
 ## Key Constants Reference
 
-### Detection Thresholds (CrossingDetector.swift lines 12-45)
+### Detection Constants (PhotoFinishDetector)
 
-```swift
-// Primary thresholds
-enterThreshold = 0.22           // First contact
-confirmThreshold = 0.35         // Must reach to confirm
-gateClearBelow = 0.15           // Hysteresis lower
-gateUnclearAbove = 0.25         // Hysteresis upper
-fallbackArmThreshold = 0.65     // No-pose fallback
+```kotlin
+// Work resolution
+WORK_W = 160
+WORK_H = 284
 
-// Distance filtering
-minTorsoHeightFraction = 0.12   // 12% of frame
+// IMU stability
+GYRO_THRESHOLD = 0.35f            // rad/s
+STABLE_DURATION_TO_ARM_S = 0.5f   // seconds
 
-// 3-strip validation
-adjacentStripThreshold = 0.55   // Side strip requirement
-strongEvidenceThreshold = 0.85  // Override proximity
+// Motion mask
+DEFAULT_DIFF_THRESHOLD = 14
+MIN_DIFF_THRESHOLD = 8
+MAX_DIFF_THRESHOLD = 40
 
-// Chest band
-minRunChestFraction = 0.55      // 55% of band height
-absoluteMinRunChest = 12        // Minimum 12 pixels
+// Blob filtering
+MIN_BLOB_HEIGHT_FOR_CROSSING = 0.33f  // 33% of frame height
+
+// Body validation (column density)
+MIN_COLUMN_DENSITY_FOR_BODY = WORK_H * 0.15f  // ~42 pixels
+MIN_REGION_WIDTH_FOR_BODY = 8                  // consecutive dense columns
+
+// Velocity
+MIN_VELOCITY_PX_PER_SEC = 60.0f  // at work resolution
 
 // Timing
-gateClearDuration = 0.2s        // Clear before arming
-postrollDuration = 0.2s         // Capture after trigger
-cooldownDuration = 0.1s         // Between crossings
-persistenceFrames = 2           // Frames above confirm
+COOLDOWN_DURATION_S = 0.3f
+WARMUP_DURATION_S = 0.30f
+REARM_DURATION_S = 0.2f
+MIN_TIME_BETWEEN_CROSSINGS_S = 0.3f
+ARMING_GRACE_PERIOD_S = 0.20f
+
+// Rearm hysteresis
+HYSTERESIS_DISTANCE_FRACTION = 0.25f
+EXIT_ZONE_FRACTION = 0.35f
+
+// Trajectory
+TRAJECTORY_BUFFER_SIZE = 6
+MIN_DIRECTION_CHANGE_PX = 2.0f
 ```
 
-### Background Model (BackgroundModel.swift lines 12-41)
+### Clock Sync Constants
 
-```swift
-frameCount = 30                 // Calibration frames
-minMAD = 10.0                   // Minimum MAD
-madMultiplier = 3.5             // Threshold multiplier
-defaultThreshold = 45.0         // Fallback
-samplingBandWidth = 5           // Pixels around gate
-adaptationRate = 0.002          // Slow adaptation
-```
-
-### Clock Sync (ClockSyncService.swift)
-
-```swift
-// Multipeer full sync
-fullSyncSamples = 100
-fullSyncInterval = 50ms
-fullSyncMaxRTT = 50ms
-rttFilterPercentile = 0.20
-minValidSamples = 10
-
-// Multipeer mini sync
-miniSyncSamples = 30
-miniSyncInterval = 100ms
-miniSyncMaxRTT = 150ms
-refreshInterval = 60s
-
-// BLE sync
-bleFullSamples = 80
-bleMiniSamples = 25
-bleRttFilter = 0.15
-bleMaxRTT = 200ms (full), 350ms (mini)
+```kotlin
+// Full sync
+FULL_SYNC_SAMPLES = 100
+FULL_SYNC_INTERVAL_MS = 50        // 20Hz
+FULL_SYNC_MAX_RTT_MS = 200
+RTT_FILTER_PERCENTILE = 0.20      // Keep lowest 20%
+MIN_VALID_SAMPLES = 10
 
 // Quality tiers (uncertaintyMs)
-excellent < 3
-good < 5
-fair < 10
-poor < 15
-bad >= 15
-```
-
-### Heartbeat Intervals (RaceSession.swift)
-
-```swift
-idle = 5s
-armed = 1s
-running = 0.5s
-```
-
-### Rolling Shutter (Device-specific)
-
-```swift
-iPhone 15 Pro readout = 4.7ms
-// Apply: correctedTime = timestamp + (rowFraction × readoutTime)
-```
-
----
-
-## Protocol Version
-
-```swift
-kTimingProtocolVersion = 3  // Current version
-```
-
-Changes:
-- v2: Initial handshake protocol
-- v3: Host-controlled calibration/arming
-
----
-
-## Supabase Configuration
-
-```swift
-// From SupabaseService.swift
-supabaseURL = "https://hkvrttatbpjwzuuckbqj.supabase.co"
-// Use existing anon key from iOS app
-
-// Tables
-- race_events (existing)
-- race_sessions (existing)
-- users (existing)
-
-// Realtime channel pattern
-"race_events:session_id=eq.{sessionId}"
-```
-
----
-
-## File Path Patterns
-
-### Image Storage
-
-```
-// iOS pattern (ImageStorageService)
-{documentsDir}/sessions/{sessionId}/gates/{gateId}/thumbnails/{timestamp}.jpg
-
-// Android equivalent
-{context.filesDir}/sessions/{sessionId}/gates/{gateId}/thumbnails/{timestamp}.jpg
-```
-
-### Composite Images
-
-```
-// iOS
-{documentsDir}/sessions/{sessionId}/composites/{runId}.png
-
-// Android
-{context.filesDir}/sessions/{sessionId}/composites/{runId}.png
+EXCELLENT < 3
+GOOD < 5
+FAIR < 10
+POOR < 15
+BAD >= 15
 ```
 
 ---
 
 ## UI Screen Mapping
 
-| iOS Screen | Android Screen | Notes |
-|------------|----------------|-------|
-| `MainTabView` | `MainScreen` | Bottom nav |
-| `DashboardHomeView` | `HomeScreen` | Mode selection |
-| `BasicModeView` | `BasicTimingScreen` | Single phone |
-| `RaceModeView` | `RaceModeScreen` | Multi-phone |
-| `CreateSessionFlowView` | `CreateSessionFlow` | Host setup |
-| `JoinSessionView` | `JoinSessionScreen` | Device pairing |
-| `SetupAssistantView` | `SetupAssistantScreen` | Handshake |
-| `TimingSessionView` | `TimingSessionScreen` | Main timing |
-| `LiveSessionResultsView` | `ResultsScreen` | Run results |
-| `SessionDetailView` | `SessionDetailScreen` | History detail |
-
----
-
-## Debug Overlays
-
-| iOS Overlay | Purpose | Android Equivalent |
-|-------------|---------|-------------------|
-| `DetectionDebugOverlay` | rLeft/rCenter/rRight, state, rejection reasons | `DetectionDebugComposable` |
-| `ConnectionDebugOverlay` | Multipeer/Supabase status | `ConnectionDebugComposable` |
-| `ThermalDebugView` | CPU/thermal state | `ThermalDebugComposable` |
-| `MultipeerDebugView` | P2P details | `BleDebugComposable` |
+| iOS Screen | Android Screen | Status |
+|------------|----------------|--------|
+| `DashboardHomeView` | `HomeScreen` | Implemented |
+| `BasicModeView` | `BasicTimingScreen` | Implemented |
+| `RaceModeView` | `RaceModePlaceholder` | Placeholder |
+| `SessionDetailView` | `SessionDetailScreen` | Implemented |
+| `SettingsView` | `SettingsScreen` | Implemented |
+| `ClockSyncView` | `ClockSyncScreen` | Implemented |
+| `CreateSessionFlowView` | Not implemented | -- |
+| `JoinSessionView` | Not implemented | -- |
+| `TimingSessionView` | Not implemented | -- |
 
 ---
 
@@ -238,40 +144,81 @@ t_remote = t_local + offset
 ```kotlin
 // Android: Use elapsedRealtimeNanos()
 val timestamp = SystemClock.elapsedRealtimeNanos()
-
 // NOT System.nanoTime() - can jump on suspend
 ```
 
-### 3. Three-Strip Delta
+### 3. Adaptive Noise Calibration
 ```kotlin
-// Auto-calculate strip spacing
-val stripDelta = maxOf(3, frameWidth / 100)
+// During warmup (first ~10 frames):
+// threshold = median + 3.5 * MAD * 1.4826
+// Clamped to [8, 40]
 ```
 
-### 4. Chest Band Calculation
+### 4. Column Density for Body Position
 ```kotlin
-// Band half-height = clamp(0.03 × torsoHeight, 8, 20) pixels
-val bandHalfHeight = (0.03f * torsoHeightPx)
-    .toInt()
-    .coerceIn(8, 20)
+// Scan columns from leading edge inward
+// Column is "dense" if longest contiguous run >= MIN_COLUMN_DENSITY_FOR_BODY (~42px)
+// Need MIN_REGION_WIDTH_FOR_BODY (8) consecutive dense columns
+// First such column is the chest X position
 ```
 
 ### 5. Sub-Frame Interpolation
 ```kotlin
-// Quadratic preferred (3+ samples)
-// Linear fallback (1-2 samples)
+// Primary: 6-point linear regression on trajectory buffer
+// Fallback: 2-frame linear interpolation
 // Must handle int64 nanosecond math carefully
 ```
 
-### 6. Post-Roll is Fixed Duration
+### 6. Message Serialization
 ```kotlin
-// 0.2 seconds, NOT exit-detection based
-// Matches Photo Finish approach
-```
-
-### 7. Message Serialization
-```kotlin
-// JSON for Supabase/general messages
+// JSON for Supabase/general messages (snake_case fields)
 // Binary for BLE clock sync (performance)
 // Must be byte-compatible with iOS
+```
+
+---
+
+## File Path Patterns
+
+### Thumbnail Storage
+
+```
+// Android
+{context.filesDir}/thumbnails/{timestamp}.jpg
+```
+
+### Database
+
+```
+// Android (Room)
+{context.getDatabasePath("trackspeed_database")}
+```
+
+---
+
+## Protocol Version
+
+```swift
+kTimingProtocolVersion = 3  // Current version (from iOS)
+```
+
+---
+
+## Supabase Configuration
+
+```
+// Shared with iOS
+supabaseURL = "https://hkvrttatbpjwzuuckbqj.supabase.co"
+// Use existing anon key from iOS app
+
+// Tables
+- race_events
+- sessions
+- runs
+- crossings
+- pairing_requests
+- athletes
+
+// Realtime channel pattern
+"race_events:session_id=eq.{sessionId}"
 ```
