@@ -1,11 +1,16 @@
 package com.trackspeed.android.ui.screens.race
 
+import android.content.Context
+import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.camera.CameraManager
+import com.trackspeed.android.cloud.RaceEventService
+import com.trackspeed.android.cloud.dto.RaceEventDto
+import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.detection.CrossingEvent
 import com.trackspeed.android.detection.GateEngine
 import com.trackspeed.android.detection.PhotoFinishDetector
@@ -14,25 +19,43 @@ import com.trackspeed.android.sync.BleClockSyncService
 import com.trackspeed.android.sync.ClockSyncManager
 import com.trackspeed.android.sync.SyncQuality
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 import kotlin.math.pow
 import kotlin.math.sqrt
 
 @HiltViewModel
 class RaceModeViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val cameraManager: CameraManager,
     private val gateEngine: GateEngine,
     private val clockSyncManager: ClockSyncManager,
-    private val bleClockSyncService: BleClockSyncService
+    private val bleClockSyncService: BleClockSyncService,
+    private val raceEventService: RaceEventService,
+    private val sessionRepository: SessionRepository
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "RaceModeViewModel"
     }
+
+    private val deviceId: String by lazy {
+        val prefs = context.getSharedPreferences("trackspeed", Context.MODE_PRIVATE)
+        prefs.getString("device_id", null) ?: run {
+            val newId = UUID.randomUUID().toString()
+            prefs.edit().putString("device_id", newId).apply()
+            newId
+        }
+    }
+    private val deviceName: String = "${Build.MANUFACTURER} ${Build.MODEL}"
+
+    // Session ID for cloud sync (generated per race session)
+    private var sessionId: String = UUID.randomUUID().toString()
 
     private val _uiState = MutableStateFlow(RaceModeUiState())
     val uiState: StateFlow<RaceModeUiState> = _uiState.asStateFlow()
@@ -264,6 +287,7 @@ class RaceModeViewModel @Inject constructor(
     // === Session Start ===
 
     fun startSession() {
+        sessionId = UUID.randomUUID().toString()
         _uiState.update {
             it.copy(
                 phase = RacePhase.ACTIVE_RACE,
@@ -311,6 +335,9 @@ class RaceModeViewModel @Inject constructor(
                     )
                 )
                 Log.i(TAG, "Sent StartEvent via BLE (remote=$remoteTimeNanos): sent=$sent")
+
+                // Upload start event to Supabase (fire-and-forget)
+                uploadRaceEvent("start", crossingTimeNanos)
             }
             DeviceRole.FINISH -> {
                 // Finish phone: record finish time, calculate split
@@ -319,6 +346,9 @@ class RaceModeViewModel @Inject constructor(
 
                 stopTimerTick()
                 calculateResult()
+
+                // Upload finish event to Supabase (fire-and-forget)
+                uploadRaceEvent("finish", crossingTimeNanos)
             }
             null -> { /* Should not happen */ }
         }
@@ -399,6 +429,45 @@ class RaceModeViewModel @Inject constructor(
                 elapsedTimeSeconds = splitSeconds,
                 raceStatus = "Finished!"
             )
+        }
+
+        // Save result to local Room DB
+        viewModelScope.launch {
+            try {
+                sessionRepository.saveRaceResult(
+                    distance = _uiState.value.distanceMeters,
+                    startType = "standing",
+                    timeSeconds = splitSeconds
+                )
+                Log.i(TAG, "Saved race result to local DB")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save race result", e)
+            }
+        }
+    }
+
+    /**
+     * Upload a race event to Supabase (fire-and-forget, non-blocking).
+     */
+    private fun uploadRaceEvent(eventType: String, crossingTimeNanos: Long) {
+        viewModelScope.launch {
+            try {
+                val syncOffset = clockSyncManager.getOffsetNanos()
+                raceEventService.insertRaceEvent(
+                    RaceEventDto(
+                        sessionId = sessionId,
+                        eventType = eventType,
+                        crossingTimeNanos = crossingTimeNanos,
+                        deviceId = deviceId,
+                        deviceName = deviceName,
+                        clockOffsetNanos = syncOffset,
+                        uncertaintyMs = _uiState.value.syncUncertaintyMs
+                    )
+                )
+                Log.d(TAG, "Uploaded $eventType event to Supabase")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to upload race event to cloud (non-critical)", e)
+            }
         }
     }
 

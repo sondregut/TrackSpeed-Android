@@ -7,6 +7,7 @@ import com.trackspeed.android.data.local.dao.SessionBestTime
 import com.trackspeed.android.data.local.dao.TrainingSessionDao
 import com.trackspeed.android.data.local.entities.RunEntity
 import com.trackspeed.android.data.local.entities.TrainingSessionEntity
+import com.trackspeed.android.data.local.entities.AthleteEntity
 import com.trackspeed.android.ui.screens.timing.SoloLapResult
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +50,8 @@ class SessionRepository @Inject constructor(
         name: String?,
         distance: Double,
         startType: String,
-        laps: List<SoloLapResult>
+        laps: List<SoloLapResult>,
+        athletes: List<AthleteEntity> = emptyList()
     ): String {
         val sessionId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
@@ -70,9 +72,19 @@ class SessionRepository @Inject constructor(
         val bestTime = actualLaps.minOfOrNull { it.lapTimeSeconds }
 
         for (lap in actualLaps) {
+            // Cycle through athletes round-robin (1-indexed lap numbers)
+            val athlete = if (athletes.isNotEmpty()) {
+                athletes[(lap.lapNumber - 1) % athletes.size]
+            } else {
+                null
+            }
+
             val thumbnailPath = saveThumbnail(sessionId, lap.lapNumber, lap.thumbnail)
             val run = RunEntity(
                 sessionId = sessionId,
+                athleteId = athlete?.id,
+                athleteName = athlete?.name,
+                athleteColor = athlete?.color,
                 runNumber = lap.lapNumber,
                 timeSeconds = lap.lapTimeSeconds,
                 distance = distance,
@@ -83,6 +95,41 @@ class SessionRepository @Inject constructor(
             )
             runDao.insert(run)
         }
+
+        return sessionId
+    }
+
+    /**
+     * Save a multi-device race result (single run with known time).
+     */
+    suspend fun saveRaceResult(
+        distance: Double,
+        startType: String,
+        timeSeconds: Double
+    ): String {
+        val sessionId = UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+
+        val session = TrainingSessionEntity(
+            id = sessionId,
+            date = now,
+            name = null,
+            distance = distance,
+            startType = startType,
+            createdAt = now,
+            updatedAt = now
+        )
+        sessionDao.insert(session)
+
+        val run = RunEntity(
+            sessionId = sessionId,
+            runNumber = 1,
+            timeSeconds = timeSeconds,
+            distance = distance,
+            startType = startType,
+            createdAt = now
+        )
+        runDao.insert(run)
 
         return sessionId
     }
