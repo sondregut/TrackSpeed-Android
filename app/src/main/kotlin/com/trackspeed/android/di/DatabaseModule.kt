@@ -26,7 +26,9 @@ object DatabaseModule {
             context,
             TrackSpeedDatabase::class.java,
             "trackspeed.db"
-        ).build()
+        )
+            .addMigrations(TrackSpeedDatabase.MIGRATION_1_2)
+            .build()
     }
 
     @Provides

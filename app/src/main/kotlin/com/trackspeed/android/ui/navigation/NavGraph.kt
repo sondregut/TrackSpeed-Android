@@ -35,9 +35,9 @@ import com.trackspeed.android.ui.screens.timing.BasicTimingScreen
 sealed class Screen(val route: String) {
     data object Onboarding : Screen("onboarding")
     data object Home : Screen("home")
-    data object BasicTiming : Screen("basic_timing?distance={distance}&startType={startType}") {
-        fun createRoute(distance: Double = 60.0, startType: String = "standing") =
-            "basic_timing?distance=$distance&startType=$startType"
+    data object BasicTiming : Screen("basic_timing?distance={distance}&startType={startType}&athleteIds={athleteIds}") {
+        fun createRoute(distance: Double = 60.0, startType: String = "standing", athleteIds: String = "") =
+            "basic_timing?distance=$distance&startType=$startType&athleteIds=$athleteIds"
     }
     data object RaceMode : Screen("race_mode")
     data object ClockSync : Screen("clock_sync")
@@ -150,7 +150,8 @@ fun TrackSpeedNavHost(
             route = Screen.BasicTiming.route,
             arguments = listOf(
                 navArgument("distance") { type = NavType.FloatType; defaultValue = 60f },
-                navArgument("startType") { type = NavType.StringType; defaultValue = "standing" }
+                navArgument("startType") { type = NavType.StringType; defaultValue = "standing" },
+                navArgument("athleteIds") { type = NavType.StringType; defaultValue = "" }
             )
         ) { backStackEntry ->
             val distance = backStackEntry.arguments?.getFloat("distance")?.toDouble() ?: 60.0
@@ -228,8 +229,9 @@ fun TrackSpeedNavHost(
                 onNavigateBack = {
                     navController.popBackStack()
                 },
-                onStartSession = { distance, startType, _ ->
-                    navController.navigate(Screen.BasicTiming.createRoute(distance, startType)) {
+                onStartSession = { distance, startType, athleteIds ->
+                    val athleteIdsParam = athleteIds.joinToString(",")
+                    navController.navigate(Screen.BasicTiming.createRoute(distance, startType, athleteIdsParam)) {
                         popUpTo(Screen.SessionSetup.route) { inclusive = true }
                     }
                 }

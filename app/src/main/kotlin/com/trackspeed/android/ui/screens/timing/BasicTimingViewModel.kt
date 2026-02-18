@@ -8,6 +8,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.audio.CrossingFeedback
 import com.trackspeed.android.camera.CameraManager
+import com.trackspeed.android.data.local.dao.AthleteDao
+import com.trackspeed.android.data.local.entities.AthleteEntity
 import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.data.repository.SettingsRepository
 import com.trackspeed.android.detection.GateEngine
@@ -28,12 +30,17 @@ class BasicTimingViewModel @Inject constructor(
     private val gateEngine: GateEngine,
     private val crossingFeedback: CrossingFeedback,
     private val sessionRepository: SessionRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val athleteDao: AthleteDao
 ) : ViewModel() {
 
     // Session configuration from navigation arguments (overrides settings defaults)
     private var sessionDistance: Double = (savedStateHandle.get<Float>("distance") ?: SettingsRepository.Defaults.DISTANCE.toFloat()).toDouble()
     private var sessionStartType: String = savedStateHandle.get<String>("startType") ?: SettingsRepository.Defaults.START_TYPE
+
+    // Athletes selected for this session
+    private val athleteIdsRaw: String = savedStateHandle.get<String>("athleteIds") ?: ""
+    private var sessionAthletes: List<AthleteEntity> = emptyList()
 
     private val _uiState = MutableStateFlow(BasicTimingUiState(
         distance = sessionDistance,
@@ -133,6 +140,14 @@ class BasicTimingViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.speedUnit.collect { unit ->
                 _uiState.update { it.copy(speedUnit = unit) }
+            }
+        }
+
+        // Load selected athletes from navigation argument
+        viewModelScope.launch {
+            val ids = athleteIdsRaw.split(",").filter { it.isNotBlank() }
+            if (ids.isNotEmpty()) {
+                sessionAthletes = ids.mapNotNull { athleteDao.getAthleteById(it) }
             }
         }
 
@@ -375,11 +390,14 @@ class BasicTimingViewModel @Inject constructor(
     }
 
     /**
-     * Capture a grayscale thumbnail from the latest camera frame.
-     * Camera frames are in sensor-native orientation (landscape for most phones),
-     * so we rotate by sensorOrientation to produce an upright portrait thumbnail.
+     * Capture a thumbnail - prefers the photo finish composite slit-scan,
+     * falls back to a grayscale snapshot from the latest camera frame.
      */
     private fun captureThumbnail(): Bitmap? {
+        // Try composite slit-scan first (photo finish style)
+        gateEngine.getComposite()?.let { return it }
+
+        // Fallback: capture from latest camera frame
         val frame = latestFrameData ?: return null
         return try {
             val orientation = cameraManager.getSensorOrientation()
@@ -439,7 +457,8 @@ class BasicTimingViewModel @Inject constructor(
                 name = null,
                 distance = sessionDistance,
                 startType = sessionStartType,
-                laps = laps
+                laps = laps,
+                athletes = sessionAthletes
             )
             _uiState.update { it.copy(sessionSaved = true) }
         }

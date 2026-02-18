@@ -22,7 +22,9 @@ data class RunEntity(
     @PrimaryKey
     val id: String = UUID.randomUUID().toString(),
     val sessionId: String,
+    val athleteId: String? = null,
     val athleteName: String? = null,
+    val athleteColor: String? = null,
     val runNumber: Int,
     val timeSeconds: Double,
     val distance: Double,
