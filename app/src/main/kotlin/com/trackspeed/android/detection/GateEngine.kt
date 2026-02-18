@@ -1,6 +1,7 @@
 package com.trackspeed.android.detection
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -28,6 +29,9 @@ class GateEngine @Inject constructor(
 
     // Photo Finish detector (created on demand to allow re-creation on reset)
     private var detector: PhotoFinishDetector = PhotoFinishDetector(context)
+
+    // Photo finish slit-scan composite buffer (created lazily on first frame)
+    private var compositeBuffer: CompositeBuffer? = null
 
     // State
     private val _engineState = MutableStateFlow(EngineState.READY)
@@ -59,6 +63,9 @@ class GateEngine @Inject constructor(
     init {
         // Wire up crossing callback
         detector.onCrossingDetected = { adjustedPts, detectionPts, monotonicNanos, frameNumber, chestPositionNormalized ->
+            // Mark crossing in composite buffer
+            compositeBuffer?.markCrossing()
+
             val event = CrossingEvent(
                 timestamp = adjustedPts,
                 frameIndex = frameNumber,
@@ -113,6 +120,13 @@ class GateEngine @Inject constructor(
     ) {
         detector.gatePosition = _gatePosition.value
 
+        // Feed slit to composite buffer (photo finish image)
+        val composite = compositeBuffer ?: CompositeBuffer(height).also {
+            compositeBuffer = it
+            it.startRecording()
+        }
+        composite.addSlit(yPlane, width, height, rowStride, _gatePosition.value, ptsNanos)
+
         val result = detector.processFrame(
             yPlane = yPlane,
             width = width,
@@ -151,8 +165,15 @@ class GateEngine @Inject constructor(
 
     fun reset() {
         detector.reset()
+        compositeBuffer?.reset()
+        compositeBuffer?.startRecording()
         _engineState.value = EngineState.READY
     }
+
+    /**
+     * Get the photo finish composite bitmap.
+     */
+    fun getComposite(): Bitmap? = compositeBuffer?.getComposite()
 
     fun isArmed(): Boolean {
         return detector.state == PhotoFinishDetector.State.READY && detector.isPhoneStable
