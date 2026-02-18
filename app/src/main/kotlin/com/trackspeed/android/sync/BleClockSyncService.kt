@@ -94,6 +94,10 @@ class BleClockSyncService @Inject constructor(
     private var syncJob: Job? = null
     private val handler = Handler(Looper.getMainLooper())
 
+    // General message receiving (for non-sync messages like crossing events)
+    private val _incomingMessages = MutableSharedFlow<TimingMessage>(extraBufferCapacity = 64)
+    val incomingMessages: SharedFlow<TimingMessage> = _incomingMessages.asSharedFlow()
+
     // Device and session identity (stable across app runs)
     private val deviceId: String by lazy { getOrCreateDeviceId() }
     private var sessionId: String = UUID.randomUUID().toString().uppercase()
@@ -253,36 +257,41 @@ class BleClockSyncService @Inject constructor(
                     return
                 }
 
-                // Handle sync ping
+                // Handle message based on type
                 val payload = message.payload
-                if (payload is TimingPayload.SyncPing) {
-                    // Record T3 (send time) right before creating pong
-                    val t3 = SystemClock.elapsedRealtimeNanos()
+                when (payload) {
+                    is TimingPayload.SyncPing -> {
+                        // Record T3 (send time) right before creating pong
+                        val t3 = SystemClock.elapsedRealtimeNanos()
 
-                    val pongPayload = TimingPayload.SyncPong(
-                        pingId = payload.pingId,
-                        t1Nanos = payload.t1Nanos,
-                        t2Nanos = t2,
-                        t3Nanos = t3,
-                        requesterId = payload.requesterId
-                    )
-                    val pongMessage = TimingMessage.create(
-                        seq = sequenceNumber.incrementAndGet(),
-                        senderId = deviceId,
-                        sessionId = sessionId,
-                        payload = pongPayload
-                    )
-                    val pongData = TimingMessageCodec.encodeToBytes(pongMessage)
+                        val pongPayload = TimingPayload.SyncPong(
+                            pingId = payload.pingId,
+                            t1Nanos = payload.t1Nanos,
+                            t2Nanos = t2,
+                            t3Nanos = t3,
+                            requesterId = payload.requesterId
+                        )
+                        val pongMessage = TimingMessage.create(
+                            seq = sequenceNumber.incrementAndGet(),
+                            senderId = deviceId,
+                            sessionId = sessionId,
+                            payload = pongPayload
+                        )
+                        val pongData = TimingMessageCodec.encodeToBytes(pongMessage)
 
-                    // Send pong via notification on TX characteristic
-                    txCharacteristic?.let { char ->
-                        char.value = pongData
-                        gattServer?.notifyCharacteristicChanged(device, char, false)
+                        // Send pong via notification on TX characteristic
+                        txCharacteristic?.let { char ->
+                            char.value = pongData
+                            gattServer?.notifyCharacteristicChanged(device, char, false)
+                        }
+
+                        Log.d(TAG, "Server: Responded to syncPing (pingId=${payload.pingId.take(8)})")
                     }
-
-                    Log.d(TAG, "Server: Responded to syncPing (pingId=${payload.pingId.take(8)})")
-                } else {
-                    Log.d(TAG, "Server: Received non-ping message: ${payload::class.simpleName}")
+                    else -> {
+                        // Forward all other messages to the app via incomingMessages flow
+                        Log.d(TAG, "Server: Forwarding ${payload::class.simpleName} to app")
+                        _incomingMessages.tryEmit(message)
+                    }
                 }
             }
         }
@@ -597,34 +606,14 @@ class BleClockSyncService @Inject constructor(
         syncJob?.cancel()
         syncJob = CoroutineScope(Dispatchers.IO).launch {
             val miniCalc = ClockSyncCalculator(isFullSync = false)
+            // Point syncCalculator to miniCalc so pong responses are added to the right calculator
+            syncCalculator = miniCalc
+            pendingPings.clear()
 
             repeat(ClockSyncConfig.MINI_SYNC_SAMPLES) { i ->
                 if (!isActive) return@launch
 
-                // Create and send ping using JSON protocol
-                val pingId = UUID.randomUUID().toString().uppercase()
-                val t1 = SystemClock.elapsedRealtimeNanos()
-                pendingPings[pingId] = t1
-
-                val pingPayload = TimingPayload.SyncPing(
-                    pingId = pingId,
-                    t1Nanos = t1,
-                    requesterId = deviceId
-                )
-                val message = TimingMessage.create(
-                    seq = sequenceNumber.incrementAndGet(),
-                    senderId = deviceId,
-                    sessionId = sessionId,
-                    payload = pingPayload
-                )
-                val messageData = TimingMessageCodec.encodeToBytes(message)
-
-                rxCharacteristic?.let { char ->
-                    char.value = messageData
-                    char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    gattClient?.writeCharacteristic(char)
-                }
-
+                sendPing()
                 delay(ClockSyncConfig.MINI_SYNC_INTERVAL_MS)
             }
 
@@ -711,7 +700,9 @@ class BleClockSyncService @Inject constructor(
                     "RTT=${String.format("%.2f", sample.rtt / 1_000_000.0)}ms, accepted=$accepted")
             }
             else -> {
-                Log.d(TAG, "Client: Received non-pong message: ${payload::class.simpleName}")
+                // Forward all other messages to the app via incomingMessages flow
+                Log.d(TAG, "Client: Forwarding ${payload::class.simpleName} to app")
+                _incomingMessages.tryEmit(message)
             }
         }
     }
@@ -742,6 +733,55 @@ class BleClockSyncService @Inject constructor(
             val id = UUID.randomUUID().toString().uppercase()
             prefs.edit().putString("device_id", id).apply()
             id
+        }
+    }
+
+    /**
+     * Send a TimingMessage to the connected peer.
+     *
+     * As server: sends via GATT notification on TX characteristic.
+     * As client: writes to RX characteristic on the server.
+     *
+     * @return true if the message was queued for sending, false if not connected.
+     */
+    @SuppressLint("MissingPermission")
+    fun sendMessage(payload: TimingPayload): Boolean {
+        if (connectedDevice == null) {
+            Log.w(TAG, "Cannot send message: not connected")
+            return false
+        }
+
+        val message = TimingMessage.create(
+            seq = sequenceNumber.incrementAndGet(),
+            senderId = deviceId,
+            sessionId = sessionId,
+            payload = payload
+        )
+        val messageData = TimingMessageCodec.encodeToBytes(message)
+
+        return when (role) {
+            Role.Server -> {
+                // Server sends via notification on TX characteristic
+                val device = connectedDevice ?: return false
+                txCharacteristic?.let { char ->
+                    char.value = messageData
+                    gattServer?.notifyCharacteristicChanged(device, char, false)
+                    Log.d(TAG, "Server: Sent ${payload::class.simpleName} (${messageData.size} bytes)")
+                    true
+                } ?: false
+            }
+            Role.Client -> {
+                // Client writes to RX characteristic on server
+                val client = gattClient ?: return false
+                rxCharacteristic?.let { char ->
+                    char.value = messageData
+                    char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    client.writeCharacteristic(char)
+                    Log.d(TAG, "Client: Sent ${payload::class.simpleName} (${messageData.size} bytes)")
+                    true
+                } ?: false
+            }
+            null -> false
         }
     }
 

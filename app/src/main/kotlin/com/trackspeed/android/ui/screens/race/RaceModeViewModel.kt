@@ -9,6 +9,7 @@ import com.trackspeed.android.camera.CameraManager
 import com.trackspeed.android.detection.CrossingEvent
 import com.trackspeed.android.detection.GateEngine
 import com.trackspeed.android.detection.PhotoFinishDetector
+import com.trackspeed.android.protocol.TimingPayload
 import com.trackspeed.android.sync.BleClockSyncService
 import com.trackspeed.android.sync.ClockSyncManager
 import com.trackspeed.android.sync.SyncQuality
@@ -181,6 +182,13 @@ class RaceModeViewModel @Inject constructor(
                 handleLocalCrossing(event)
             }
         }
+
+        // Observe incoming BLE messages from the remote device
+        viewModelScope.launch {
+            bleClockSyncService.incomingMessages.collect { message ->
+                handleRemoteMessage(message.payload)
+            }
+        }
     }
 
     // === Role Selection ===
@@ -282,7 +290,7 @@ class RaceModeViewModel @Inject constructor(
 
         when (currentState.role) {
             DeviceRole.START -> {
-                // Start phone: record start time, notify finish phone
+                // Start phone: record start time, notify finish phone via BLE
                 localStartTimeNanos = crossingTimeNanos
                 Log.i(TAG, "START crossing detected at $crossingTimeNanos ns")
 
@@ -293,9 +301,16 @@ class RaceModeViewModel @Inject constructor(
                 // Start the live timer
                 startTimerTick()
 
-                // TODO: Send crossing event to finish phone via BLE
-                // For now, log it. In a full implementation, we would write to
-                // a BLE characteristic that the finish phone reads.
+                // Send start event to finish phone via BLE
+                // Convert to remote clock so finish phone can use it directly
+                val remoteTimeNanos = clockSyncManager.toRemoteTime(crossingTimeNanos)
+                val sent = bleClockSyncService.sendMessage(
+                    TimingPayload.StartEvent(
+                        monotonicNanos = remoteTimeNanos,
+                        thumbnailData = null
+                    )
+                )
+                Log.i(TAG, "Sent StartEvent via BLE (remote=$remoteTimeNanos): sent=$sent")
             }
             DeviceRole.FINISH -> {
                 // Finish phone: record finish time, calculate split
@@ -310,10 +325,41 @@ class RaceModeViewModel @Inject constructor(
     }
 
     /**
-     * Called when the finish phone receives a start event from the start phone.
-     * In a full implementation, this would be triggered by a BLE characteristic notification.
+     * Handle an incoming message from the remote device via BLE.
      */
-    fun onRemoteStartReceived(remoteTimestampNanos: Long) {
+    private fun handleRemoteMessage(payload: TimingPayload) {
+        when (payload) {
+            is TimingPayload.StartEvent -> {
+                onRemoteStartReceived(payload.monotonicNanos)
+            }
+            is TimingPayload.CrossingEvent -> {
+                Log.i(TAG, "Remote crossing event: gate=${payload.gateId}, role=${payload.role}")
+                // Can be extended for multi-gate support
+            }
+            is TimingPayload.NewRun -> {
+                Log.i(TAG, "Remote requested new run")
+                startNewRace()
+            }
+            is TimingPayload.CancelRun -> {
+                Log.i(TAG, "Remote cancelled run")
+                startNewRace()
+            }
+            is TimingPayload.Abort -> {
+                Log.i(TAG, "Remote aborted: ${payload.reason}")
+                _uiState.update { it.copy(errorMessage = "Remote: ${payload.reason}") }
+            }
+            else -> {
+                Log.d(TAG, "Received remote message: ${payload::class.simpleName}")
+            }
+        }
+    }
+
+    /**
+     * Called when the finish phone receives a start event from the start phone.
+     */
+    private fun onRemoteStartReceived(remoteTimestampNanos: Long) {
+        if (_uiState.value.phase != RacePhase.ACTIVE_RACE) return
+
         remoteStartTimeNanos = remoteTimestampNanos
         val localStartTime = clockSyncManager.toLocalTime(remoteTimestampNanos)
         localStartTimeNanos = localStartTime
