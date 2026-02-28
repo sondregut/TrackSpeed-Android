@@ -1,12 +1,17 @@
 package com.trackspeed.android.ui.screens.onboarding
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.billing.PromoCodeError
+import com.trackspeed.android.billing.PromoRedemptionResult
+import com.trackspeed.android.billing.SubscriptionManager
 import com.trackspeed.android.data.model.FlyingDistance
 import com.trackspeed.android.data.model.OnboardingProfile
 import com.trackspeed.android.data.model.SportDiscipline
 import com.trackspeed.android.data.model.UserRole
 import com.trackspeed.android.data.repository.SettingsRepository
+import com.trackspeed.android.referral.ReferralService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,22 +53,51 @@ enum class OnboardingStep {
     val showsBackButton: Boolean get() = ordinal > 0 && this != COMPLETION
 }
 
+sealed interface PromoRedemptionState {
+    data object Idle : PromoRedemptionState
+    data object Loading : PromoRedemptionState
+    data class Success(val result: PromoRedemptionResult) : PromoRedemptionState
+    data class Error(val message: String) : PromoRedemptionState
+}
+
 data class OnboardingUiState(
     val currentStep: OnboardingStep = OnboardingStep.WELCOME,
     val profile: OnboardingProfile = OnboardingProfile(),
     val isLoading: Boolean = false,
-    val isAuthenticated: Boolean = false
+    val isAuthenticated: Boolean = false,
+    val promoRedemptionState: PromoRedemptionState = PromoRedemptionState.Idle,
+    val referralCode: String = "",
+    val referralLink: String = ""
 )
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val subscriptionManager: SubscriptionManager,
+    private val referralService: ReferralService
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "OnboardingViewModel"
+    }
 
     val onboardingCompletedFlow: Flow<Boolean> = settingsRepository.onboardingCompleted
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
+
+    init {
+        // Load referral code on init
+        viewModelScope.launch {
+            try {
+                val code = referralService.getOrCreateReferralCode()
+                val link = referralService.getReferralLink()
+                _uiState.update { it.copy(referralCode = code, referralLink = link) }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load referral code: ${e.message}")
+            }
+        }
+    }
 
     suspend fun isOnboardingCompleted(): Boolean {
         return settingsRepository.onboardingCompleted.first()
@@ -109,7 +143,59 @@ class OnboardingViewModel @Inject constructor(
                 profile.promoCode?.let { settingsRepository.setPromoCode(it) }
                 profile.referralCode?.let { settingsRepository.setReferralCode(it) }
             }
+
+            // Track referral signup if a referral code was entered during onboarding
+            val enteredReferralCode = _uiState.value.profile.referralCode
+            if (!enteredReferralCode.isNullOrBlank()) {
+                try {
+                    referralService.trackReferralSignup(enteredReferralCode)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to track referral signup: ${e.message}")
+                }
+            }
         }
+    }
+
+    /**
+     * Submit a promo code for redemption via the backend.
+     */
+    fun submitPromoCode(code: String, source: String) {
+        if (code.isBlank()) return
+
+        _uiState.update { it.copy(promoRedemptionState = PromoRedemptionState.Loading) }
+
+        viewModelScope.launch {
+            try {
+                val result = subscriptionManager.redeemPromoCode(code, source)
+                _uiState.update {
+                    it.copy(
+                        promoRedemptionState = PromoRedemptionState.Success(result),
+                        profile = it.profile.copy(promoCode = code)
+                    )
+                }
+            } catch (e: PromoCodeError) {
+                val message = when (e) {
+                    is PromoCodeError.InvalidCode -> "Invalid or inactive promo code"
+                    is PromoCodeError.Expired -> "This promo code has expired"
+                    is PromoCodeError.MaxUsesReached -> "This promo code has reached its maximum uses"
+                    is PromoCodeError.AlreadyRedeemed -> "You've already redeemed this code"
+                    is PromoCodeError.RateLimited -> "Please wait before trying again"
+                    is PromoCodeError.NetworkError -> "Network error. Please check your connection."
+                }
+                _uiState.update { it.copy(promoRedemptionState = PromoRedemptionState.Error(message)) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(promoRedemptionState = PromoRedemptionState.Error("Something went wrong. Please try again."))
+                }
+            }
+        }
+    }
+
+    /**
+     * Reset promo redemption state back to idle.
+     */
+    fun clearPromoRedemptionState() {
+        _uiState.update { it.copy(promoRedemptionState = PromoRedemptionState.Idle) }
     }
 
     fun setRole(role: UserRole) {

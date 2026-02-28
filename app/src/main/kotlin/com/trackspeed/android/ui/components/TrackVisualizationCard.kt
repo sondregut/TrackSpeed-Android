@@ -29,10 +29,8 @@ import com.trackspeed.android.ui.theme.SurfaceDark
 import com.trackspeed.android.ui.theme.TextPrimary
 import com.trackspeed.android.ui.theme.TextSecondary
 
-private val TrackColor = BorderSubtle
 private val StartGreen = Color(0xFF30D158)
 private val FinishAmber = Color(0xFFFFAB00)
-private val SplitBlue = AccentNavy
 
 /**
  * Gate marker data for the track visualization.
@@ -104,6 +102,10 @@ fun TrackVisualizationCard(
             // Track canvas
             val totalDistance = gates.maxOfOrNull { it.distanceMeters } ?: 100.0
 
+            // Capture composable colors for use inside Canvas DrawScope
+            val borderSubtleColor = BorderSubtle
+            val textSecondaryColor = TextSecondary
+
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -115,7 +117,7 @@ fun TrackVisualizationCard(
 
                 // Draw track line
                 drawRoundRect(
-                    color = TrackColor,
+                    color = borderSubtleColor,
                     topLeft = Offset(trackPadding, trackY - 2f),
                     size = Size(trackWidth, 4f),
                     cornerRadius = CornerRadius(2f, 2f)
@@ -197,7 +199,7 @@ fun TrackVisualizationCard(
                         text = "${gate.distanceMeters.toInt()}m",
                         style = TextStyle(
                             fontSize = 9.sp,
-                            color = TextSecondary
+                            color = textSecondaryColor
                         )
                     )
                     drawText(
@@ -249,7 +251,7 @@ private fun TrackVisualizationCard3GatesPreview() {
     TrackVisualizationCard(
         gates = listOf(
             GateMarker("START", 0.0, StartGreen),
-            GateMarker("LAP 1", 30.0, SplitBlue),
+            GateMarker("LAP 1", 30.0, AccentNavy),
             GateMarker("FINISH", 60.0, FinishAmber)
         ),
         totalDistanceLabel = "60m with Split",

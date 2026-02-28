@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,31 +16,35 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.screens.onboarding.PromoRedemptionState
 import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = AccentNavy
-private val SuccessGreen = AccentGreen
-private val SurfaceColor = SurfaceDark
+private val ErrorRed = Color(0xFFFF5252)
 
 @Composable
 fun PromoCodeStep(
     promoCode: String,
     onPromoCodeChanged: (String) -> Unit,
+    redemptionState: PromoRedemptionState,
+    onSubmit: (String) -> Unit,
     onContinue: () -> Unit,
     onSkip: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
     var isFocused by remember { mutableStateOf(false) }
-    var codeApplied by remember { mutableStateOf(false) }
 
-    // Reset applied state when code is cleared
-    LaunchedEffect(promoCode) {
-        if (promoCode.isEmpty() && codeApplied) {
-            codeApplied = false
+    val isLoading = redemptionState is PromoRedemptionState.Loading
+    val isSuccess = redemptionState is PromoRedemptionState.Success
+    val isError = redemptionState is PromoRedemptionState.Error
+
+    // Auto-advance after successful free code redemption
+    LaunchedEffect(redemptionState) {
+        if (redemptionState is PromoRedemptionState.Success && redemptionState.result.type == "free") {
+            kotlinx.coroutines.delay(2000)
+            onContinue()
         }
     }
 
@@ -99,10 +104,19 @@ fun PromoCodeStep(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = if (isFocused) AccentBlue else BorderSubtle,
-                        unfocusedBorderColor = BorderSubtle,
-                        focusedContainerColor = SurfaceColor,
-                        unfocusedContainerColor = SurfaceColor,
+                        focusedBorderColor = when {
+                            isError -> ErrorRed
+                            isSuccess -> AccentGreen
+                            isFocused -> AccentBlue
+                            else -> BorderSubtle
+                        },
+                        unfocusedBorderColor = when {
+                            isError -> ErrorRed
+                            isSuccess -> AccentGreen
+                            else -> BorderSubtle
+                        },
+                        focusedContainerColor = SurfaceDark,
+                        unfocusedContainerColor = SurfaceDark,
                         cursorColor = AccentBlue
                     ),
                     textStyle = TextStyle(
@@ -111,57 +125,117 @@ fun PromoCodeStep(
                         color = TextPrimary
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    singleLine = true,
+                    enabled = !isLoading && !isSuccess
                 )
             }
 
-            // Applied confirmation
-            if (codeApplied) {
-                Spacer(Modifier.height(12.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = SuccessGreen
-                    )
-                    Text(
-                        text = stringResource(R.string.onboarding_promo_applied),
-                        fontSize = 14.sp,
-                        color = SuccessGreen
-                    )
+            // Status messages
+            Spacer(Modifier.height(12.dp))
+
+            when (redemptionState) {
+                is PromoRedemptionState.Loading -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = AccentBlue,
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            text = "Verifying code...",
+                            fontSize = 14.sp,
+                            color = TextSecondary
+                        )
+                    }
+                }
+                is PromoRedemptionState.Success -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = AccentGreen
+                        )
+                        Text(
+                            text = if (redemptionState.result.type == "free") {
+                                "Pro Activated!"
+                            } else {
+                                "30-day trial unlocked!"
+                            },
+                            fontSize = 14.sp,
+                            color = AccentGreen,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                is PromoRedemptionState.Error -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Error,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = ErrorRed
+                        )
+                        Text(
+                            text = redemptionState.message,
+                            fontSize = 14.sp,
+                            color = ErrorRed
+                        )
+                    }
+                }
+                is PromoRedemptionState.Idle -> {
+                    // Show nothing
                 }
             }
         }
 
         Spacer(Modifier.weight(1f))
 
-        // Continue / Skip button
+        // Apply / Continue / Skip button
         Button(
             onClick = {
                 focusManager.clearFocus()
-                if (promoCode.isBlank()) {
-                    onSkip()
-                } else {
-                    if (!codeApplied) {
-                        codeApplied = true
-                    }
-                    onContinue()
+                when {
+                    promoCode.isBlank() -> onSkip()
+                    isSuccess -> onContinue()
+                    else -> onSubmit(promoCode)
                 }
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isSuccess) AccentGreen else AccentBlue
+            ),
+            enabled = !isLoading
         ) {
-            Text(
-                text = if (promoCode.isBlank()) stringResource(R.string.common_skip) else stringResource(R.string.common_continue),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.5.dp
+                )
+            } else {
+                Text(
+                    text = when {
+                        promoCode.isBlank() -> stringResource(R.string.common_skip)
+                        isSuccess -> stringResource(R.string.common_continue)
+                        else -> "Apply Code"
+                    },
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isSuccess) Color.Black else Color.White
+                )
+            }
         }
 
         Spacer(Modifier.height(32.dp))

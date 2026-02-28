@@ -42,13 +42,6 @@ import com.trackspeed.android.ui.components.CameraPreviewPlaceholder
 import com.trackspeed.android.ui.theme.*
 
 // Dark theme color constants using new LaserSpeed theme
-private val CardBackground = SurfaceDark
-private val DarkGray = BorderSubtle
-private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val TextTertiary = TextMuted
-private val AccentBlue = AccentNavy
-private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
 private val AccentRed = Color(0xFFFF453A)
 private val AccentOrange = Color(0xFFFF9F0A)
 
@@ -196,7 +189,7 @@ private fun RaceTopBar(
             onClick = onBack,
             modifier = Modifier
                 .size(36.dp)
-                .background(DarkGray, CircleShape)
+                .background(BorderSubtle, CircleShape)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -354,7 +347,7 @@ private fun PairingContent(
         // Cancel button
         PillButton(
             text = stringResource(R.string.race_cancel),
-            backgroundColor = DarkGray,
+            backgroundColor = BorderSubtle,
             onClick = onCancel
         )
     }
@@ -400,6 +393,7 @@ private fun ScanningAnimation() {
         label = "scale2"
     )
 
+    val accentBlueColor = AccentBlue
     Box(
         modifier = Modifier.size(120.dp),
         contentAlignment = Alignment.Center
@@ -407,12 +401,12 @@ private fun ScanningAnimation() {
         // Animated rings
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
-                color = AccentBlue.copy(alpha = alpha1),
+                color = accentBlueColor.copy(alpha = alpha1),
                 radius = 30.dp.toPx() * scale1,
                 style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
             )
             drawCircle(
-                color = AccentBlue.copy(alpha = alpha2),
+                color = accentBlueColor.copy(alpha = alpha2),
                 radius = 30.dp.toPx() * scale2,
                 style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
             )
@@ -486,7 +480,7 @@ private fun SyncingContent(
                 progress = { progress },
                 modifier = Modifier.fillMaxSize(),
                 color = AccentBlue,
-                trackColor = DarkGray,
+                trackColor = BorderSubtle,
                 strokeWidth = 6.dp
             )
 
@@ -520,7 +514,7 @@ private fun SyncingContent(
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp)),
             color = AccentBlue,
-            trackColor = DarkGray
+            trackColor = BorderSubtle
         )
 
         Text(
@@ -540,7 +534,7 @@ private fun SyncingContent(
 
         PillButton(
             text = stringResource(R.string.race_cancel),
-            backgroundColor = DarkGray,
+            backgroundColor = BorderSubtle,
             onClick = onCancel
         )
     }
@@ -587,7 +581,7 @@ private fun RaceReadyContent(
                 .fillMaxWidth()
                 .height(200.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .border(2.dp, DarkGray, RoundedCornerShape(20.dp))
+                .border(2.dp, BorderSubtle, RoundedCornerShape(20.dp))
         ) {
             if (uiState.hasPermission && uiState.cameraState !is CameraManager.CameraState.Error) {
                 CameraPreview(
@@ -741,7 +735,7 @@ private fun DistanceSelector(
                         .weight(1f)
                         .height(36.dp)
                         .background(
-                            if (isSelected) AccentBlue else DarkGray,
+                            if (isSelected) AccentBlue else BorderSubtle,
                             RoundedCornerShape(8.dp)
                         )
                         .clickable { onDistanceChanged(distance) },
@@ -1087,7 +1081,7 @@ private fun ResultContent(
 
         PillButton(
             text = stringResource(R.string.race_exit),
-            backgroundColor = DarkGray,
+            backgroundColor = BorderSubtle,
             onClick = onExit
         )
 

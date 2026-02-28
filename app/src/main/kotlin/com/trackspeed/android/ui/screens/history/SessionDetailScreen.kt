@@ -1,5 +1,7 @@
 package com.trackspeed.android.ui.screens.history
 
+import com.trackspeed.android.ui.theme.*
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
@@ -49,11 +51,6 @@ import com.trackspeed.android.data.local.entities.RunEntity
 import kotlinx.coroutines.launch
 import com.trackspeed.android.ui.components.ExpandedThumbnail
 import com.trackspeed.android.ui.components.ThumbnailViewerDialog
-import com.trackspeed.android.ui.theme.AccentNavy
-import com.trackspeed.android.ui.theme.TextPrimary as ThemeTextPrimary
-import com.trackspeed.android.ui.theme.TextSecondary as ThemeTextSecondary
-import com.trackspeed.android.ui.theme.SurfaceDark
-import com.trackspeed.android.ui.theme.gradientBackground
 import com.trackspeed.android.ui.util.formatTime
 import com.trackspeed.android.ui.util.formatSpeed
 import com.trackspeed.android.ui.util.parseAthleteColor
@@ -64,13 +61,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val TextPrimary = ThemeTextPrimary
-private val TextSecondary = ThemeTextSecondary
 private val BestGreen = Color(0xFF4CAF50)
 private val SeasonGold = Color(0xFFFFD600)
-private val AccentBlue = AccentNavy
-private val ChipUnselected = SurfaceDark
-private val TableHeaderBg = SurfaceDark
 private val BestRowBg = Color(0xFF1A3A1A)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -289,7 +281,7 @@ private fun AthleteFilterChips(
         Surface(
             modifier = Modifier.clickable { onAthleteSelected(null) },
             shape = RoundedCornerShape(8.dp),
-            color = if (allSelected) AccentBlue else ChipUnselected
+            color = if (allSelected) AccentBlue else CardBackground
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -319,7 +311,7 @@ private fun AthleteFilterChips(
             Surface(
                 modifier = Modifier.clickable { onAthleteSelected(athlete.id) },
                 shape = RoundedCornerShape(8.dp),
-                color = if (isSelected) chipColor else ChipUnselected
+                color = if (isSelected) chipColor else CardBackground
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -359,7 +351,7 @@ private fun TableHeader(showAthlete: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(TableHeaderBg, RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
+            .background(SurfaceDark, RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -56,9 +56,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.data.local.entities.AthleteEntity
 import com.trackspeed.android.ui.theme.*
 
-private val CardBg = SurfaceDark
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val AccentBlue = AccentNavy
 private val DeleteRed = Color(0xFFFF453A)
 
 @Composable
@@ -182,8 +179,8 @@ private fun SearchBar(
         singleLine = true,
         shape = RoundedCornerShape(12.dp),
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = CardBg,
-            unfocusedContainerColor = CardBg,
+            focusedContainerColor = CardBackground,
+            unfocusedContainerColor = CardBackground,
             focusedTextColor = TextPrimary,
             unfocusedTextColor = TextPrimary,
             cursorColor = AccentBlue,
@@ -268,7 +265,7 @@ private fun AthleteRow(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBg)
+        colors = CardDefaults.cardColors(containerColor = CardBackground)
     ) {
         Row(
             modifier = Modifier
@@ -414,7 +411,7 @@ internal fun athleteColor(colorName: String): Color {
 )
 @Composable
 private fun AthleteListPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         AthleteListContent(
             uiState = AthleteListUiState(
                 athletes = listOf(
@@ -439,7 +436,7 @@ private fun AthleteListPreview() {
 )
 @Composable
 private fun AthleteListEmptyPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         AthleteListContent(
             uiState = AthleteListUiState(),
             onSearchQueryChanged = {},

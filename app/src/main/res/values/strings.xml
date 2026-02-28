@@ -103,6 +103,10 @@
     <string name="settings_language_title">Language</string>
     <string name="settings_speed_unit">Speed unit</string>
     <string name="settings_dark_mode">Dark mode</string>
+    <string name="settings_theme">Appearance</string>
+    <string name="theme_midnight">Midnight</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_gold">Gold</string>
     <string name="settings_section_detection">Detection</string>
     <string name="settings_sensitivity">Sensitivity</string>
     <string name="settings_frame_rate">Frame rate</string>

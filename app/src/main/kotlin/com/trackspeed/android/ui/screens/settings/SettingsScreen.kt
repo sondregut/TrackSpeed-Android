@@ -39,13 +39,6 @@ import com.trackspeed.android.BuildConfig
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 
-private val CardBackground = SurfaceDark
-private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val TextTertiary = TextMuted
-private val DividerColor = BorderSubtle
-private val AccentBlue = AccentNavy
-private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
 private val DestructiveRed = Color(0xFFFF3B30)
 
 /**
@@ -94,7 +87,7 @@ fun SettingsScreen(
         onDistanceSelected = { viewModel.setDefaultDistance(it) },
         onStartTypeSelected = { viewModel.setStartType(it) },
         onSpeedUnitSelected = { viewModel.setSpeedUnit(it) },
-        onDarkModeChanged = { viewModel.setDarkMode(it) },
+        onThemeSelected = { viewModel.setAppTheme(it) },
         onSensitivityChanged = { viewModel.setDetectionSensitivity(it) },
         onFpsSelected = { viewModel.setPreferredFps(it) },
         onVoiceProviderSelected = { viewModel.setVoiceProvider(it) },
@@ -120,7 +113,7 @@ private fun SettingsScreenContent(
     onDistanceSelected: (Double) -> Unit,
     onStartTypeSelected: (String) -> Unit,
     onSpeedUnitSelected: (String) -> Unit,
-    onDarkModeChanged: (Boolean) -> Unit,
+    onThemeSelected: (AppTheme) -> Unit,
     onSensitivityChanged: (Float) -> Unit,
     onFpsSelected: (Int) -> Unit = {},
     onVoiceProviderSelected: (String) -> Unit = {},
@@ -395,9 +388,9 @@ private fun SettingsScreenContent(
             )
         )
 
-        // Dark mode
+        // Theme picker
         ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_dark_mode), color = TextPrimary) },
+            headlineContent = { Text(stringResource(R.string.settings_theme), color = TextPrimary) },
             leadingContent = {
                 Icon(
                     imageVector = Icons.Outlined.DarkMode,
@@ -405,18 +398,41 @@ private fun SettingsScreenContent(
                     tint = TextSecondary
                 )
             },
-            trailingContent = {
-                Switch(
-                    checked = state.darkMode,
-                    onCheckedChange = { onDarkModeChanged(it) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = AccentBlue,
-                        uncheckedThumbColor = Color.White,
-                        uncheckedTrackColor = TextTertiary,
-                        uncheckedBorderColor = TextTertiary
-                    )
-                )
+            supportingContent = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    listOf(
+                        AppTheme.MIDNIGHT to stringResource(R.string.theme_midnight),
+                        AppTheme.LIGHT to stringResource(R.string.theme_light),
+                        AppTheme.DARKGOLD to stringResource(R.string.theme_gold)
+                    ).forEach { (theme, label) ->
+                        FilterChip(
+                            selected = state.appTheme == theme,
+                            onClick = { onThemeSelected(theme) },
+                            label = {
+                                Text(
+                                    label,
+                                    color = if (state.appTheme == theme) Color.White else TextSecondary,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = CardBackground,
+                                selectedContainerColor = AccentBlue,
+                                labelColor = TextSecondary,
+                                selectedLabelColor = Color.White
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = TextTertiary,
+                                selectedBorderColor = AccentBlue,
+                                enabled = true,
+                                selected = state.appTheme == theme
+                            )
+                        )
+                    }
+                }
             },
             colors = ListItemDefaults.colors(
                 containerColor = Color.Transparent
@@ -925,13 +941,13 @@ private fun SectionHeader(title: String) {
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun SettingsScreenPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         SettingsScreenContent(
             state = SettingsUiState(),
             onDistanceSelected = {},
             onStartTypeSelected = {},
             onSpeedUnitSelected = {},
-            onDarkModeChanged = {},
+            onThemeSelected = {},
             onSensitivityChanged = {},
             onFpsSelected = {},
             onPaywallClick = {},
@@ -944,13 +960,13 @@ private fun SettingsScreenPreview() {
 @Preview(showBackground = true, backgroundColor = 0xFF000000, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun SettingsScreenDarkPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         SettingsScreenContent(
             state = SettingsUiState(isProUser = true),
             onDistanceSelected = {},
             onStartTypeSelected = {},
             onSpeedUnitSelected = {},
-            onDarkModeChanged = {},
+            onThemeSelected = {},
             onSensitivityChanged = {},
             onFpsSelected = {},
             onPaywallClick = {},

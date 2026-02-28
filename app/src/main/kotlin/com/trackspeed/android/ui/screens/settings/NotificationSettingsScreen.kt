@@ -38,13 +38,6 @@ import com.trackspeed.android.notifications.NotificationTiming
 import com.trackspeed.android.ui.theme.*
 
 // Colors using the new LaserSpeed theme
-private val CardBackground = SurfaceDark
-private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val TextTertiary = TextMuted
-private val DividerColor = BorderSubtle
-private val AccentBlue = AccentNavy
-private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
 private val AccentOrange = Color(0xFFFF9F0A)
 private val WarningYellow = Color(0xFFFFD60A)
 
@@ -480,7 +473,7 @@ private fun SectionHeader(title: String) {
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun NotificationSettingsPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         NotificationSettingsContent(
             state = NotificationSettingsUiState(
                 tryProReminderEnabled = true,
@@ -502,7 +495,7 @@ private fun NotificationSettingsPreview() {
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun NotificationSettingsNoPermissionPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         NotificationSettingsContent(
             state = NotificationSettingsUiState(
                 hasNotificationPermission = false

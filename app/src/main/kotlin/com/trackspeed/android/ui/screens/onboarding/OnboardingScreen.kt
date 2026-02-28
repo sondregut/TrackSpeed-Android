@@ -130,6 +130,7 @@ fun OnboardingScreen(
                     onAttributionSelected = { viewModel.setAttribution(it) },
                     promoCode = state.profile.promoCode ?: "",
                     onPromoCodeChanged = { viewModel.setPromoCode(it) },
+                    onSubmitPromoCode = { code, source -> viewModel.submitPromoCode(code, source) },
                     onContinue = { viewModel.goForward() }
                 )
                 OnboardingStep.RATING -> RatingStep(
@@ -168,15 +169,20 @@ fun OnboardingScreen(
                 OnboardingStep.PROMO_CODE -> PromoCodeStep(
                     promoCode = state.profile.promoCode ?: "",
                     onPromoCodeChanged = { viewModel.setPromoCode(it) },
+                    redemptionState = state.promoRedemptionState,
+                    onSubmit = { code -> viewModel.submitPromoCode(code, "onboarding_promo") },
                     onContinue = { viewModel.goForward() },
                     onSkip = { viewModel.goForward() }
                 )
                 OnboardingStep.REFERRAL -> ReferralStep(
+                    referralCode = state.referralCode,
+                    referralLink = state.referralLink,
                     onContinue = { viewModel.goForward() },
                     onSkip = { viewModel.goForward() }
                 )
                 OnboardingStep.SPIN_WHEEL -> SpinWheelStep(
-                    onContinue = { viewModel.goForward() }
+                    onContinue = { viewModel.goForward() },
+                    onClaimDiscount = { /* Discount preference handled in PaywallViewModel */ }
                 )
                 OnboardingStep.COMPLETION -> CompletionStep(
                     onTrySoloMode = {

@@ -1,5 +1,7 @@
 package com.trackspeed.android.ui.components
 
+import com.trackspeed.android.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,14 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.trackspeed.android.ui.theme.AccentNavy
-import com.trackspeed.android.ui.theme.SurfaceDark
-import com.trackspeed.android.ui.theme.TextPrimary
-import com.trackspeed.android.ui.theme.TextSecondary
-
 // Accent colors - use theme values
-private val AccentBlue = AccentNavy
-private val CardDark = SurfaceDark
 
 /**
  * Start mode options matching the iOS start type selection.
@@ -189,7 +184,7 @@ private fun StartModeOption(
                 .clip(RoundedCornerShape(12.dp))
                 .background(
                     if (isSelected) selectedColor.copy(alpha = 0.15f)
-                    else CardDark
+                    else CardBackground
                 ),
             contentAlignment = Alignment.Center
         ) {

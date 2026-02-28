@@ -19,7 +19,6 @@ import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
 
 private val AccentYellow = AccentGold
-private val AccentBlue = AccentNavy
 
 @Composable
 fun TrialReminderStep(onContinue: () -> Unit) {

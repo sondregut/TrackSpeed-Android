@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = AccentNavy
 private val GreenMarker = AccentGreen
 private val RedMarker = TimerRed
 

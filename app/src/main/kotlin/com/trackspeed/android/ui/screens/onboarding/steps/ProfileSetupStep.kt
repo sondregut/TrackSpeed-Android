@@ -20,8 +20,6 @@ import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = AccentNavy
-private val SurfaceColor = SurfaceDark
 
 @Composable
 fun ProfileSetupStep(
@@ -98,8 +96,8 @@ fun ProfileSetupStep(
                     unfocusedTextColor = TextPrimary,
                     focusedBorderColor = AccentBlue,
                     unfocusedBorderColor = BorderSubtle,
-                    focusedContainerColor = SurfaceColor,
-                    unfocusedContainerColor = SurfaceColor,
+                    focusedContainerColor = SurfaceDark,
+                    unfocusedContainerColor = SurfaceDark,
                     cursorColor = AccentBlue
                 ),
                 shape = RoundedCornerShape(12.dp),
@@ -141,8 +139,8 @@ fun ProfileSetupStep(
                     unfocusedTextColor = TextPrimary,
                     focusedBorderColor = AccentBlue,
                     unfocusedBorderColor = BorderSubtle,
-                    focusedContainerColor = SurfaceColor,
-                    unfocusedContainerColor = SurfaceColor,
+                    focusedContainerColor = SurfaceDark,
+                    unfocusedContainerColor = SurfaceDark,
                     cursorColor = AccentBlue
                 ),
                 shape = RoundedCornerShape(12.dp),

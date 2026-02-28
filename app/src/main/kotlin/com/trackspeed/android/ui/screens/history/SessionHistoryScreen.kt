@@ -1,5 +1,7 @@
 package com.trackspeed.android.ui.screens.history
 
+import com.trackspeed.android.ui.theme.*
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
@@ -45,25 +47,14 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.res.stringResource
 import com.trackspeed.android.R
-import com.trackspeed.android.ui.theme.AccentNavy
-import com.trackspeed.android.ui.theme.TextPrimary as ThemeTextPrimary
-import com.trackspeed.android.ui.theme.TextSecondary as ThemeTextSecondary
-import com.trackspeed.android.ui.theme.SurfaceDark
-import com.trackspeed.android.ui.theme.gradientBackground
-import com.trackspeed.android.ui.theme.gunmetalCard
 import com.trackspeed.android.ui.util.formatTime
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val TextPrimary = ThemeTextPrimary
-private val TextSecondary = ThemeTextSecondary
-private val AccentBlue = AccentNavy
-private val ChipUnselectedBackground = SurfaceDark
 private val BestGreen = Color(0xFF30D158)
 private val DeleteRed = Color(0xFFFF3B30)
-private val SectionHeaderColor = ThemeTextSecondary
 
 @Composable
 fun SessionHistoryScreen(
@@ -275,7 +266,7 @@ fun SessionHistoryScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 letterSpacing = 1.5.sp
                             ),
-                            color = SectionHeaderColor,
+                            color = TextSecondary,
                             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 4.dp)
                         )
                     }
@@ -405,8 +396,8 @@ private fun SearchBar(
         singleLine = true,
         shape = RoundedCornerShape(12.dp),
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = ChipUnselectedBackground,
-            unfocusedContainerColor = ChipUnselectedBackground,
+            focusedContainerColor = CardBackground,
+            unfocusedContainerColor = CardBackground,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
             focusedTextColor = TextPrimary,
@@ -444,7 +435,7 @@ private fun FilterChipRow(
                 Surface(
                     modifier = Modifier.clickable { onSelected(index) },
                     shape = RoundedCornerShape(8.dp),
-                    color = if (isSelected) AccentBlue else ChipUnselectedBackground
+                    color = if (isSelected) AccentBlue else CardBackground
                 ) {
                     Text(
                         text = option,

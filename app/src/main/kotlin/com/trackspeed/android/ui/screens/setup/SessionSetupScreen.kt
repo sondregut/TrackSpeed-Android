@@ -65,12 +65,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.data.local.entities.AthleteEntity
 import com.trackspeed.android.ui.theme.*
 
-private val CardBackground = com.trackspeed.android.ui.theme.SurfaceDark
-private val SecondaryText = TextSecondary
-private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
-private val AccentBlue = AccentNavy
-private val StepGray = TextMuted
-private val SurfaceDarkLocal = com.trackspeed.android.ui.theme.SurfaceDark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -197,7 +191,7 @@ private fun StepIndicator(
             val circleColor = when {
                 isCompleted -> AccentGreen
                 isCurrent -> AccentBlue
-                else -> StepGray
+                else -> TextMuted
             }
 
             Box(
@@ -232,7 +226,7 @@ private fun StepIndicator(
                         .height(2.dp)
                         .background(
                             if (index < currentActiveIndex) AccentGreen
-                            else StepGray
+                            else TextMuted
                         )
                 )
             }
@@ -261,7 +255,7 @@ private fun AthleteSelectionStep(
             text = if (selectedIds.isEmpty()) "Optional - skip if solo practice"
             else "${selectedIds.size} selected",
             style = MaterialTheme.typography.bodyMedium,
-            color = SecondaryText,
+            color = TextSecondary,
             modifier = Modifier.padding(bottom = 20.dp)
         )
 
@@ -294,20 +288,20 @@ private fun EmptyAthletesPlaceholder() {
         Icon(
             imageVector = Icons.Default.Person,
             contentDescription = null,
-            tint = StepGray,
+            tint = TextMuted,
             modifier = Modifier.size(64.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "No athletes added yet",
             style = MaterialTheme.typography.bodyLarge,
-            color = SecondaryText
+            color = TextSecondary
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "You can continue without selecting athletes,\nor add them from the Profile tab.",
             style = MaterialTheme.typography.bodySmall,
-            color = StepGray,
+            color = TextMuted,
             textAlign = TextAlign.Center
         )
     }
@@ -371,7 +365,7 @@ private fun AthleteRow(
                     Text(
                         text = nickname,
                         style = MaterialTheme.typography.bodySmall,
-                        color = SecondaryText
+                        color = TextSecondary
                     )
                 }
             }
@@ -379,7 +373,7 @@ private fun AthleteRow(
             Icon(
                 imageVector = if (isSelected) Icons.Default.Check else Icons.Default.Person,
                 contentDescription = if (isSelected) "Selected" else "Not selected",
-                tint = if (isSelected) AccentGreen else StepGray,
+                tint = if (isSelected) AccentGreen else TextMuted,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -408,7 +402,7 @@ private fun DistanceSelectionStep(
         Text(
             text = "Choose a preset or enter custom",
             style = MaterialTheme.typography.bodyMedium,
-            color = SecondaryText,
+            color = TextSecondary,
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
@@ -432,7 +426,7 @@ private fun DistanceSelectionStep(
         Text(
             text = "Or enter custom distance",
             style = MaterialTheme.typography.bodySmall,
-            color = SecondaryText,
+            color = TextSecondary,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
@@ -453,9 +447,9 @@ private fun DistanceSelectionStep(
                     unfocusedTextColor = TextPrimary,
                     cursorColor = AccentBlue,
                     focusedBorderColor = AccentBlue,
-                    unfocusedBorderColor = StepGray,
-                    focusedContainerColor = SurfaceDarkLocal,
-                    unfocusedContainerColor = SurfaceDarkLocal
+                    unfocusedBorderColor = TextMuted,
+                    focusedContainerColor = SurfaceDark,
+                    unfocusedContainerColor = SurfaceDark
                 ),
                 shape = RoundedCornerShape(12.dp)
             )
@@ -463,7 +457,7 @@ private fun DistanceSelectionStep(
             Text(
                 text = "meters",
                 style = MaterialTheme.typography.bodyMedium,
-                color = SecondaryText
+                color = TextSecondary
             )
         }
     }
@@ -517,7 +511,7 @@ private fun StartTypeSelectionStep(
         Text(
             text = "Choose the start method",
             style = MaterialTheme.typography.bodyMedium,
-            color = SecondaryText,
+            color = TextSecondary,
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
@@ -572,7 +566,7 @@ private fun StartTypeCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isSelected) AccentGreen else SecondaryText,
+                tint = if (isSelected) AccentGreen else TextSecondary,
                 modifier = Modifier.size(28.dp)
             )
 
@@ -590,7 +584,7 @@ private fun StartTypeCard(
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = SecondaryText,
+                    color = TextSecondary,
                     lineHeight = 18.sp
                 )
             }
@@ -640,7 +634,7 @@ private fun BottomBar(
                     .weight(1f)
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = StepGray)
+                colors = CardDefaults.cardColors(containerColor = TextMuted)
             ) {
                 Row(
                     modifier = Modifier.fillMaxSize(),
@@ -708,7 +702,7 @@ private fun ConnectPhonesStep() {
         Text(
             text = "This session requires 2 phones \u2014 one at the start line and one at the finish.",
             style = MaterialTheme.typography.bodyMedium,
-            color = SecondaryText,
+            color = TextSecondary,
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
@@ -756,14 +750,14 @@ private fun ConnectPhonesStep() {
                     Text(
                         text = "\u2022 \u2022 \u2022 \u2022 \u2022",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = StepGray,
+                        color = TextMuted,
                         letterSpacing = 4.sp
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "BLE Sync",
                         style = MaterialTheme.typography.labelSmall,
-                        color = StepGray
+                        color = TextMuted
                     )
                 }
 
@@ -800,7 +794,7 @@ private fun ConnectPhonesStep() {
         Text(
             text = "On the next screen you\u2019ll pair the two phones using Bluetooth and synchronize their clocks for accurate timing.",
             style = MaterialTheme.typography.bodyMedium,
-            color = SecondaryText,
+            color = TextSecondary,
             lineHeight = 22.sp
         )
     }
@@ -830,7 +824,7 @@ private fun athleteColorFromString(color: String): Color {
 )
 @Composable
 private fun SessionSetupPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         // Simplified preview without Hilt
         Scaffold(
             containerColor = BackgroundDark,
@@ -873,7 +867,7 @@ private fun SessionSetupPreview() {
 )
 @Composable
 private fun StartTypeStepPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         Scaffold(
             containerColor = BackgroundDark,
             bottomBar = {

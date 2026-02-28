@@ -1,5 +1,6 @@
 package com.trackspeed.android.ui.screens.referral
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.referral.ReferralService
@@ -26,6 +27,10 @@ class ReferralViewModel @Inject constructor(
     private val referralService: ReferralService
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "ReferralViewModel"
+    }
+
     private val _uiState = MutableStateFlow(ReferralUiState())
     val uiState: StateFlow<ReferralUiState> = _uiState.asStateFlow()
 
@@ -48,16 +53,28 @@ class ReferralViewModel @Inject constructor(
                         isLoading = false
                     )
                 }
+
+                // Refresh stats from Supabase
+                refreshStats()
             } catch (e: Exception) {
+                Log.w(TAG, "Failed to load referral data: ${e.message}")
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
 
-        // Collect stats
+        // Collect local stats cache
         viewModelScope.launch {
             referralService.stats.collect { stats ->
                 _uiState.update { it.copy(stats = stats) }
             }
+        }
+    }
+
+    private suspend fun refreshStats() {
+        try {
+            referralService.refreshStats()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to refresh referral stats: ${e.message}")
         }
     }
 

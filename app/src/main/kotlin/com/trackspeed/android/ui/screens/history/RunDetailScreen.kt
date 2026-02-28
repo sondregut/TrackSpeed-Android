@@ -1,5 +1,7 @@
 package com.trackspeed.android.ui.screens.history
 
+import com.trackspeed.android.ui.theme.*
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
@@ -75,12 +77,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.components.ExpandedThumbnail
 import com.trackspeed.android.ui.components.ThumbnailViewerDialog
-import com.trackspeed.android.ui.theme.AccentNavy
-import com.trackspeed.android.ui.theme.TextPrimary as ThemeTextPrimary
-import com.trackspeed.android.ui.theme.TextSecondary as ThemeTextSecondary
-import com.trackspeed.android.ui.theme.SurfaceDark
-import com.trackspeed.android.ui.theme.gradientBackground
-import com.trackspeed.android.ui.theme.gunmetalCard
 import com.trackspeed.android.ui.util.formatTime
 import com.trackspeed.android.ui.util.parseAthleteColor
 import java.io.File
@@ -88,11 +84,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val TextPrimary = ThemeTextPrimary
-private val TextSecondary = ThemeTextSecondary
 private val BestGreen = Color(0xFF4CAF50)
 private val SeasonGold = Color(0xFFFFD600)
-private val AccentBlue = AccentNavy
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

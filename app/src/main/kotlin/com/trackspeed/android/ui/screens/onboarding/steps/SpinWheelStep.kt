@@ -27,15 +27,15 @@ import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
 
-private val AccentBlue = AccentNavy
-private val SpinGreen = AccentGreen
-
 private data class WheelSegment(val labelRes: Int?, val emoji: String?, val color: Color, val isTarget: Boolean = false)
 
 private enum class SpinState { READY, SPINNING, LANDED }
 
 @Composable
-fun SpinWheelStep(onContinue: () -> Unit) {
+fun SpinWheelStep(
+    onContinue: () -> Unit,
+    onClaimDiscount: () -> Unit = {}
+) {
     var spinState by remember { mutableStateOf(SpinState.READY) }
     var canSkip by remember { mutableStateOf(false) }
 
@@ -43,16 +43,20 @@ fun SpinWheelStep(onContinue: () -> Unit) {
     val segment20Off = stringResource(R.string.onboarding_spin_segment_20_off)
     val segmentNoLuck = stringResource(R.string.onboarding_spin_segment_no_luck)
 
-    val segments = remember(segment20Off, segmentNoLuck) {
+    // Capture composable colors before entering remember block
+    val accentBlueColor = AccentBlue
+    val surfaceDarkColor = SurfaceDark
+
+    val segments = remember(segment20Off, segmentNoLuck, accentBlueColor, surfaceDarkColor) {
         listOf(
-            WheelSegment(null, segment20Off, AccentBlue, isTarget = true),
-            WheelSegment(null, "\uD83C\uDF81", SurfaceDark),
-            WheelSegment(null, segmentNoLuck, SurfaceDark.copy(alpha = 0.8f)),
-            WheelSegment(null, "\uD83C\uDF81", SurfaceDark),
-            WheelSegment(null, segmentNoLuck, SurfaceDark.copy(alpha = 0.8f)),
-            WheelSegment(null, "\uD83C\uDF81", SurfaceDark),
-            WheelSegment(null, segmentNoLuck, SurfaceDark.copy(alpha = 0.8f)),
-            WheelSegment(null, "\uD83C\uDF81", SurfaceDark),
+            WheelSegment(null, segment20Off, accentBlueColor, isTarget = true),
+            WheelSegment(null, "\uD83C\uDF81", surfaceDarkColor),
+            WheelSegment(null, segmentNoLuck, surfaceDarkColor.copy(alpha = 0.8f)),
+            WheelSegment(null, "\uD83C\uDF81", surfaceDarkColor),
+            WheelSegment(null, segmentNoLuck, surfaceDarkColor.copy(alpha = 0.8f)),
+            WheelSegment(null, "\uD83C\uDF81", surfaceDarkColor),
+            WheelSegment(null, segmentNoLuck, surfaceDarkColor.copy(alpha = 0.8f)),
+            WheelSegment(null, "\uD83C\uDF81", surfaceDarkColor),
         )
     }
 
@@ -102,6 +106,7 @@ fun SpinWheelStep(onContinue: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         // Wheel with pointer
+        val pointerColor = TextPrimary
         Box(
             contentAlignment = Alignment.TopCenter,
             modifier = Modifier.size(260.dp)
@@ -135,7 +140,7 @@ fun SpinWheelStep(onContinue: () -> Unit) {
                     lineTo(size.width, 0f)
                     close()
                 }
-                drawPath(path, TextPrimary)
+                drawPath(path, pointerColor)
             }
         }
 
@@ -200,7 +205,10 @@ fun SpinWheelStep(onContinue: () -> Unit) {
                 when (spinState) {
                     SpinState.READY -> spinState = SpinState.SPINNING
                     SpinState.SPINNING -> {} // no-op
-                    SpinState.LANDED -> onContinue()
+                    SpinState.LANDED -> {
+                        onClaimDiscount()
+                        onContinue()
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),

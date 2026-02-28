@@ -1,5 +1,7 @@
 package com.trackspeed.android.ui.screens.history
 
+import com.trackspeed.android.ui.theme.*
+
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -55,18 +57,10 @@ import com.trackspeed.android.R
 import com.trackspeed.android.ui.components.ComposeCapture
 import com.trackspeed.android.ui.components.ShareCardTheme
 import com.trackspeed.android.ui.components.ShareableResultCard
-import com.trackspeed.android.ui.theme.AccentNavy
-import com.trackspeed.android.ui.theme.TextPrimary as ThemeTextPrimary
-import com.trackspeed.android.ui.theme.TextSecondary as ThemeTextSecondary
-import com.trackspeed.android.ui.theme.SurfaceDark
-import com.trackspeed.android.ui.theme.gradientBackground
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val TextPrimary = ThemeTextPrimary
-private val TextSecondary = ThemeTextSecondary
-private val AccentBlue = AccentNavy
 
 // Card render size in pixels (1080x1920 = 9:16 for Instagram Stories)
 private const val CARD_WIDTH_PX = 1080

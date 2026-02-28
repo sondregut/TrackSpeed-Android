@@ -32,7 +32,6 @@ import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
 
-private val AccentBlue = AccentNavy
 private val SuccessGreen = AccentGreen
 private val WarningOrange = AccentGold
 

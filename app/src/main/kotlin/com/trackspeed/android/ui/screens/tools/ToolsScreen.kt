@@ -24,11 +24,6 @@ import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 
-private val CardBackground = SurfaceDark
-private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val TextTertiary = TextMuted
-private val AccentBlue = AccentNavy
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -155,7 +150,7 @@ private fun ToolItem(
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun ToolsScreenPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         ToolsScreen(
             onNavigateBack = {},
             onWindAdjustmentClick = {},

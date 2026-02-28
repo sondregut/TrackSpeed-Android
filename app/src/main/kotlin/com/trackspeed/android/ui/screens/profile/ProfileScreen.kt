@@ -1045,7 +1045,7 @@ private fun formatTime(seconds: Double): String {
 )
 @Composable
 private fun ProfileScreenPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         ProfileScreenContent(
             uiState = ProfileUiState(
                 userName = "Sondre",
@@ -1070,7 +1070,7 @@ private fun ProfileScreenPreview() {
 )
 @Composable
 private fun ProfileScreenEmptyPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         ProfileScreenContent(
             uiState = ProfileUiState()
         )
@@ -1085,7 +1085,7 @@ private fun ProfileScreenEmptyPreview() {
 )
 @Composable
 private fun ProfileScreenProPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         ProfileScreenContent(
             uiState = ProfileUiState(
                 userName = "Coach Mike",

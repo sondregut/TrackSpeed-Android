@@ -29,15 +29,10 @@ import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
-import java.util.UUID
-
-private val AccentBlue = AccentNavy
-private val SuccessGreen = AccentGreen
-private val SurfaceColor = SurfaceDark
 
 // Avatar colors for social proof
 private val avatarColors = listOf(
-    AccentNavy,
+    Color(0xFF5C8DB8),  // AccentNavy
     Color(0xFF34A47A),
     Color(0xFFEC9732),
     Color(0xFF9333EA)
@@ -45,22 +40,13 @@ private val avatarColors = listOf(
 
 @Composable
 fun ReferralStep(
+    referralCode: String,
+    referralLink: String,
     onContinue: () -> Unit,
     onSkip: () -> Unit
 ) {
     val context = LocalContext.current
     var copiedLink by remember { mutableStateOf(false) }
-
-    // Generate a referral code (in a real app this would come from the server)
-    val referralCode = remember {
-        val prefs = context.getSharedPreferences("trackspeed", Context.MODE_PRIVATE)
-        prefs.getString("referral_code", null) ?: run {
-            val code = UUID.randomUUID().toString().take(8).uppercase()
-            prefs.edit().putString("referral_code", code).apply()
-            code
-        }
-    }
-    val referralLink = "https://trackspeed.app/ref/$referralCode"
 
     // Reset copied state after delay
     LaunchedEffect(copiedLink) {
@@ -120,14 +106,14 @@ fun ReferralStep(
                     modifier = Modifier
                         .offset(x = (-12 * initials.size).dp)
                         .padding(start = 8.dp),
-                    color = SuccessGreen.copy(alpha = 0.15f),
+                    color = AccentGreen.copy(alpha = 0.15f),
                     shape = RoundedCornerShape(50)
                 ) {
                     Text(
                         text = "+100",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = SuccessGreen,
+                        color = AccentGreen,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                 }
@@ -173,7 +159,7 @@ fun ReferralStep(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
                 shape = RoundedCornerShape(20.dp)
             ) {
                 Row(
@@ -200,7 +186,7 @@ fun ReferralStep(
                             copiedLink = true
                         },
                         color = if (copiedLink)
-                            SuccessGreen.copy(alpha = 0.1f)
+                            AccentGreen.copy(alpha = 0.1f)
                         else
                             AccentBlue.copy(alpha = 0.1f),
                         shape = RoundedCornerShape(50)
@@ -214,13 +200,13 @@ fun ReferralStep(
                                 imageVector = Icons.Default.ContentCopy,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp),
-                                tint = if (copiedLink) SuccessGreen else AccentBlue
+                                tint = if (copiedLink) AccentGreen else AccentBlue
                             )
                             Text(
                                 text = if (copiedLink) stringResource(R.string.onboarding_referral_copied) else stringResource(R.string.onboarding_referral_copy),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (copiedLink) SuccessGreen else AccentBlue
+                                color = if (copiedLink) AccentGreen else AccentBlue
                             )
                         }
                     }

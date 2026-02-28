@@ -61,17 +61,6 @@ import com.trackspeed.android.ui.theme.*
 
 // Color constants - keep camera area dark for contrast, update accent/text colors
 private val ScreenBackground = Color(0xFF000000) // Keep dark for camera contrast
-private val CardBackground = SurfaceDark
-private val TimerBlue = AccentNavy
-private val PracticeGreen = com.trackspeed.android.ui.theme.AccentGreen
-private val StatusRed = com.trackspeed.android.ui.theme.StatusRed
-private val StatusGreen = com.trackspeed.android.ui.theme.StatusGreen
-private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val TextTertiary = TextMuted
-private val DarkGray = BorderSubtle
-private val TabSelectedColor = com.trackspeed.android.ui.theme.TextPrimary
-private val TabUnselectedColor = com.trackspeed.android.ui.theme.TextSecondary
 
 @Composable
 fun BasicTimingScreen(
@@ -256,7 +245,7 @@ fun BasicTimingScreen(
             ) {
                 Text(
                     text = formatTime(uiState.currentTime),
-                    color = TimerBlue,
+                    color = AccentBlue,
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
@@ -395,7 +384,7 @@ private fun TopBar(
         Row(
             modifier = Modifier
                 .background(
-                    color = PracticeGreen.copy(alpha = 0.2f),
+                    color = AccentGreen.copy(alpha = 0.2f),
                     shape = RoundedCornerShape(16.dp)
                 )
                 .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -405,12 +394,12 @@ private fun TopBar(
             Icon(
                 imageVector = Icons.Default.Sync,
                 contentDescription = null,
-                tint = PracticeGreen,
+                tint = AccentGreen,
                 modifier = Modifier.size(14.dp)
             )
             Text(
                 text = pillLabel,
-                color = PracticeGreen,
+                color = AccentGreen,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.SemiBold
                 )
@@ -425,7 +414,7 @@ private fun TopBar(
             modifier = Modifier
                 .size(36.dp)
                 .background(
-                    color = DarkGray,
+                    color = BorderSubtle,
                     shape = CircleShape
                 )
         ) {
@@ -508,7 +497,7 @@ private fun TabPill(
         modifier = modifier
             .padding(horizontal = 4.dp)
             .background(
-                color = if (isSelected) DarkGray else Color.Transparent,
+                color = if (isSelected) BorderSubtle else Color.Transparent,
                 shape = RoundedCornerShape(8.dp)
             )
             .clickable { onClick() }
@@ -522,12 +511,12 @@ private fun TabPill(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isSelected) TabSelectedColor else TabUnselectedColor,
+                tint = if (isSelected) TextPrimary else TextSecondary,
                 modifier = Modifier.size(16.dp)
             )
             Text(
                 text = label,
-                color = if (isSelected) TabSelectedColor else TabUnselectedColor,
+                color = if (isSelected) TextPrimary else TextSecondary,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                 )
@@ -684,7 +673,7 @@ private fun TimerCameraRow(
             // Large time display
             Text(
                 text = formatTime(uiState.currentTime),
-                color = TimerBlue,
+                color = AccentBlue,
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
@@ -851,7 +840,7 @@ private fun PracticeSectionHeader(
         Icon(
             imageVector = Icons.Default.Sync,
             contentDescription = null,
-            tint = PracticeGreen,
+            tint = AccentGreen,
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(6.dp))
@@ -1231,7 +1220,7 @@ private fun ResultsSummaryCard(
                 StatItem(
                     label = stringResource(R.string.timing_stat_average),
                     value = formatTime(averageLapTime),
-                    valueColor = TimerBlue
+                    valueColor = AccentBlue
                 )
                 StatItem(
                     label = stringResource(R.string.timing_stat_laps),
@@ -1334,7 +1323,7 @@ private fun LapComparisonRow(
             modifier = Modifier
                 .size(32.dp)
                 .background(
-                    color = if (isBest) StatusGreen.copy(alpha = 0.2f) else DarkGray,
+                    color = if (isBest) StatusGreen.copy(alpha = 0.2f) else BorderSubtle,
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -1359,7 +1348,7 @@ private fun LapComparisonRow(
                     .fillMaxWidth()
                     .height(6.dp)
                     .background(
-                        color = DarkGray,
+                        color = BorderSubtle,
                         shape = RoundedCornerShape(3.dp)
                     )
             ) {
@@ -1368,7 +1357,7 @@ private fun LapComparisonRow(
                         .fillMaxHeight()
                         .fillMaxWidth(fraction = barFraction)
                         .background(
-                            color = if (isBest) StatusGreen else TimerBlue.copy(alpha = 0.7f),
+                            color = if (isBest) StatusGreen else AccentBlue.copy(alpha = 0.7f),
                             shape = RoundedCornerShape(3.dp)
                         )
                 )
@@ -1458,7 +1447,7 @@ private fun BottomButtonBar(
             uiState.isRunning -> {
                 PillButton(
                     text = stringResource(R.string.timing_btn_pause),
-                    backgroundColor = DarkGray,
+                    backgroundColor = BorderSubtle,
                     onClick = onStop
                 )
             }
@@ -1468,7 +1457,7 @@ private fun BottomButtonBar(
                 if (hasActualLaps) {
                     PillButton(
                         text = stringResource(R.string.timing_btn_save_session),
-                        backgroundColor = TimerBlue,
+                        backgroundColor = AccentBlue,
                         onClick = onSave
                     )
                 }
@@ -1484,7 +1473,7 @@ private fun BottomButtonBar(
                     )
                     PillButton(
                         text = stringResource(R.string.timing_btn_exit),
-                        backgroundColor = DarkGray,
+                        backgroundColor = BorderSubtle,
                         onClick = onNavigateBack,
                         modifier = Modifier.weight(1f)
                     )
@@ -1497,7 +1486,7 @@ private fun BottomButtonBar(
                 Row(
                     modifier = Modifier
                         .background(
-                            color = DarkGray,
+                            color = BorderSubtle,
                             shape = RoundedCornerShape(16.dp)
                         )
                         .clickable { onStartModeClick() }

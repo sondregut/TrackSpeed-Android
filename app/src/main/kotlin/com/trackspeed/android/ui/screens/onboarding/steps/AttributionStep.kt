@@ -23,6 +23,7 @@ fun AttributionStep(
     onAttributionSelected: (String) -> Unit,
     promoCode: String,
     onPromoCodeChanged: (String) -> Unit,
+    onSubmitPromoCode: (String, String) -> Unit,
     onContinue: () -> Unit
 ) {
     var selected by remember { mutableStateOf<String?>(null) }
@@ -83,7 +84,13 @@ fun AttributionStep(
         Spacer(Modifier.weight(1f))
 
         Button(
-            onClick = onContinue,
+            onClick = {
+                // Fire-and-forget promo code submission if entered (matching iOS behavior)
+                if (promoCode.isNotBlank()) {
+                    onSubmitPromoCode(promoCode, "onboarding_attribution")
+                }
+                onContinue()
+            },
             modifier = Modifier.fillMaxWidth().height(56.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AccentNavy)
         ) {

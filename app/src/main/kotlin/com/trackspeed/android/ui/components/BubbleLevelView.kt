@@ -183,6 +183,9 @@ fun BubbleLevelContent(
     val passZoneFraction = (passThreshold / 15.0).toFloat()
     val acceptableZoneFraction = (acceptableThreshold / 15.0).toFloat()
 
+    // Capture composable colors for use inside Canvas DrawScope
+    val textMutedColor = TextMuted
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
@@ -223,13 +226,13 @@ fun BubbleLevelContent(
                 // Crosshairs
                 val crosshairOffset = 10.dp.toPx()
                 drawLine(
-                    color = TextMuted.copy(alpha = 0.3f),
+                    color = textMutedColor.copy(alpha = 0.3f),
                     start = Offset(crosshairOffset, center.y),
                     end = Offset(this.size.width - crosshairOffset, center.y),
                     strokeWidth = 1.dp.toPx()
                 )
                 drawLine(
-                    color = TextMuted.copy(alpha = 0.3f),
+                    color = textMutedColor.copy(alpha = 0.3f),
                     start = Offset(center.x, crosshairOffset),
                     end = Offset(center.x, this.size.height - crosshairOffset),
                     strokeWidth = 1.dp.toPx()
@@ -237,7 +240,7 @@ fun BubbleLevelContent(
 
                 // Center target dot
                 drawCircle(
-                    color = TextMuted.copy(alpha = 0.5f),
+                    color = textMutedColor.copy(alpha = 0.5f),
                     radius = 4.dp.toPx(),
                     center = center
                 )
@@ -380,7 +383,7 @@ private fun AngleReadout(
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun BubbleLevelPassPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         BubbleLevelContent(
             roll = 0.3,
             pitch = 0.5,
@@ -392,7 +395,7 @@ private fun BubbleLevelPassPreview() {
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun BubbleLevelAcceptablePreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         BubbleLevelContent(
             roll = 5.2,
             pitch = 1.5,
@@ -404,7 +407,7 @@ private fun BubbleLevelAcceptablePreview() {
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun BubbleLevelNotReadyPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         BubbleLevelContent(
             roll = 12.0,
             pitch = -5.0,

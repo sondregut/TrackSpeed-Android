@@ -28,8 +28,6 @@ import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
 
-private val AccentBlue = AccentNavy
-private val SurfaceColor = SurfaceDark
 
 @Composable
 fun PaywallStep(
@@ -100,7 +98,7 @@ fun PaywallStep(
             // Pricing card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
                 shape = RoundedCornerShape(20.dp)
             ) {
                 Column(

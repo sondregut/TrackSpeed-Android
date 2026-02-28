@@ -26,12 +26,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.ui.theme.*
 
-private val CardBackground = SurfaceDark
-private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val DividerColor = BorderSubtle
-private val AccentBlue = AccentNavy
-private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
 private val AccentRed = Color(0xFFFF453A)
 private val AccentOrange = Color(0xFFFF9F0A)
 
@@ -363,7 +357,7 @@ private fun SectionHeader(title: String) {
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun WindAdjustmentScreenPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         WindAdjustmentContent(
             state = WindAdjustmentUiState(
                 timeInput = "10.25",

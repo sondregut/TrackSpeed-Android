@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = AccentNavy
 private val AccentGreen = Color(0xFF30D158)
 private val AccentOrange = Color(0xFFFF9500)
 private val AccentPurple = Color(0xFFAF52DE)
@@ -194,6 +193,7 @@ private val builtInTemplates = listOf(
     )
 )
 
+@Composable
 private fun TemplateCategory.accentColor(): Color = when (this) {
     TemplateCategory.ACCELERATION -> AccentGreen
     TemplateCategory.SPEED -> AccentBlue
@@ -502,7 +502,7 @@ private fun AddTemplateCard(
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun TemplatesScreenPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         TemplatesScreen()
     }
 }
@@ -515,7 +515,7 @@ private fun TemplatesScreenPreview() {
 )
 @Composable
 private fun TemplatesScreenSmallPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         TemplatesScreen()
     }
 }

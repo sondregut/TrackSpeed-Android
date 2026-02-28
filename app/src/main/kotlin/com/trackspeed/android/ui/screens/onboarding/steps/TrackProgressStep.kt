@@ -31,8 +31,6 @@ import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = AccentNavy
-private val SurfaceColor = SurfaceDark
 
 private data class DataPoint(val month: String, val time: Double)
 
@@ -105,6 +103,12 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                 .padding(start = 50.dp, bottom = 8.dp)
         )
 
+        // Capture composable colors for use inside Canvas DrawScope
+        val gridLineColor = SurfaceDark
+        val labelColor = TextMuted
+        val accentColor = AccentBlue
+        val bgBottom = BackgroundGradientBottom
+
         // Performance graph
         Canvas(
             modifier = Modifier
@@ -124,7 +128,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
 
                 // Grid line
                 drawLine(
-                    color = SurfaceDark,
+                    color = gridLineColor,
                     start = Offset(chartLeft, y),
                     end = Offset(size.width, y),
                     strokeWidth = 1f
@@ -134,7 +138,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                 val label = textMeasurer.measure(
                     String.format("%.2fs", value),
                     style = TextStyle(
-                        color = TextMuted,
+                        color = labelColor,
                         fontSize = 10.sp
                     )
                 )
@@ -151,7 +155,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                 val label = textMeasurer.measure(
                     point.month,
                     style = TextStyle(
-                        color = TextMuted,
+                        color = labelColor,
                         fontSize = 10.sp
                     )
                 )
@@ -188,8 +192,8 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                     fillPath,
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            AccentBlue.copy(alpha = 0.25f),
-                            AccentBlue.copy(alpha = 0.02f)
+                            accentColor.copy(alpha = 0.25f),
+                            accentColor.copy(alpha = 0.02f)
                         ),
                         startY = 0f,
                         endY = chartBottom
@@ -207,7 +211,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                 }
                 drawPath(
                     linePath,
-                    color = AccentBlue,
+                    color = accentColor,
                     style = Stroke(
                         width = 3f,
                         cap = StrokeCap.Round,
@@ -222,13 +226,13 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                 if (progress >= pointThreshold) {
                     // Outer dot
                     drawCircle(
-                        color = AccentBlue,
+                        color = accentColor,
                         radius = 5f,
                         center = point
                     )
                     // Inner dot
                     drawCircle(
-                        color = BackgroundGradientBottom,
+                        color = bgBottom,
                         radius = 2f,
                         center = point
                     )
@@ -242,7 +246,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
         if (showResearchCard) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
                 shape = RoundedCornerShape(20.dp)
             ) {
                 Column(

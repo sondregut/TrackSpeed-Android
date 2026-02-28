@@ -1,5 +1,7 @@
 package com.trackspeed.android.ui.screens.stats
 
+import com.trackspeed.android.ui.theme.*
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -47,23 +49,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
-import com.trackspeed.android.ui.theme.AccentNavy
-import com.trackspeed.android.ui.theme.TextPrimary as ThemeTextPrimary
-import com.trackspeed.android.ui.theme.TextSecondary as ThemeTextSecondary
-import com.trackspeed.android.ui.theme.SurfaceDark
-import com.trackspeed.android.ui.theme.BorderSubtle
-import com.trackspeed.android.ui.theme.gradientBackground
-import com.trackspeed.android.ui.theme.gunmetalCard
-import com.trackspeed.android.ui.theme.GunmetalCardBottom
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-private val TextPrimary = ThemeTextPrimary
-private val TextSecondary = ThemeTextSecondary
-private val AccentBlue = AccentNavy
 private val ChartGreen = Color(0xFF30D158)
-private val ChipUnselected = SurfaceDark
-private val ChipBorder = BorderSubtle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -233,13 +222,13 @@ private fun TestTypeSelector(
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    containerColor = ChipUnselected,
+                    containerColor = CardBackground,
                     selectedContainerColor = AccentBlue,
                     labelColor = TextSecondary,
                     selectedLabelColor = Color.White
                 ),
                 border = FilterChipDefaults.filterChipBorder(
-                    borderColor = ChipBorder,
+                    borderColor = BorderSubtle,
                     selectedBorderColor = AccentBlue,
                     enabled = true,
                     selected = isSelected
@@ -336,6 +325,11 @@ private fun ProgressChart(
     val yMin = minTime - yPadding
     val yMax = maxTime + yPadding
 
+    // Capture composable colors for use inside Canvas DrawScope
+    val textSecondaryColor = TextSecondary
+    val borderSubtleColor = BorderSubtle
+    val cardBottomColor = GunmetalCardBottom
+
     Card(
         modifier = modifier.gunmetalCard(),
         shape = RoundedCornerShape(20.dp),
@@ -354,10 +348,10 @@ private fun ProgressChart(
             val chartHeight = chartBottom - chartTop
 
             val textPaintColor = android.graphics.Color.argb(
-                (TextSecondary.alpha * 255).toInt(),
-                (TextSecondary.red * 255).toInt(),
-                (TextSecondary.green * 255).toInt(),
-                (TextSecondary.blue * 255).toInt()
+                (textSecondaryColor.alpha * 255).toInt(),
+                (textSecondaryColor.red * 255).toInt(),
+                (textSecondaryColor.green * 255).toInt(),
+                (textSecondaryColor.blue * 255).toInt()
             )
             val textPaint = android.graphics.Paint().apply {
                 color = textPaintColor
@@ -376,7 +370,7 @@ private fun ProgressChart(
 
                 // Grid line
                 drawLine(
-                    color = BorderSubtle,
+                    color = borderSubtleColor,
                     start = Offset(chartLeft, y),
                     end = Offset(chartRight, y),
                     strokeWidth = 1f
@@ -458,7 +452,7 @@ private fun ProgressChart(
                     )
                     // Inner circle
                     drawCircle(
-                        color = GunmetalCardBottom,
+                        color = cardBottomColor,
                         radius = 3f,
                         center = point
                     )

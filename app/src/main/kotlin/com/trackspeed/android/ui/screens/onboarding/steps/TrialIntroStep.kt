@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = AccentNavy
 
 @Composable
 fun TrialIntroStep(onContinue: () -> Unit) {

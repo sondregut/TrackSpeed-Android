@@ -630,7 +630,7 @@ private fun RecentSessionCard(
 @Preview(showBackground = true)
 @Composable
 private fun HomeScreenPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         HomeScreen()
     }
 }
@@ -638,7 +638,7 @@ private fun HomeScreenPreview() {
 @Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun HomeScreenDarkPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         HomeScreen()
     }
 }

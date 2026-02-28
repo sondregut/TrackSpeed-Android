@@ -1,15 +1,20 @@
 package com.trackspeed.android.ui.screens.paywall
 
 import android.app.Activity
+import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.revenuecat.purchases.Offerings
 import com.revenuecat.purchases.Package
 import com.trackspeed.android.billing.BillingConfig
+import com.trackspeed.android.billing.PromoCodeError
+import com.trackspeed.android.billing.PromoRedemptionResult
 import com.trackspeed.android.billing.SubscriptionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Currency
 import javax.inject.Inject
@@ -19,6 +24,16 @@ sealed interface PurchaseState {
     data object Loading : PurchaseState
     data object Success : PurchaseState
     data class Error(val message: String) : PurchaseState
+}
+
+sealed interface PromoSheetState {
+    data object Hidden : PromoSheetState
+    data class Visible(
+        val code: String = "",
+        val isLoading: Boolean = false,
+        val result: PromoRedemptionResult? = null,
+        val error: String? = null
+    ) : PromoSheetState
 }
 
 enum class PlanType {
@@ -40,6 +55,10 @@ class PaywallViewModel @Inject constructor(
     private val subscriptionManager: SubscriptionManager
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "PaywallViewModel"
+    }
+
     private val _selectedPlan = MutableStateFlow(PlanType.YEARLY)
     val selectedPlan: StateFlow<PlanType> = _selectedPlan.asStateFlow()
 
@@ -56,6 +75,14 @@ class PaywallViewModel @Inject constructor(
     val offeringsError: StateFlow<String?> = _offeringsError.asStateFlow()
 
     val isProUser: StateFlow<Boolean> = subscriptionManager.isProUser
+
+    // Promo code bottom sheet state
+    private val _promoSheetState = MutableStateFlow<PromoSheetState>(PromoSheetState.Hidden)
+    val promoSheetState: StateFlow<PromoSheetState> = _promoSheetState.asStateFlow()
+
+    // Whether a discount package should be preferred (from spin wheel)
+    private val _preferDiscountPackage = MutableStateFlow(false)
+    val preferDiscountPackage: StateFlow<Boolean> = _preferDiscountPackage.asStateFlow()
 
     init {
         loadOfferings()
@@ -80,6 +107,10 @@ class PaywallViewModel @Inject constructor(
         _selectedPlan.value = plan
     }
 
+    fun setPreferDiscountPackage(prefer: Boolean) {
+        _preferDiscountPackage.value = prefer
+    }
+
     fun getMonthlyPlan(): PlanInfo {
         val rcPackage = _offerings.value?.current?.monthly
         return PlanInfo(
@@ -92,7 +123,22 @@ class PaywallViewModel @Inject constructor(
     }
 
     fun getYearlyPlan(): PlanInfo {
-        val rcPackage = _offerings.value?.current?.annual
+        // Check for special packages based on eligibility
+        val effectivePackageId = subscriptionManager.getEffectiveYearlyPackageId()
+        val rcPackage = if (effectivePackageId != "annual") {
+            // Try to find the special package in the offering
+            _offerings.value?.current?.availablePackages
+                ?.firstOrNull { it.identifier == effectivePackageId }
+                ?: _offerings.value?.current?.annual
+        } else if (_preferDiscountPackage.value) {
+            // Spin wheel discount
+            _offerings.value?.current?.availablePackages
+                ?.firstOrNull { it.identifier == BillingConfig.PACKAGE_ANNUAL_DISCOUNT }
+                ?: _offerings.value?.current?.annual
+        } else {
+            _offerings.value?.current?.annual
+        }
+
         val monthlyEquiv = rcPackage?.product?.price?.let { price ->
             val monthly = price.amountMicros / 12.0 / 1_000_000.0
             val formatter = NumberFormat.getCurrencyInstance().apply {
@@ -157,5 +203,63 @@ class PaywallViewModel @Inject constructor(
 
     fun clearError() {
         _purchaseState.value = PurchaseState.Idle
+    }
+
+    // ---- Promo code sheet ----
+
+    fun showPromoSheet() {
+        _promoSheetState.value = PromoSheetState.Visible()
+    }
+
+    fun hidePromoSheet() {
+        _promoSheetState.value = PromoSheetState.Hidden
+    }
+
+    fun setPromoCodeInput(code: String) {
+        val current = _promoSheetState.value
+        if (current is PromoSheetState.Visible) {
+            _promoSheetState.value = current.copy(code = code.uppercase(), error = null)
+        }
+    }
+
+    fun redeemPromoCode() {
+        val current = _promoSheetState.value
+        if (current !is PromoSheetState.Visible || current.code.isBlank()) return
+
+        _promoSheetState.value = current.copy(isLoading = true, error = null)
+
+        viewModelScope.launch {
+            try {
+                val result = subscriptionManager.redeemPromoCode(current.code, "paywall")
+                _promoSheetState.value = current.copy(
+                    isLoading = false,
+                    result = result,
+                    error = null
+                )
+
+                // If free type, pro is now active - close after delay
+                if (result.type == "free") {
+                    kotlinx.coroutines.delay(1500)
+                    _promoSheetState.value = PromoSheetState.Hidden
+                    _purchaseState.value = PurchaseState.Success
+                }
+            } catch (e: PromoCodeError) {
+                val message = when (e) {
+                    is PromoCodeError.InvalidCode -> "Invalid or inactive promo code"
+                    is PromoCodeError.Expired -> "This promo code has expired"
+                    is PromoCodeError.MaxUsesReached -> "This code has reached its maximum uses"
+                    is PromoCodeError.AlreadyRedeemed -> "You've already redeemed this code"
+                    is PromoCodeError.RateLimited -> "Please wait before trying again"
+                    is PromoCodeError.NetworkError -> "Network error. Check your connection."
+                }
+                _promoSheetState.value = current.copy(isLoading = false, error = message)
+            } catch (e: Exception) {
+                Log.e(TAG, "Promo redemption failed", e)
+                _promoSheetState.value = current.copy(
+                    isLoading = false,
+                    error = "Something went wrong. Please try again."
+                )
+            }
+        }
     }
 }

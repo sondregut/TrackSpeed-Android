@@ -33,13 +33,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.referral.ReferralStats
 import com.trackspeed.android.ui.theme.*
 
-private val CardBackground = SurfaceDark
-private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val DividerColor = BorderSubtle
-private val AccentBlue = AccentNavy
-private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
-private val CodeBackground = SurfaceDark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -181,7 +174,7 @@ private fun ReferralContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = CodeBackground,
+                        color = CardBackground,
                         shape = RoundedCornerShape(12.dp)
                     )
                     .border(
@@ -343,7 +336,7 @@ private fun StepItem(number: String, text: String) {
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun ReferralScreenPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         ReferralContent(
             state = ReferralUiState(
                 referralCode = "TRK4X9",

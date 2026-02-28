@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,7 +35,8 @@ import javax.inject.Singleton
 class SubscriptionManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val trainingSessionDao: TrainingSessionDao,
-    private val supabaseClient: SupabaseClient
+    private val supabaseClient: SupabaseClient,
+    private val promoCodeService: PromoCodeService
 ) : UpdatedCustomerInfoListener {
 
     companion object {
@@ -55,6 +57,10 @@ class SubscriptionManager @Inject constructor(
 
     private val _willRenew = MutableStateFlow(false)
     val willRenew: StateFlow<Boolean> = _willRenew.asStateFlow()
+
+    // Influencer offer eligibility (trial type promo code redeemed)
+    private val _isInfluencerOfferEligible = MutableStateFlow(false)
+    val isInfluencerOfferEligible: StateFlow<Boolean> = _isInfluencerOfferEligible.asStateFlow()
 
     private var hasPromoAccess = false
 
@@ -171,6 +177,27 @@ class SubscriptionManager @Inject constructor(
     }
 
     /**
+     * Redeem a promo code via PromoCodeService.
+     * Returns the result and refreshes pro status.
+     */
+    suspend fun redeemPromoCode(code: String, source: String): PromoRedemptionResult {
+        val result = promoCodeService.redeemPromoCode(code, source)
+
+        // Refresh pro status based on result
+        when (result.type) {
+            "free" -> {
+                hasPromoAccess = true
+                _isProUser.value = true
+            }
+            "trial" -> {
+                _isInfluencerOfferEligible.value = true
+            }
+        }
+
+        return result
+    }
+
+    /**
      * Whether the user can save a new session (under free limit or pro).
      */
     suspend fun canSaveSession(): Boolean {
@@ -215,44 +242,50 @@ class SubscriptionManager @Inject constructor(
      */
     fun canUseRaceMode(): Boolean = _isProUser.value
 
-    // ---- Promo code checking via Supabase ----
-
-    @Serializable
-    private data class PromoRedemption(
-        val id: String? = null,
-        @SerialName("device_id") val deviceId: String,
-        val status: String,
-        @SerialName("expires_at") val expiresAt: String? = null
-    )
-
-    private suspend fun checkPromoAccess() {
-        try {
-            val deviceId = getDeviceId()
-            val redemptions = supabaseClient.postgrest["promo_redemptions"]
-                .select {
-                    filter {
-                        eq("device_id", deviceId)
-                        eq("status", "active")
-                    }
-                }
-                .decodeList<PromoRedemption>()
-
-            hasPromoAccess = redemptions.isNotEmpty()
-            if (hasPromoAccess) {
-                _isProUser.value = true
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to check promo access: ${e.message}")
-            // Non-fatal - promo is supplementary
+    /**
+     * Get the effective yearly package identifier based on eligibility.
+     * Returns annual_referral (30-day trial) if influencer/referral eligible, else standard annual.
+     */
+    fun getEffectiveYearlyPackageId(): String {
+        return if (_isInfluencerOfferEligible.value) {
+            BillingConfig.PACKAGE_ANNUAL_REFERRAL
+        } else {
+            "annual"
         }
     }
 
-    private fun getDeviceId(): String {
-        val prefs = context.getSharedPreferences("trackspeed", Context.MODE_PRIVATE)
-        return prefs.getString("device_id", null) ?: run {
-            val newId = java.util.UUID.randomUUID().toString()
-            prefs.edit().putString("device_id", newId).apply()
-            newId
+    /**
+     * Get the discount package identifier for spin wheel.
+     */
+    fun getDiscountPackageId(): String {
+        return BillingConfig.PACKAGE_ANNUAL_DISCOUNT
+    }
+
+    // ---- Promo code checking via Supabase ----
+
+    private suspend fun checkPromoAccess() {
+        try {
+            val activeRedemption = promoCodeService.getActivePromoAccess()
+            hasPromoAccess = activeRedemption != null
+            if (hasPromoAccess) {
+                _isProUser.value = true
+            }
+
+            // Also check influencer offer eligibility
+            val hasInfluencer = promoCodeService.hasInfluencerOffer()
+            _isInfluencerOfferEligible.value = hasInfluencer
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to check promo access: ${e.message}")
+        }
+    }
+
+    /**
+     * Force refresh of pro status from all sources.
+     */
+    fun refreshProStatus() {
+        refreshCustomerInfo()
+        scope.launch {
+            checkPromoAccess()
         }
     }
 }

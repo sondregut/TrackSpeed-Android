@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.trackspeed.android.billing.PromoCodeService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -17,8 +18,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Referral stats tracked locally.
- * In a full implementation these would come from Supabase.
+ * Referral stats — backed by Supabase with local cache fallback.
  */
 data class ReferralStats(
     val friendsJoined: Int = 0,
@@ -28,15 +28,14 @@ data class ReferralStats(
 /**
  * Service for managing referral codes and sharing.
  *
- * Generates a unique referral code based on the device ID hash (6 characters).
- * Stores the code in DataStore for persistence.
- * In the full implementation, referral tracking would be backed by Supabase
- * (matching the iOS ReferralService which uses SupabaseService).
+ * Uses Supabase RPC to get/create referral codes and track stats.
+ * Falls back to local device-ID-based code generation if Supabase is unavailable.
  */
 @Singleton
 class ReferralService @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    private val promoCodeService: PromoCodeService
 ) {
     companion object {
         private const val TAG = "ReferralService"
@@ -65,14 +64,26 @@ class ReferralService @Inject constructor(
 
     /**
      * Get or create the user's referral code.
-     * Generates a 6-character alphanumeric code derived from the device ID.
+     * Tries Supabase first, falls back to local hash-based generation.
      */
     suspend fun getOrCreateReferralCode(): String {
+        // Check local cache first
         val existing = dataStore.data.first()[Keys.REFERRAL_CODE]
         if (!existing.isNullOrEmpty()) {
             return existing
         }
 
+        // Try Supabase RPC
+        val supabaseCode = promoCodeService.getOrCreateReferralCodeFromSupabase()
+        if (supabaseCode != null) {
+            dataStore.edit { prefs ->
+                prefs[Keys.REFERRAL_CODE] = supabaseCode
+            }
+            Log.i(TAG, "Got referral code from Supabase: $supabaseCode")
+            return supabaseCode
+        }
+
+        // Fallback: generate locally from device ID hash
         val deviceId = getDeviceId()
         val code = generateCodeFromDeviceId(deviceId)
 
@@ -80,7 +91,7 @@ class ReferralService @Inject constructor(
             prefs[Keys.REFERRAL_CODE] = code
         }
 
-        Log.i(TAG, "Generated referral code: $code")
+        Log.i(TAG, "Generated local referral code: $code")
         return code
     }
 
@@ -99,6 +110,29 @@ class ReferralService @Inject constructor(
         val code = getOrCreateReferralCode()
         val link = REFERRAL_BASE_URL + code
         return "Try TrackSpeed for sprint timing! Use my code: $code $link"
+    }
+
+    /**
+     * Track a referral signup in Supabase (when a referred user enters a referrer's code).
+     */
+    suspend fun trackReferralSignup(referrerCode: String): Boolean {
+        return promoCodeService.trackReferralSignup(referrerCode)
+    }
+
+    /**
+     * Refresh referral stats from Supabase and update local cache.
+     */
+    suspend fun refreshStats() {
+        val code = dataStore.data.first()[Keys.REFERRAL_CODE] ?: return
+
+        val stats = promoCodeService.getReferralStats(code)
+        if (stats != null) {
+            dataStore.edit { prefs ->
+                prefs[Keys.FRIENDS_JOINED] = stats.successfulReferrals
+                prefs[Keys.FREE_MONTHS_EARNED] = stats.freeMonthsEarned
+            }
+            Log.i(TAG, "Refreshed referral stats: ${stats.successfulReferrals} friends, ${stats.freeMonthsEarned} months")
+        }
     }
 
     /**

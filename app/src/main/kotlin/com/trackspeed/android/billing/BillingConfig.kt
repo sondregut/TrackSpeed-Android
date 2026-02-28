@@ -8,6 +8,10 @@ object BillingConfig {
     const val PRODUCT_MONTHLY = "trackspeed_pro:monthly"
     const val PRODUCT_YEARLY = "trackspeed_pro:yearly"
 
+    // RevenueCat package identifiers for special offers
+    const val PACKAGE_ANNUAL_DISCOUNT = "annual_discount"   // Spin wheel 20% off
+    const val PACKAGE_ANNUAL_REFERRAL = "annual_referral"   // Influencer/referral 30-day trial
+
     // Free tier limits
     const val FREE_SESSION_LIMIT = 10
     const val FREE_SESSION_WARNING_THRESHOLD = 8

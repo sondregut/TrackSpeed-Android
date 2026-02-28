@@ -7,8 +7,8 @@ import com.trackspeed.android.audio.ElevenLabsService
 import com.trackspeed.android.audio.ElevenLabsVoiceId
 import com.trackspeed.android.audio.VoiceProvider
 import com.trackspeed.android.billing.SubscriptionManager
-import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.data.repository.SettingsRepository
+import com.trackspeed.android.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +28,7 @@ data class SettingsUiState(
     val startType: String = SettingsRepository.Defaults.START_TYPE,
     val detectionSensitivity: Float = SettingsRepository.Defaults.SENSITIVITY,
     val speedUnit: String = SettingsRepository.Defaults.SPEED_UNIT,
-    val darkMode: Boolean = SettingsRepository.Defaults.DARK_MODE,
+    val appTheme: AppTheme = AppTheme.MIDNIGHT,
     val onboardingCompleted: Boolean = SettingsRepository.Defaults.ONBOARDING_COMPLETED,
     val preferredFps: Int = SettingsRepository.Defaults.PREFERRED_FPS,
     val isProUser: Boolean = false,
@@ -95,7 +95,7 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.startType,
         settingsRepository.detectionSensitivity,
         settingsRepository.speedUnit,
-        settingsRepository.darkMode,
+        settingsRepository.appearanceMode,
         settingsRepository.onboardingCompleted,
         settingsRepository.preferredFps,
         subscriptionManager.isProUser
@@ -105,7 +105,7 @@ class SettingsViewModel @Inject constructor(
             startType = values[1] as String,
             detectionSensitivity = values[2] as Float,
             speedUnit = values[3] as String,
-            darkMode = values[4] as Boolean,
+            appTheme = appearanceModeToTheme(values[4] as String),
             onboardingCompleted = values[5] as Boolean,
             preferredFps = values[6] as Int,
             isProUser = values[7] as Boolean
@@ -155,9 +155,9 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setDarkMode(enabled: Boolean) {
+    fun setAppTheme(theme: AppTheme) {
         viewModelScope.launch {
-            settingsRepository.setDarkMode(enabled)
+            settingsRepository.setAppearanceMode(theme.key)
         }
     }
 
@@ -216,16 +216,22 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * Clear all local data: delete cached thumbnails directory.
-     * Note: Room database clearing would require the database instance;
-     * for now this clears the thumbnail cache.
      */
     fun clearAllData() {
         viewModelScope.launch {
-            // Clear thumbnail cache
             val thumbnailDir = File(context.filesDir, "thumbnails")
             if (thumbnailDir.exists()) {
                 thumbnailDir.deleteRecursively()
             }
+        }
+    }
+
+    companion object {
+        fun appearanceModeToTheme(mode: String): AppTheme = when (mode) {
+            "midnight", "dark" -> AppTheme.MIDNIGHT
+            "light" -> AppTheme.LIGHT
+            "gold" -> AppTheme.DARKGOLD
+            else -> AppTheme.MIDNIGHT
         }
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +37,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -52,6 +55,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -64,10 +69,6 @@ import com.trackspeed.android.billing.ProFeature
 import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
 
-private val PrimaryAccent = AccentNavy
-private val CardBackground = SurfaceDark
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val TextMuted = com.trackspeed.android.ui.theme.TextMuted
 private val SuccessGreen = Color(0xFF30D158)
 private val ErrorRed = Color(0xFFFF5252)
 
@@ -84,6 +85,7 @@ fun PaywallScreen(
     val isLoadingOfferings by viewModel.isLoadingOfferings.collectAsStateWithLifecycle()
     val offeringsError by viewModel.offeringsError.collectAsStateWithLifecycle()
     val isProUser by viewModel.isProUser.collectAsStateWithLifecycle()
+    val promoSheetState by viewModel.promoSheetState.collectAsStateWithLifecycle()
 
     val activity = LocalContext.current as? Activity
 
@@ -113,7 +115,12 @@ fun PaywallScreen(
         onPurchase = { activity?.let { viewModel.purchase(it) } },
         onRestore = { viewModel.restorePurchases() },
         onRetry = { viewModel.loadOfferings() },
-        onClearError = { viewModel.clearError() }
+        onClearError = { viewModel.clearError() },
+        promoSheetState = promoSheetState,
+        onShowPromoSheet = { viewModel.showPromoSheet() },
+        onHidePromoSheet = { viewModel.hidePromoSheet() },
+        onPromoCodeChanged = { viewModel.setPromoCodeInput(it) },
+        onRedeemPromoCode = { viewModel.redeemPromoCode() }
     )
 }
 
@@ -131,7 +138,12 @@ private fun PaywallContent(
     onPurchase: () -> Unit,
     onRestore: () -> Unit,
     onRetry: () -> Unit,
-    onClearError: () -> Unit
+    onClearError: () -> Unit,
+    promoSheetState: PromoSheetState = PromoSheetState.Hidden,
+    onShowPromoSheet: () -> Unit = {},
+    onHidePromoSheet: () -> Unit = {},
+    onPromoCodeChanged: (String) -> Unit = {},
+    onRedeemPromoCode: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showCloseButton by remember { mutableStateOf(false) }
@@ -224,14 +236,7 @@ private fun PaywallContent(
             // Legal links below title
             LegalLinksSection(
                 onRestore = onRestore,
-                onHaveCode = {
-                    // Open Google Play subscription redeem or promo code flow
-                    val intent = Intent(
-                        Intent.ACTION_VIEW,
-                        Uri.parse("https://play.google.com/redeem")
-                    )
-                    context.startActivity(intent)
-                },
+                onHaveCode = onShowPromoSheet,
                 modifier = Modifier.padding(top = 8.dp)
             )
 
@@ -323,9 +328,9 @@ private fun PaywallContent(
                         .fillMaxWidth()
                         .height(56.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryAccent,
+                        containerColor = AccentBlue,
                         contentColor = Color.White,
-                        disabledContainerColor = PrimaryAccent.copy(alpha = 0.4f)
+                        disabledContainerColor = AccentBlue.copy(alpha = 0.4f)
                     ),
                     shape = RoundedCornerShape(28.dp),
                     enabled = purchaseState !is PurchaseState.Loading && !isLoadingOfferings
@@ -402,6 +407,16 @@ private fun PaywallContent(
             onRestore = onRestore
         )
     }
+
+    // Promo code bottom sheet
+    if (promoSheetState is PromoSheetState.Visible) {
+        PromoCodeSheet(
+            state = promoSheetState as PromoSheetState.Visible,
+            onDismiss = onHidePromoSheet,
+            onCodeChanged = onPromoCodeChanged,
+            onRedeem = onRedeemPromoCode
+        )
+    }
 }
 
 @Composable
@@ -463,7 +478,7 @@ private fun FeatureRow(
         Icon(
             imageVector = Icons.Default.CheckCircle,
             contentDescription = null,
-            tint = PrimaryAccent,
+            tint = AccentBlue,
             modifier = Modifier.size(28.dp)
         )
 
@@ -597,9 +612,9 @@ private fun AllPlansSheet(
                     .fillMaxWidth()
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryAccent,
+                    containerColor = AccentBlue,
                     contentColor = Color.White,
-                    disabledContainerColor = PrimaryAccent.copy(alpha = 0.4f)
+                    disabledContainerColor = AccentBlue.copy(alpha = 0.4f)
                 ),
                 shape = RoundedCornerShape(28.dp),
                 enabled = purchaseState !is PurchaseState.Loading
@@ -684,7 +699,7 @@ private fun AllPlansPlanCard(
             .then(
                 if (isSelected) {
                     Modifier.border(
-                        border = BorderStroke(2.dp, PrimaryAccent),
+                        border = BorderStroke(2.dp, AccentBlue),
                         shape = RoundedCornerShape(20.dp)
                     )
                 } else Modifier
@@ -698,7 +713,7 @@ private fun AllPlansPlanCard(
             Icon(
                 imageVector = Icons.Default.CheckCircle,
                 contentDescription = "Selected",
-                tint = PrimaryAccent,
+                tint = AccentBlue,
                 modifier = Modifier.size(24.dp)
             )
         } else {
@@ -747,12 +762,203 @@ private fun AllPlansPlanCard(
     }
 }
 
+// ---------- Promo Code Bottom Sheet ----------
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PromoCodeSheet(
+    state: PromoSheetState.Visible,
+    onDismiss: () -> Unit,
+    onCodeChanged: (String) -> Unit,
+    onRedeem: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = SurfaceDark,
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .width(36.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(TextMuted)
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Enter Promo Code",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = TextPrimary
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Enter your promo or influencer code below",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            OutlinedTextField(
+                value = state.code,
+                onValueChange = { onCodeChanged(it.uppercase()) },
+                placeholder = { Text("PROMO CODE", color = TextMuted) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    focusedBorderColor = when {
+                        state.error != null -> ErrorRed
+                        state.result != null -> SuccessGreen
+                        else -> AccentBlue
+                    },
+                    unfocusedBorderColor = when {
+                        state.error != null -> ErrorRed
+                        state.result != null -> SuccessGreen
+                        else -> TextMuted
+                    },
+                    focusedContainerColor = CardBackground,
+                    unfocusedContainerColor = CardBackground,
+                    cursorColor = AccentBlue
+                ),
+                textStyle = TextStyle(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 20.sp,
+                    color = TextPrimary,
+                    textAlign = TextAlign.Center
+                ),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true,
+                enabled = !state.isLoading && state.result == null
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Status messages
+            when {
+                state.isLoading -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = AccentBlue,
+                            strokeWidth = 2.dp
+                        )
+                        Text("Verifying code...", fontSize = 14.sp, color = TextSecondary)
+                    }
+                }
+                state.result != null -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = SuccessGreen
+                        )
+                        Text(
+                            text = if (state.result.type == "free") {
+                                "Pro Activated!"
+                            } else {
+                                "30-day trial unlocked! Tap Get Started"
+                            },
+                            fontSize = 14.sp,
+                            color = SuccessGreen,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                state.error != null -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Error,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = ErrorRed
+                        )
+                        Text(
+                            text = state.error,
+                            fontSize = 14.sp,
+                            color = ErrorRed
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Button(
+                onClick = onRedeem,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (state.result != null) SuccessGreen else AccentBlue,
+                    contentColor = Color.White,
+                    disabledContainerColor = AccentBlue.copy(alpha = 0.4f)
+                ),
+                shape = RoundedCornerShape(26.dp),
+                enabled = state.code.isNotBlank() && !state.isLoading && state.result == null
+            ) {
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.5.dp
+                    )
+                } else {
+                    Text(
+                        text = "Apply Code",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Cancel",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMuted,
+                modifier = Modifier.clickable { onDismiss() }
+            )
+        }
+    }
+}
+
 // ---------- Previews ----------
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun PaywallScreenPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         PaywallContent(
             selectedPlan = PlanType.YEARLY,
             purchaseState = PurchaseState.Idle,

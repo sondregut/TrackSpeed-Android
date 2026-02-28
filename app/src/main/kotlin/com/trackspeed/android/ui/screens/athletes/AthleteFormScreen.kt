@@ -56,9 +56,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.ui.theme.*
 
-private val CardBg = SurfaceDark
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val AccentBlue = AccentNavy
 private val DeleteRed = Color(0xFFFF453A)
 
 private val presetColors = listOf(
@@ -190,7 +187,7 @@ private fun AthleteFormContent(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBg)
+                colors = CardDefaults.cardColors(containerColor = CardBackground)
             ) {
                 Column {
                     TextField(
@@ -231,7 +228,7 @@ private fun AthleteFormContent(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBg)
+                colors = CardDefaults.cardColors(containerColor = CardBackground)
             ) {
                 FlowRow(
                     modifier = Modifier
@@ -330,7 +327,7 @@ private fun AthleteFormContent(
                     Text("Cancel", color = AccentBlue)
                 }
             },
-            containerColor = CardBg,
+            containerColor = CardBackground,
             titleContentColor = TextPrimary,
             textContentColor = TextSecondary
         )
@@ -370,7 +367,7 @@ private fun textFieldColors() = TextFieldDefaults.colors(
 )
 @Composable
 private fun AthleteFormAddPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         AthleteFormContent(
             uiState = AthleteFormUiState(isLoaded = true),
             onNameChanged = {},
@@ -391,7 +388,7 @@ private fun AthleteFormAddPreview() {
 )
 @Composable
 private fun AthleteFormEditPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         AthleteFormContent(
             uiState = AthleteFormUiState(
                 name = "John Smith",

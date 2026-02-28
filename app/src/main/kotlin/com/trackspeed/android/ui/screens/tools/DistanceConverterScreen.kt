@@ -25,14 +25,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.ui.theme.*
 
-private val CardBackground = SurfaceDark
-private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
-private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
-private val DividerColor = BorderSubtle
-private val AccentBlue = AccentNavy
-private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
-private val PresetBackground = SurfaceDark
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DistanceConverterScreen(
@@ -138,7 +130,7 @@ private fun DistanceConverterContent(
 
                     Box(modifier = Modifier.weight(1f)) {
                         Surface(
-                            color = PresetBackground,
+                            color = SurfaceDark,
                             shape = MaterialTheme.shapes.small,
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { fromDropdownExpanded = true }
@@ -201,7 +193,7 @@ private fun DistanceConverterContent(
 
                     Box(modifier = Modifier.weight(1f)) {
                         Surface(
-                            color = PresetBackground,
+                            color = SurfaceDark,
                             shape = MaterialTheme.shapes.small,
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { toDropdownExpanded = true }
@@ -339,7 +331,7 @@ private fun formatResult(value: Double): String {
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun DistanceConverterScreenPreview() {
-    TrackSpeedTheme(darkTheme = true) {
+    TrackSpeedTheme() {
         DistanceConverterContent(
             state = DistanceConverterUiState(
                 inputValue = "100",
