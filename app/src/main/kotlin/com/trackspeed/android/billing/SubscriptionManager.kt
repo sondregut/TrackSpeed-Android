@@ -43,7 +43,8 @@ class SubscriptionManager @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private val _isProUser = MutableStateFlow(false)
+    // Pro unlocked until RevenueCat + Google Play subscriptions are configured
+    private val _isProUser = MutableStateFlow(true)
     val isProUser: StateFlow<Boolean> = _isProUser.asStateFlow()
 
     private val _customerInfo = MutableStateFlow<CustomerInfo?>(null)
