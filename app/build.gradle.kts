@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +8,13 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
+
+// Load local.properties so secrets are available via localProp()
+val localProperties = Properties().also { props ->
+    rootProject.file("local.properties").takeIf { it.exists() }
+        ?.inputStream()?.use { props.load(it) }
+}
+fun localProp(key: String): String = localProperties.getProperty(key) ?: ""
 
 android {
     namespace = "com.trackspeed.android"
@@ -22,11 +31,11 @@ android {
 
         // Supabase configuration - will be loaded from local.properties
         buildConfigField("String", "SUPABASE_URL", "\"https://hkvrttatbpjwzuuckbqj.supabase.co\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${findProperty("SUPABASE_ANON_KEY") ?: ""}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProp("SUPABASE_ANON_KEY")}\"")
 
         // RevenueCat API key - loaded from local.properties
-        buildConfigField("String", "REVENUECAT_API_KEY", "\"${findProperty("REVENUECAT_API_KEY") ?: ""}\"")
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${findProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
+        buildConfigField("String", "REVENUECAT_API_KEY", "\"${localProp("REVENUECAT_API_KEY")}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProp("GOOGLE_WEB_CLIENT_ID")}\"")
     }
 
     buildTypes {

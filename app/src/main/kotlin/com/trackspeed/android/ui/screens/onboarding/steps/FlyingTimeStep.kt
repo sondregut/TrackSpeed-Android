@@ -1,6 +1,5 @@
 package com.trackspeed.android.ui.screens.onboarding.steps
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -14,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
@@ -97,28 +95,22 @@ fun FlyingTimeStep(
                     color = TextSecondary
                 )
 
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FlyingDistance.entries.forEach { distance ->
-                        val isSelected = selectedDistance == distance
-                        Button(
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    FlyingDistance.entries.forEachIndexed { index, distance ->
+                        SegmentedButton(
+                            selected = selectedDistance == distance,
                             onClick = { onDistanceSelected(distance) },
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, if (isSelected) AccentNavy else BorderSubtle),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSelected) AccentNavy else SurfaceDark
-                            )
-                        ) {
-                            Text(
-                                distance.displayName,
-                                color = if (isSelected) Color.White else TextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = FlyingDistance.entries.size
+                            ),
+                            label = {
+                                Text(
+                                    distance.rawValue,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        )
                     }
                 }
             }
