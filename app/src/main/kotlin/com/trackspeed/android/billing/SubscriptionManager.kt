@@ -49,6 +49,12 @@ class SubscriptionManager @Inject constructor(
     private val _customerInfo = MutableStateFlow<CustomerInfo?>(null)
     val customerInfo: StateFlow<CustomerInfo?> = _customerInfo.asStateFlow()
 
+    private val _isInBillingGracePeriod = MutableStateFlow(false)
+    val isInBillingGracePeriod: StateFlow<Boolean> = _isInBillingGracePeriod.asStateFlow()
+
+    private val _willRenew = MutableStateFlow(false)
+    val willRenew: StateFlow<Boolean> = _willRenew.asStateFlow()
+
     private var hasPromoAccess = false
 
     init {
@@ -82,10 +88,13 @@ class SubscriptionManager @Inject constructor(
     }
 
     private fun updateProStatus(customerInfo: CustomerInfo) {
-        val hasEntitlement = customerInfo
-            .entitlements[BillingConfig.ENTITLEMENT_ID]
-            ?.isActive == true
+        val entitlement = customerInfo.entitlements[BillingConfig.ENTITLEMENT_ID]
+        val hasEntitlement = entitlement?.isActive == true
         _isProUser.value = hasEntitlement || hasPromoAccess
+
+        // Grace period: billingIssueDetectedAt is non-null when there's a payment problem
+        _isInBillingGracePeriod.value = entitlement?.billingIssueDetectedAt != null
+        _willRenew.value = entitlement?.willRenew == true
     }
 
     /**
@@ -181,6 +190,29 @@ class SubscriptionManager @Inject constructor(
     fun isFeatureAvailable(feature: ProFeature): Boolean {
         return _isProUser.value
     }
+
+    /**
+     * Whether the given start mode is available to the current user.
+     * Free users: flying, touch, inFrame.
+     * Pro users: all modes including voice and countdown.
+     */
+    fun canUseStartMode(modeName: String): Boolean {
+        return when (modeName.lowercase()) {
+            "flying", "touch", "inframe" -> true
+            "voice", "countdown" -> _isProUser.value
+            else -> true
+        }
+    }
+
+    /**
+     * Whether the user can use ElevenLabs TTS voices (Pro only).
+     */
+    fun canUseElevenLabs(): Boolean = _isProUser.value
+
+    /**
+     * Whether the user can access multi-device race mode (Pro only).
+     */
+    fun canUseRaceMode(): Boolean = _isProUser.value
 
     // ---- Promo code checking via Supabase ----
 

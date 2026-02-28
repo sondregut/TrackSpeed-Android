@@ -3,6 +3,10 @@ package com.trackspeed.android.sync
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
+import com.trackspeed.android.protocol.GateAssignment
+import com.trackspeed.android.protocol.TimingPayload
+import com.trackspeed.android.protocol.TimingRole
+import com.trackspeed.android.protocol.TimingSessionConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -60,58 +64,414 @@ class ClockSyncManager @Inject constructor(
 
     // Mini-sync refresh job
     private var miniSyncJob: Job? = null
+    private var heartbeatJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    /**
+     * Protocol handshake state machine.
+     *
+     * iOS protocol sequence:
+     *   1. HOST  → SessionConfig         (critical, needs ACK)
+     *   2. JOINER → SessionConfigAck     (non-critical)
+     *   3. JOINER → RoleRequest          (critical, needs ACK)
+     *   4. HOST  → ACK(roleRequest)      (auto, for messageId)
+     *   5. HOST  → GateAssigned          (critical, needs ACK)
+     *   6. HOST  → RoleAssigned          (critical, needs ACK)
+     *   7. JOINER → GateAssignedAck      (non-critical)
+     *   8. JOINER → ACK(gateAssigned)    (auto, for messageId)
+     *   ── Handshake complete ──
+     *   9. FINISH phone → startFullSync()
+     *  10. START phone responds with pongs
+     */
+    enum class ProtocolState {
+        IDLE,
+        CONNECTED,           // BLE link up, waiting to start handshake
+        AWAITING_CONFIG,     // Joiner: waiting for SessionConfig from host
+        AWAITING_ROLE,       // Host: sent config, waiting for RoleRequest
+        AWAITING_ASSIGNMENT, // Joiner: sent RoleRequest, waiting for assignment
+        HANDSHAKE_COMPLETE,  // Both: assignment done, ready for sync
+        SYNCING,             // Clock sync in progress
+        READY                // Fully synced, ready for timing
+    }
+
+    private val _protocolState = MutableStateFlow(ProtocolState.IDLE)
+    val protocolState: StateFlow<ProtocolState> = _protocolState.asStateFlow()
+
+    // Session configuration for host mode (set via startAsServer overload)
+    private var sessionConfig: TimingSessionConfig = TimingSessionConfig(
+        distance = ClockSyncConfig.DEFAULT_SESSION_DISTANCE,
+        startType = ClockSyncConfig.DEFAULT_SESSION_START_TYPE,
+        numberOfGates = ClockSyncConfig.DEFAULT_SESSION_NUMBER_OF_GATES,
+        hostRole = TimingRole.START_LINE
+    )
+
+    // Safety timeout job: force-sends SessionConfig if ClientReady never arrives
+    private var clientReadyTimeoutJob: Job? = null
+    private val CLIENT_READY_TIMEOUT_MS = 5000L
+
     init {
-        // Map BLE service state to high-level sync state
+        // Map BLE service state to high-level sync state and drive protocol
         bleClockSyncService.state
             .onEach { bleState ->
-                _syncState.value = when (bleState) {
-                    BleClockSyncService.State.Idle -> SyncState.NotSynced
-                    BleClockSyncService.State.Scanning -> SyncState.WaitingForPeer
-                    BleClockSyncService.State.Connecting -> SyncState.Connecting
-                    BleClockSyncService.State.Connected -> {
-                        if (_isServer.value) SyncState.WaitingForPeer
-                        else SyncState.Connecting
+                when (bleState) {
+                    BleClockSyncService.State.Idle -> {
+                        _protocolState.value = ProtocolState.IDLE
+                        _syncState.value = SyncState.NotSynced
                     }
-                    is BleClockSyncService.State.Syncing -> SyncState.Syncing(bleState.progress)
+                    BleClockSyncService.State.Pairing -> {
+                        _syncState.value = SyncState.WaitingForPeer
+                    }
+                    BleClockSyncService.State.Scanning -> {
+                        _syncState.value = SyncState.WaitingForPeer
+                    }
+                    BleClockSyncService.State.Connecting -> {
+                        _syncState.value = SyncState.Connecting
+                    }
+                    BleClockSyncService.State.Connected -> {
+                        _protocolState.value = ProtocolState.CONNECTED
+                        _syncState.value = SyncState.Connecting
+                        // Resolve role from dual-mode if needed
+                        bleClockSyncService.getResolvedRole()?.let { resolvedRole ->
+                            _isServer.value = resolvedRole is BleClockSyncService.Role.Server
+                        }
+                        onBleConnected()
+                    }
+                    BleClockSyncService.State.ClientReady -> {
+                        // Client has enabled notifications — safe to send SessionConfig now
+                        onClientReady()
+                    }
+                    is BleClockSyncService.State.Syncing -> {
+                        _protocolState.value = ProtocolState.SYNCING
+                        _syncState.value = SyncState.Syncing(bleState.progress)
+                    }
                     is BleClockSyncService.State.Synced -> {
-                        // Record sync timestamp and offset for drift tracking
+                        _protocolState.value = ProtocolState.READY
                         val now = SystemClock.elapsedRealtimeNanos()
                         syncTimestampNanos = now
                         driftTracker.addMeasurement(now, bleState.result.offsetNanos)
-                        SyncState.Synced(
+                        _syncState.value = SyncState.Synced(
                             offsetMs = bleState.result.offsetMs,
                             quality = bleState.result.quality,
                             uncertaintyMs = bleState.result.uncertaintyMs
                         )
+                        // Client: notify server that sync is complete
+                        if (!_isServer.value) {
+                            bleClockSyncService.sendMessage(
+                                TimingPayload.SyncComplete(
+                                    offsetNanos = bleState.result.offsetNanos,
+                                    uncertaintyMs = bleState.result.uncertaintyMs
+                                )
+                            )
+                            Log.i(TAG, "Client: Sent SyncComplete to server")
+                        }
+                        // Start heartbeat so iOS peer doesn't mark us as stale
+                        startHeartbeat()
                     }
-                    is BleClockSyncService.State.Error -> SyncState.Error(bleState.message)
+                    is BleClockSyncService.State.Error -> {
+                        _syncState.value = SyncState.Error(bleState.message)
+                    }
                 }
             }
+            .launchIn(scope)
+
+        // Handle incoming protocol messages (handshake, sync status)
+        bleClockSyncService.incomingMessages
+            .onEach { message -> handleIncomingMessage(message) }
             .launchIn(scope)
     }
 
     /**
-     * Start as the reference clock (server).
-     * Other devices will sync their clocks to this device.
+     * Called when BLE connection is established. Drives the protocol handshake.
+     *
+     * Host: waits for ClientReady (CCC descriptor write) before sending SessionConfig.
+     *       A safety timeout force-sends after 5s if ClientReady never arrives.
+     * Joiner: waits for SessionConfig from host.
+     */
+    private fun onBleConnected() {
+        if (_isServer.value) {
+            // Host: defer SessionConfig until client enables notifications (ClientReady)
+            // This fixes the race condition where the host sends SessionConfig before
+            // the client has subscribed to notifications, causing the message to be lost.
+            Log.i(TAG, "Host: Connected, waiting for client to enable notifications (ClientReady)...")
+
+            // Safety timeout: force-send SessionConfig if ClientReady never arrives
+            // (some BLE stacks don't reliably deliver onDescriptorWriteRequest)
+            clientReadyTimeoutJob?.cancel()
+            clientReadyTimeoutJob = scope.launch {
+                delay(CLIENT_READY_TIMEOUT_MS)
+                if (_protocolState.value == ProtocolState.CONNECTED) {
+                    Log.w(TAG, "Host: ClientReady timeout (${CLIENT_READY_TIMEOUT_MS}ms) — force-sending SessionConfig")
+                    sendSessionConfig()
+                }
+            }
+        } else {
+            // Joiner: wait for SessionConfig before sending anything
+            Log.i(TAG, "Joiner: Waiting for SessionConfig from host...")
+            _protocolState.value = ProtocolState.AWAITING_CONFIG
+        }
+    }
+
+    /**
+     * Called when the client has enabled notifications (CCC descriptor written).
+     * Now it's safe to send SessionConfig — the client will receive the notification.
+     */
+    private fun onClientReady() {
+        if (!_isServer.value) return  // Only relevant for host/server
+
+        clientReadyTimeoutJob?.cancel()
+        clientReadyTimeoutJob = null
+
+        if (_protocolState.value == ProtocolState.CONNECTED) {
+            Log.i(TAG, "Host: ClientReady received — sending SessionConfig now")
+            sendSessionConfig()
+        } else {
+            Log.d(TAG, "Host: ClientReady received but protocol already past CONNECTED (state=${_protocolState.value})")
+        }
+    }
+
+    /**
+     * Send SessionConfig to the connected client. Called either from onClientReady()
+     * or from the safety timeout.
+     */
+    private fun sendSessionConfig() {
+        Log.i(TAG, "Host: Sending SessionConfig (distance=${sessionConfig.distance}, " +
+            "startType=${sessionConfig.startType}, gates=${sessionConfig.numberOfGates})")
+        bleClockSyncService.sendCriticalMessage(
+            TimingPayload.SessionConfig(config = sessionConfig)
+        )
+        _protocolState.value = ProtocolState.AWAITING_ROLE
+    }
+
+    /**
+     * Handle protocol messages forwarded from BLE transport.
+     * Implements the iOS-compatible handshake state machine.
+     */
+    private fun handleIncomingMessage(message: com.trackspeed.android.protocol.TimingMessage) {
+        when (val payload = message.payload) {
+
+            // ── Joiner receives SessionConfig from host ──
+            is TimingPayload.SessionConfig -> {
+                Log.i(TAG, "Joiner: Received SessionConfig: distance=${payload.config.distance}, " +
+                    "startType=${payload.config.startType}, gates=${payload.config.numberOfGates}")
+                sessionConfig = payload.config
+
+                // Send SessionConfigAck (non-critical)
+                bleClockSyncService.sendMessage(TimingPayload.SessionConfigAck())
+                Log.i(TAG, "Joiner: Sent SessionConfigAck")
+
+                // Send RoleRequest (critical — host needs to ACK)
+                bleClockSyncService.sendCriticalMessage(
+                    TimingPayload.RoleRequest(
+                        preferredRole = TimingRole.FINISH_LINE,
+                        deviceId = android.os.Build.MODEL
+                    )
+                )
+                Log.i(TAG, "Joiner: Sent RoleRequest (preferred=FINISH_LINE)")
+                _protocolState.value = ProtocolState.AWAITING_ASSIGNMENT
+                _syncState.value = SyncState.Connecting
+            }
+
+            // ── Host receives RoleRequest from joiner ──
+            is TimingPayload.RoleRequest -> {
+                Log.i(TAG, "Host: Received RoleRequest from ${payload.deviceId}" +
+                    (payload.preferredRole?.let { ", preferred=$it" } ?: ""))
+
+                val assignedRole = payload.preferredRole ?: TimingRole.FINISH_LINE
+
+                // Send GateAssigned (critical)
+                bleClockSyncService.sendCriticalMessage(
+                    TimingPayload.GateAssigned(
+                        assignment = GateAssignment(
+                            role = assignedRole,
+                            gateIndex = if (assignedRole == TimingRole.START_LINE) 0 else 1,
+                            distanceFromStart = if (assignedRole == TimingRole.FINISH_LINE) sessionConfig.distance else 0.0,
+                            targetDeviceId = payload.deviceId
+                        )
+                    )
+                )
+                Log.i(TAG, "Host: Sent GateAssigned (role=${assignedRole.displayName})")
+
+                // Send RoleAssigned (critical)
+                bleClockSyncService.sendCriticalMessage(
+                    TimingPayload.RoleAssigned(
+                        role = assignedRole,
+                        targetDeviceId = payload.deviceId
+                    )
+                )
+                Log.i(TAG, "Host: Sent RoleAssigned (role=$assignedRole to ${payload.deviceId})")
+
+                _protocolState.value = ProtocolState.HANDSHAKE_COMPLETE
+                _syncState.value = SyncState.Syncing(0f)
+                Log.i(TAG, "Host: Handshake complete, waiting for joiner to start clock sync")
+            }
+
+            // ── Joiner receives GateAssigned from host ──
+            is TimingPayload.GateAssigned -> {
+                Log.i(TAG, "Joiner: Received GateAssigned: role=${payload.assignment.role.displayName}, " +
+                    "gateIndex=${payload.assignment.gateIndex}")
+
+                // Send GateAssignedAck (non-critical)
+                bleClockSyncService.sendMessage(
+                    TimingPayload.GateAssignedAck(gateIndex = payload.assignment.gateIndex)
+                )
+
+                // Complete handshake on first of GateAssigned or RoleAssigned
+                if (_protocolState.value == ProtocolState.AWAITING_ASSIGNMENT) {
+                    completeJoinerHandshake()
+                }
+            }
+
+            // ── Joiner receives RoleAssigned from host ──
+            is TimingPayload.RoleAssigned -> {
+                Log.i(TAG, "Joiner: Received RoleAssigned: role=${payload.role}")
+
+                // Send RoleAssignedAck (non-critical)
+                bleClockSyncService.sendMessage(
+                    TimingPayload.RoleAssignedAck(role = payload.role)
+                )
+
+                // Complete handshake on first of GateAssigned or RoleAssigned
+                if (_protocolState.value == ProtocolState.AWAITING_ASSIGNMENT) {
+                    completeJoinerHandshake()
+                }
+            }
+
+            // ── Host receives SyncComplete from joiner ──
+            is TimingPayload.SyncComplete -> {
+                Log.i(TAG, "Host: Received SyncComplete from peer: " +
+                    "offset=${payload.offsetNanos}ns, uncertainty=${payload.uncertaintyMs}ms")
+
+                val now = SystemClock.elapsedRealtimeNanos()
+                syncTimestampNanos = now
+                _protocolState.value = ProtocolState.READY
+                _syncState.value = SyncState.Synced(
+                    offsetMs = 0.0,
+                    quality = SyncQuality.fromUncertainty(payload.uncertaintyMs),
+                    uncertaintyMs = payload.uncertaintyMs
+                )
+                Log.i(TAG, "Host: Sync complete (reference clock, offset=0)")
+                // Start heartbeat so iOS peer doesn't mark us as stale
+                startHeartbeat()
+            }
+
+            // ── Host receives SyncRequest ──
+            is TimingPayload.SyncRequest -> {
+                Log.i(TAG, "Host: Received SyncRequest — peer will start clock sync pings")
+                _syncState.value = SyncState.Syncing(0f)
+            }
+
+            // ── Heartbeat ──
+            is TimingPayload.HeartbeatPing -> {
+                bleClockSyncService.sendMessage(
+                    TimingPayload.HeartbeatPong(pingSeq = message.seq)
+                )
+            }
+
+            // ── ACK messages (logged for debugging) ──
+            is TimingPayload.Ack -> {
+                Log.d(TAG, "Received ACK for messageId=${payload.messageId.take(8)}")
+            }
+
+            is TimingPayload.SessionConfigAck -> {
+                Log.i(TAG, "Host: Received SessionConfigAck")
+            }
+
+            is TimingPayload.RoleAssignedAck -> {
+                Log.i(TAG, "Received RoleAssignedAck: role=${payload.role}")
+            }
+
+            is TimingPayload.GateAssignedAck -> {
+                Log.i(TAG, "Received GateAssignedAck: gateIndex=${payload.gateIndex}")
+            }
+
+            else -> {
+                Log.d(TAG, "Received unhandled message: ${payload::class.simpleName}")
+            }
+        }
+    }
+
+    /**
+     * Joiner handshake completion: start NTP clock sync.
+     */
+    private fun completeJoinerHandshake() {
+        Log.i(TAG, "Joiner: Handshake complete, starting NTP clock sync...")
+        _protocolState.value = ProtocolState.HANDSHAKE_COMPLETE
+        _syncState.value = SyncState.Syncing(0f)
+
+        // Notify server that sync is starting
+        bleClockSyncService.sendMessage(TimingPayload.SyncRequest())
+
+        // Start the NTP sync process
+        bleClockSyncService.startSync()
+    }
+
+    /**
+     * Start as the reference clock (server/host).
+     * Uses default session configuration.
      */
     fun startAsServer() {
-        Log.i(TAG, "Starting as sync server (reference clock)")
+        startAsServer(
+            TimingSessionConfig(
+                distance = ClockSyncConfig.DEFAULT_SESSION_DISTANCE,
+                startType = ClockSyncConfig.DEFAULT_SESSION_START_TYPE,
+                numberOfGates = ClockSyncConfig.DEFAULT_SESSION_NUMBER_OF_GATES,
+                hostRole = TimingRole.START_LINE
+            )
+        )
+    }
+
+    /**
+     * Start as the reference clock (server/host) with specific session config.
+     * The config is sent to joiners as the first message after BLE connection.
+     */
+    fun startAsServer(config: TimingSessionConfig) {
+        Log.i(TAG, "Starting as sync server (reference clock): distance=${config.distance}, startType=${config.startType}")
+        sessionConfig = config
         _isServer.value = true
+        _protocolState.value = ProtocolState.IDLE
         driftTracker.reset()
         bleClockSyncService.startAsServer()
     }
 
     /**
-     * Start as a client that syncs to the server.
-     * Will scan for a server and perform clock sync.
+     * Start as a client (joiner) that syncs to the server.
+     * Will scan for a server, perform handshake, then clock sync.
      */
     fun startAsClient() {
-        Log.i(TAG, "Starting as sync client")
+        Log.i(TAG, "Starting as sync client (joiner)")
         _isServer.value = false
+        _protocolState.value = ProtocolState.IDLE
         driftTracker.reset()
         bleClockSyncService.startAsClient()
+    }
+
+    /**
+     * Start dual-mode auto-sync: advertise + scan simultaneously.
+     * Role is resolved automatically when a peer connects.
+     * Uses default session configuration.
+     */
+    fun startAutoSync() {
+        startAutoSync(
+            TimingSessionConfig(
+                distance = ClockSyncConfig.DEFAULT_SESSION_DISTANCE,
+                startType = ClockSyncConfig.DEFAULT_SESSION_START_TYPE,
+                numberOfGates = ClockSyncConfig.DEFAULT_SESSION_NUMBER_OF_GATES,
+                hostRole = TimingRole.START_LINE
+            )
+        )
+    }
+
+    /**
+     * Start dual-mode auto-sync with specific session config.
+     * Role is resolved automatically when a peer connects.
+     */
+    fun startAutoSync(config: TimingSessionConfig) {
+        Log.i(TAG, "Starting auto-sync (dual-mode): distance=${config.distance}, startType=${config.startType}")
+        sessionConfig = config
+        _isServer.value = false  // Will be resolved on connection
+        _protocolState.value = ProtocolState.IDLE
+        driftTracker.reset()
+        bleClockSyncService.startDual()
     }
 
     /**
@@ -140,12 +500,40 @@ class ClockSyncManager @Inject constructor(
     }
 
     /**
+     * Start periodic heartbeat so iOS peer doesn't mark us as stale/disconnected.
+     * iOS expects heartbeats from connected peers and will degrade the connection
+     * health if they stop arriving.
+     */
+    private fun startHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = scope.launch {
+            while (isActive) {
+                delay(2000)  // Every 2 seconds
+                bleClockSyncService.sendMessage(TimingPayload.HeartbeatPing())
+            }
+        }
+        Log.i(TAG, "Heartbeat started (2s interval)")
+    }
+
+    /**
+     * Stop heartbeat.
+     */
+    private fun stopHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = null
+    }
+
+    /**
      * Stop sync operations.
      */
     fun stop() {
         Log.i(TAG, "Stopping clock sync")
+        clientReadyTimeoutJob?.cancel()
+        clientReadyTimeoutJob = null
         stopPeriodicRefresh()
+        stopHeartbeat()
         bleClockSyncService.stop()
+        _protocolState.value = ProtocolState.IDLE
         _syncState.value = SyncState.NotSynced
     }
 

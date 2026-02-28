@@ -16,6 +16,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
@@ -46,9 +47,11 @@ class BleClockSyncService @Inject constructor(
     // States
     sealed class State {
         object Idle : State()
+        object Pairing : State()       // Dual-mode: advertising + scanning simultaneously
         object Scanning : State()
         object Connecting : State()
         object Connected : State()
+        object ClientReady : State()   // Client has enabled notifications (CCC written)
         data class Syncing(val progress: Float) : State()
         data class Synced(val result: ClockSyncCalculator.SyncResult) : State()
         data class Error(val message: String) : State()
@@ -86,6 +89,9 @@ class BleClockSyncService @Inject constructor(
     private var scanner: BluetoothLeScanner? = null
     private var isScanning = AtomicBoolean(false)
 
+    // Client notification readiness: set when client writes CCC descriptor to enable notifications
+    private val clientNotificationsEnabled = AtomicBoolean(false)
+
     // Sync state
     private var role: Role? = null
     private var syncCalculator: ClockSyncCalculator? = null
@@ -93,6 +99,10 @@ class BleClockSyncService @Inject constructor(
     private val pendingPings = mutableMapOf<String, Long>()  // pingId (UUID) -> t1 nanos
     private var syncJob: Job? = null
     private val handler = Handler(Looper.getMainLooper())
+
+    // Client-side write queue: BLE allows only one write at a time
+    private val clientWriteQueue = ConcurrentLinkedQueue<ByteArray>()
+    private val isClientWritePending = AtomicBoolean(false)
 
     // General message receiving (for non-sync messages like crossing events)
     private val _incomingMessages = MutableSharedFlow<TimingMessage>(extraBufferCapacity = 64)
@@ -117,6 +127,10 @@ class BleClockSyncService @Inject constructor(
             _state.value = State.Error("Bluetooth is not enabled")
             return
         }
+
+        // Stop any previous state to avoid ADVERTISE_FAILED_ALREADY_STARTED (error 3)
+        stopAdvertising()
+        closeGatt()
 
         role = Role.Server
         _state.value = State.Idle
@@ -147,6 +161,44 @@ class BleClockSyncService @Inject constructor(
     }
 
     /**
+     * Start in dual mode: advertise AND scan simultaneously.
+     * The first device to connect determines roles:
+     * - If a client connects to our GATT server → we become Server
+     * - If we find another device's advertisement → we become Client
+     */
+    @SuppressLint("MissingPermission")
+    fun startDual() {
+        if (bluetoothAdapter?.isEnabled != true) {
+            _state.value = State.Error("Bluetooth is not enabled")
+            return
+        }
+
+        // Stop any previous state
+        stopAdvertising()
+        stopScanning()
+        closeGatt()
+
+        role = null  // Undecided until connection resolves
+        _state.value = State.Pairing
+
+        // Start GATT server (so others can connect to us)
+        startGattServer()
+
+        // Start advertising (so others can find us)
+        startAdvertising()
+
+        // Start scanning (so we can find others)
+        startScanning()
+
+        Log.i(TAG, "Dual-mode pairing started: advertising + scanning")
+    }
+
+    /**
+     * Get the resolved role after dual-mode pairing completes.
+     */
+    fun getResolvedRole(): Role? = role
+
+    /**
      * Stop all BLE operations.
      */
     @SuppressLint("MissingPermission")
@@ -161,6 +213,9 @@ class BleClockSyncService @Inject constructor(
         role = null
         syncCalculator = null
         pendingPings.clear()
+        clientWriteQueue.clear()
+        isClientWritePending.set(false)
+        clientNotificationsEnabled.set(false)
         connectedDevice = null
         sessionId = UUID.randomUUID().toString().uppercase()
 
@@ -218,6 +273,12 @@ class BleClockSyncService @Inject constructor(
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.i(TAG, "Server: Client connected: ${device.address}")
                     connectedDevice = device
+                    // In dual-mode: stop scanning since we've been chosen as server
+                    if (role == null) {
+                        stopScanning()
+                        role = Role.Server
+                        Log.i(TAG, "Dual-mode resolved: this device is Server (client connected to us)")
+                    }
                     _state.value = State.Connected
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
@@ -288,6 +349,11 @@ class BleClockSyncService @Inject constructor(
                         Log.d(TAG, "Server: Responded to syncPing (pingId=${payload.pingId.take(8)})")
                     }
                     else -> {
+                        // Auto-ACK critical messages before forwarding
+                        if (message.requiresAck && message.messageId != null) {
+                            Log.d(TAG, "Server: Auto-ACK for ${payload::class.simpleName} (msgId=${message.messageId.take(8)})")
+                            sendMessage(TimingPayload.Ack(messageId = message.messageId))
+                        }
                         // Forward all other messages to the app via incomingMessages flow
                         Log.d(TAG, "Server: Forwarding ${payload::class.simpleName} to app")
                         _incomingMessages.tryEmit(message)
@@ -310,7 +376,19 @@ class BleClockSyncService @Inject constructor(
             if (responseNeeded) {
                 gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
             }
-            Log.d(TAG, "Server: Notifications enabled for ${descriptor.characteristic.uuid}")
+
+            // Detect client enabling notifications on TX characteristic (CCC descriptor)
+            val cccUuid = java.util.UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+            if (descriptor.uuid == cccUuid &&
+                descriptor.characteristic.uuid == ClockSyncConfig.PING_CHARACTERISTIC_UUID &&
+                value.contentEquals(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+            ) {
+                Log.i(TAG, "Server: Client enabled notifications on TX (CCC written) — ClientReady")
+                clientNotificationsEnabled.set(true)
+                _state.value = State.ClientReady
+            } else {
+                Log.d(TAG, "Server: Descriptor write for ${descriptor.characteristic.uuid}")
+            }
         }
     }
 
@@ -353,8 +431,13 @@ class BleClockSyncService @Inject constructor(
 
     @SuppressLint("MissingPermission")
     private fun stopAdvertising() {
-        if (isAdvertising.getAndSet(false)) {
+        val wasAdvertising = isAdvertising.getAndSet(false)
+        try {
             advertiser?.stopAdvertising(advertiseCallback)
+        } catch (e: Exception) {
+            Log.w(TAG, "stopAdvertising error (was=$wasAdvertising): ${e.message}")
+        }
+        if (wasAdvertising) {
             Log.i(TAG, "Stopped advertising")
         }
     }
@@ -399,6 +482,15 @@ class BleClockSyncService @Inject constructor(
 
             Log.i(TAG, "Found clock sync server: ${result.device.address}")
             stopScanning()
+
+            // In dual-mode: stop advertising and close GATT server since we're becoming client
+            if (role == null) {
+                stopAdvertising()
+                closeGattServer()
+                role = Role.Client
+                Log.i(TAG, "Dual-mode resolved: this device is Client (found another server)")
+            }
+
             connectToServer(result.device)
         }
 
@@ -499,10 +591,24 @@ class BleClockSyncService @Inject constructor(
             status: Int
         ) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.d(TAG, "Client: Notifications enabled")
-                // Start sync after notifications are enabled
-                startSync()
+                Log.d(TAG, "Client: Notifications enabled, ready for protocol handshake")
+                // Don't start sync here — let ClockSyncManager drive the
+                // handshake protocol. Sync starts after handshake completes.
             }
+        }
+
+        @SuppressLint("MissingPermission")
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int
+        ) {
+            isClientWritePending.set(false)
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                Log.w(TAG, "Client: Write failed: status=$status")
+            }
+            // Drain the next queued write
+            drainClientWriteQueue()
         }
 
         override fun onCharacteristicChanged(
@@ -526,8 +632,12 @@ class BleClockSyncService @Inject constructor(
         }
     }
 
+    /**
+     * Start the NTP clock sync process. Called by ClockSyncManager after
+     * the protocol handshake completes (not immediately on BLE connection).
+     */
     @SuppressLint("MissingPermission")
-    private fun startSync() {
+    fun startSync() {
         _state.value = State.Syncing(0f)
         Log.i(TAG, "Starting clock synchronization (${ClockSyncConfig.FULL_SYNC_SAMPLES} samples, JSON protocol)...")
 
@@ -545,7 +655,8 @@ class BleClockSyncService @Inject constructor(
                     if (!isActive) return@launch
 
                     sendPing()
-                    delay(ClockSyncConfig.FULL_SYNC_INTERVAL_MS)
+                    // Add 0-10ms random jitter to avoid BLE connection interval aliasing
+                    delay(ClockSyncConfig.FULL_SYNC_INTERVAL_MS + (0L..10L).random())
 
                     // Update progress
                     val sampleProgress = (i + 1).toFloat() / ClockSyncConfig.FULL_SYNC_SAMPLES
@@ -614,7 +725,7 @@ class BleClockSyncService @Inject constructor(
                 if (!isActive) return@launch
 
                 sendPing()
-                delay(ClockSyncConfig.MINI_SYNC_INTERVAL_MS)
+                delay(ClockSyncConfig.MINI_SYNC_INTERVAL_MS + (0L..10L).random())
             }
 
             delay(200)
@@ -637,8 +748,7 @@ class BleClockSyncService @Inject constructor(
 
     @SuppressLint("MissingPermission")
     private fun sendPing() {
-        val client = gattClient ?: return
-        val char = rxCharacteristic ?: return
+        if (gattClient == null || rxCharacteristic == null) return
 
         val pingId = UUID.randomUUID().toString().uppercase()
         val t1 = SystemClock.elapsedRealtimeNanos()
@@ -658,9 +768,7 @@ class BleClockSyncService @Inject constructor(
         )
         val messageData = TimingMessageCodec.encodeToBytes(message)
 
-        char.value = messageData
-        char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        client.writeCharacteristic(char)
+        writeToServer(messageData)
 
         Log.d(TAG, "Client: Sent syncPing (pingId=${pingId.take(8)})")
     }
@@ -700,6 +808,11 @@ class BleClockSyncService @Inject constructor(
                     "RTT=${String.format("%.2f", sample.rtt / 1_000_000.0)}ms, accepted=$accepted")
             }
             else -> {
+                // Auto-ACK critical messages before forwarding
+                if (message.requiresAck && message.messageId != null) {
+                    Log.d(TAG, "Client: Auto-ACK for ${payload::class.simpleName} (msgId=${message.messageId.take(8)})")
+                    sendMessage(TimingPayload.Ack(messageId = message.messageId))
+                }
                 // Forward all other messages to the app via incomingMessages flow
                 Log.d(TAG, "Client: Forwarding ${payload::class.simpleName} to app")
                 _incomingMessages.tryEmit(message)
@@ -707,15 +820,55 @@ class BleClockSyncService @Inject constructor(
         }
     }
 
+    // ==================== Client Write Queue ====================
+
+    /**
+     * Enqueue data for writing to the server (client mode only).
+     * BLE allows only one outstanding write at a time.
+     */
+    private fun writeToServer(data: ByteArray) {
+        clientWriteQueue.add(data)
+        drainClientWriteQueue()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun drainClientWriteQueue() {
+        if (isClientWritePending.compareAndSet(false, true)) {
+            val data = clientWriteQueue.poll()
+            if (data != null) {
+                val client = gattClient
+                val char = rxCharacteristic
+                if (client == null || char == null) {
+                    isClientWritePending.set(false)
+                    return
+                }
+                char.value = data
+                char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                client.writeCharacteristic(char)
+            } else {
+                isClientWritePending.set(false)
+            }
+        }
+    }
+
     // ==================== Cleanup ====================
 
     @SuppressLint("MissingPermission")
-    private fun closeGatt() {
+    private fun closeGattServer() {
         gattServer?.close()
         gattServer = null
+    }
 
+    @SuppressLint("MissingPermission")
+    private fun closeGattClient() {
         gattClient?.close()
         gattClient = null
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun closeGatt() {
+        closeGattServer()
+        closeGattClient()
 
         txCharacteristic = null
         rxCharacteristic = null
@@ -737,12 +890,7 @@ class BleClockSyncService @Inject constructor(
     }
 
     /**
-     * Send a TimingMessage to the connected peer.
-     *
-     * As server: sends via GATT notification on TX characteristic.
-     * As client: writes to RX characteristic on the server.
-     *
-     * @return true if the message was queued for sending, false if not connected.
+     * Send a non-critical TimingMessage (no messageId, no ACK expected).
      */
     @SuppressLint("MissingPermission")
     fun sendMessage(payload: TimingPayload): Boolean {
@@ -757,29 +905,49 @@ class BleClockSyncService @Inject constructor(
             sessionId = sessionId,
             payload = payload
         )
+        return sendRawMessage(message)
+    }
+
+    /**
+     * Send a critical TimingMessage (with messageId, expects ACK from peer).
+     * Used for handshake messages like SessionConfig, RoleAssigned, GateAssigned.
+     */
+    @SuppressLint("MissingPermission")
+    fun sendCriticalMessage(payload: TimingPayload): Boolean {
+        if (connectedDevice == null) {
+            Log.w(TAG, "Cannot send critical message: not connected")
+            return false
+        }
+
+        val message = TimingMessage.createCritical(
+            seq = sequenceNumber.incrementAndGet(),
+            senderId = deviceId,
+            sessionId = sessionId,
+            payload = payload
+        )
+        return sendRawMessage(message)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun sendRawMessage(message: TimingMessage): Boolean {
         val messageData = TimingMessageCodec.encodeToBytes(message)
+        val payloadName = message.payload::class.simpleName
+        val criticalTag = if (message.messageId != null) " [CRITICAL msgId=${message.messageId.take(8)}]" else ""
 
         return when (role) {
             Role.Server -> {
-                // Server sends via notification on TX characteristic
                 val device = connectedDevice ?: return false
                 txCharacteristic?.let { char ->
                     char.value = messageData
                     gattServer?.notifyCharacteristicChanged(device, char, false)
-                    Log.d(TAG, "Server: Sent ${payload::class.simpleName} (${messageData.size} bytes)")
+                    Log.d(TAG, "Server: Sent $payloadName (${messageData.size}B)$criticalTag")
                     true
                 } ?: false
             }
             Role.Client -> {
-                // Client writes to RX characteristic on server
-                val client = gattClient ?: return false
-                rxCharacteristic?.let { char ->
-                    char.value = messageData
-                    char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    client.writeCharacteristic(char)
-                    Log.d(TAG, "Client: Sent ${payload::class.simpleName} (${messageData.size} bytes)")
-                    true
-                } ?: false
+                writeToServer(messageData)
+                Log.d(TAG, "Client: Queued $payloadName (${messageData.size}B)$criticalTag")
+                true
             }
             null -> false
         }
