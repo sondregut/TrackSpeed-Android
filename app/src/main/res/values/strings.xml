@@ -1,4 +1,966 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">TrackSpeed</string>
+
+    <!-- Common -->
+    <string name="common_cancel">Cancel</string>
+    <string name="common_back">Back</string>
+    <string name="common_settings">Settings</string>
+    <string name="common_pro_badge">PRO</string>
+
+    <!-- Home Screen -->
+    <string name="home_tab_home">Home</string>
+    <string name="home_tab_templates">Templates</string>
+    <string name="home_tab_history">History</string>
+    <string name="home_tab_profile">Profile</string>
+    <string name="home_greeting_morning">Good morning</string>
+    <string name="home_greeting_afternoon">Good afternoon</string>
+    <string name="home_greeting_evening">Good evening</string>
+    <string name="home_greeting_default">Hello</string>
+    <string name="home_greeting_with_name">%1$s, %2$s</string>
+    <string name="home_default_user_name">Athlete</string>
+    <string name="home_start_first_sprint">Start your first sprint</string>
+    <plurals name="home_sprints_recorded">
+        <item quantity="one">%d sprint recorded</item>
+        <item quantity="other">%d sprints recorded</item>
+    </plurals>
+    <string name="home_section_quick_start">QUICK START</string>
+    <string name="home_solo_mode">Solo Mode</string>
+    <string name="home_10m_acceleration">10m Acceleration</string>
+    <string name="home_60m_sprint">60m Sprint</string>
+    <string name="home_take_off_velocity">Take Off Velocity</string>
+    <string name="home_custom_session">Custom Session</string>
+    <string name="home_custom_session_subtitle">Configure distance, start type &amp; more</string>
+    <string name="home_join_session">Join Session</string>
+    <string name="home_join_session_subtitle">Connect to another phone</string>
+    <string name="home_recent_sessions">Recent Sessions</string>
+    <string name="home_see_all">See All</string>
+    <string name="home_no_recent_sessions">No recent sessions</string>
+
+    <!-- Timing Screen -->
+    <string name="timing_tap_to_close">Tap to close</string>
+    <string name="timing_flip_camera">Flip camera</string>
+    <string name="timing_session_saved">Session saved!</string>
+    <string name="timing_end">End</string>
+    <string name="timing_tab_record">Record</string>
+    <string name="timing_tab_results">Results</string>
+    <string name="timing_banner_hold_still">HOLD STILL</string>
+    <string name="timing_banner_too_far">TOO FAR</string>
+    <string name="timing_banner_running">RUNNING</string>
+    <string name="timing_banner_ready">READY</string>
+    <string name="timing_banner_stopped">STOPPED</string>
+    <string name="timing_run_number">Run #%d</string>
+    <string name="timing_label_speed">Speed</string>
+    <string name="timing_label_distance">Distance</string>
+    <string name="timing_practice_label">%s Practice</string>
+    <plurals name="timing_lap_count">
+        <item quantity="zero">0 laps</item>
+        <item quantity="one">%d lap</item>
+        <item quantity="other">%d laps</item>
+    </plurals>
+    <string name="timing_no_laps_yet">No laps yet</string>
+    <string name="timing_run_through_gate">Run through the gate to start recording</string>
+    <string name="timing_crossing_frame">Crossing frame</string>
+    <string name="timing_go">GO</string>
+    <string name="timing_no_thumbnail">--</string>
+    <string name="timing_start">Start</string>
+    <string name="timing_lap_number">Lap %d</string>
+    <string name="timing_timer_started">Timer started</string>
+    <string name="timing_total_time">Total: %s</string>
+    <string name="timing_no_results_yet">No results yet</string>
+    <string name="timing_complete_laps_hint">Complete some laps to see your stats</string>
+    <string name="timing_session_summary">Session Summary</string>
+    <string name="timing_stat_best">Best</string>
+    <string name="timing_stat_total_time">Total Time</string>
+    <string name="timing_stat_average">Average</string>
+    <string name="timing_stat_laps">Laps</string>
+    <string name="timing_best_speed">Best Speed</string>
+    <string name="timing_speed_ms_format">%.2f m/s</string>
+    <string name="timing_no_speed_ms">-- m/s</string>
+    <string name="timing_lap_comparison">Lap Comparison</string>
+    <string name="timing_best_label">BEST</string>
+    <string name="timing_delta_format">+%.2fs</string>
+    <string name="timing_btn_cancel_run">Cancel Run</string>
+    <string name="timing_btn_pause">Pause</string>
+    <string name="timing_btn_save_session">Save Session</string>
+    <string name="timing_btn_restart">Restart</string>
+    <string name="timing_btn_exit">Exit</string>
+    <string name="timing_btn_start">Start</string>
+    <string name="timing_camera_permission_required">Camera permission required</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_subscription">Subscription</string>
+    <string name="settings_trackspeed_pro">TrackSpeed Pro</string>
+    <string name="settings_active">Active</string>
+    <string name="settings_manage">Manage</string>
+    <string name="settings_upgrade_to_pro">Upgrade to Pro</string>
+    <string name="settings_unlock_all_features">Unlock all features</string>
+    <string name="settings_section_timing">Timing</string>
+    <string name="settings_distance">Distance</string>
+    <string name="settings_start_type">Start type</string>
+    <string name="settings_section_display">Display</string>
+    <string name="settings_language_title">Language</string>
+    <string name="settings_speed_unit">Speed unit</string>
+    <string name="settings_dark_mode">Dark mode</string>
+    <string name="settings_section_detection">Detection</string>
+    <string name="settings_sensitivity">Sensitivity</string>
+    <string name="settings_frame_rate">Frame rate</string>
+    <string name="settings_fps_label">%dfps</string>
+    <string name="settings_section_notifications">Notifications</string>
+    <string name="settings_notification_settings">Notification Settings</string>
+    <string name="settings_notification_subtitle">Manage alerts and reminders</string>
+    <string name="settings_section_storage">Storage</string>
+    <string name="settings_thumbnail_storage">Thumbnail Storage</string>
+    <string name="settings_storage_used">Used: %s</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_version_format">TrackSpeed v%1$s (%2$d)</string>
+    <string name="settings_section_developer">Developer</string>
+    <string name="settings_show_onboarding">Show Onboarding</string>
+    <string name="settings_show_onboarding_subtitle">Reset and replay onboarding flow</string>
+    <string name="settings_debug_tools">Debug Tools</string>
+    <string name="settings_debug_tools_subtitle">Detection debug overlay and logs</string>
+    <string name="settings_section_data">Data</string>
+    <string name="settings_clear_data">Clear Data</string>
+    <string name="settings_clear_data_description">Delete all sessions, runs, and cached thumbnails. This cannot be undone.</string>
+    <string name="settings_clear_all_data">Clear All Data</string>
+    <string name="settings_clear_data_dialog_title">Clear All Data?</string>
+    <string name="settings_clear_data_dialog_message">This will permanently delete all training sessions, run history, and cached thumbnail images. This action cannot be undone.</string>
+    <string name="settings_delete_all">Delete All</string>
+    <string name="settings_distance_40yd">40yd</string>
+    <string name="settings_distance_60m">60m</string>
+    <string name="settings_distance_100m">100m</string>
+    <string name="settings_distance_200m">200m</string>
+    <string name="settings_start_type_flying">Flying</string>
+    <string name="settings_start_type_standing">Standing</string>
+    <string name="settings_start_mode">Start mode</string>
+    <string name="settings_start_mode_flying">Flying</string>
+    <string name="settings_start_mode_touch">Touch Release</string>
+    <string name="settings_start_mode_countdown">Countdown</string>
+    <string name="settings_start_mode_voice">Voice Command</string>
+    <string name="settings_start_mode_inframe">In-Frame</string>
+    <string name="settings_storage_0kb">0 KB</string>
+    <string name="settings_storage_bytes">%d B</string>
+    <string name="settings_storage_kb">%d KB</string>
+    <string name="settings_storage_mb">%.1f MB</string>
+
+    <!-- Notification Settings Screen -->
+    <string name="notification_settings_title">Notifications</string>
+    <string name="notification_settings_section_system">System Notifications</string>
+    <string name="notification_settings_try_pro_title">Try Pro Reminder</string>
+    <string name="notification_settings_try_pro_description">Get notified about Pro features after %d days</string>
+    <string name="notification_settings_training_title">Training Reminder</string>
+    <string name="notification_settings_training_description">Remind me if I haven\'t trained in %d days</string>
+    <string name="notification_settings_rating_title">Rating Prompt</string>
+    <string name="notification_settings_rating_description">Prompt to rate the app after %d sessions</string>
+    <string name="notification_settings_section_in_app">In-App Notifications</string>
+    <string name="notification_settings_personal_bests_title">Personal Bests</string>
+    <string name="notification_settings_personal_bests_description">In-app celebration when you set a new PB</string>
+    <string name="notification_settings_session_summary_title">Session Summary</string>
+    <string name="notification_settings_session_summary_description">Toast when training session ends</string>
+    <string name="notification_settings_in_app_footer">These notifications appear as banners while using the app. They are always enabled.</string>
+    <string name="notification_settings_section_test">Test</string>
+    <string name="notification_settings_test_description">Send a test notification to verify your settings are working correctly.</string>
+    <string name="notification_settings_test_button">Test Notification</string>
+    <string name="notification_settings_test_sent">Notification Sent…</string>
+    <string name="notification_settings_permission_disabled_title">Notifications are disabled</string>
+    <string name="notification_settings_permission_disabled_message">Enable notifications in system settings to receive reminders.</string>
+    <string name="notification_settings_open_settings">Open Settings</string>
+
+    <!-- Profile Screen -->
+    <string name="profile_photo_title">Profile Photo</string>
+    <string name="profile_photo_choose_option">Choose an option</string>
+    <string name="profile_photo_choose_new">Choose New Photo</string>
+    <string name="profile_photo_take">Take Photo</string>
+    <string name="profile_photo_remove">Remove Photo</string>
+    <string name="profile_avatar_cd">Profile avatar</string>
+    <string name="profile_change_photo_cd">Change photo</string>
+    <string name="profile_name_placeholder">Athlete</string>
+    <string name="profile_sprints_recorded">%d sprints recorded</string>
+    <string name="profile_trackspeed_pro">TrackSpeed Pro</string>
+    <string name="profile_upgrade_to_pro">Upgrade to Pro</string>
+    <string name="profile_upgrade_subtitle">Unlock multi-phone sync, unlimited history &amp; more</string>
+    <string name="profile_stat_sessions">Sessions</string>
+    <string name="profile_stat_runs">Runs</string>
+    <string name="profile_stat_best_time">Best Time</string>
+    <string name="profile_stat_no_value">--</string>
+    <string name="profile_section_personal_bests">Personal Bests</string>
+    <string name="profile_no_personal_bests">No personal bests yet</string>
+    <string name="profile_no_personal_bests_subtitle">Complete runs to record your times</string>
+    <string name="profile_invite_friends">Invite Friends</string>
+    <string name="profile_invite_friends_subtitle">Share TrackSpeed with your team</string>
+    <string name="profile_section_athletes">Athletes</string>
+    <string name="profile_manage_athletes">Manage Athletes</string>
+    <string name="profile_athlete_count">%d athletes</string>
+    <string name="profile_athlete_count_singular">%d athlete</string>
+    <string name="profile_section_calculators">Sprint Calculators</string>
+    <string name="profile_wind_adjustment">Wind Adjustment</string>
+    <string name="profile_wind_adjustment_subtitle">Adjust times for wind conditions</string>
+    <string name="profile_distance_converter">Distance Converter</string>
+    <string name="profile_distance_converter_subtitle">Convert between sprint distances</string>
+    <string name="profile_section_account">Account</string>
+    <string name="profile_sign_out">Sign Out</string>
+    <string name="profile_delete_account">Delete Account</string>
+    <string name="profile_guest_account">Guest Account</string>
+    <string name="profile_guest_sign_in_hint">Sign in to sync data across devices</string>
+    <string name="profile_section_about">About</string>
+    <string name="profile_version_label">Version</string>
+    <string name="profile_version_value">TrackSpeed v1.0.0</string>
+    <string name="profile_build_label">Build</string>
+    <string name="profile_build_value">Android</string>
+    <string name="profile_tagline">TrackSpeed - Precision Sprint Timing</string>
+    <string name="profile_sign_out_title">Sign Out?</string>
+    <string name="profile_sign_out_message">You\'ll need to sign in again to sync your data across devices.</string>
+    <string name="profile_delete_account_title">Delete Account?</string>
+    <string name="profile_delete_account_message">This will permanently delete your account and ALL associated data including your profile, sessions, runs, and athletes. This action cannot be undone.</string>
+    <string name="profile_account_type_guest">Guest</string>
+
+    <!-- Session Detail Screen -->
+    <string name="session_detail_title_default">Session Details</string>
+    <string name="session_detail_back_cd">Back</string>
+    <string name="session_detail_export_cd">Export CSV</string>
+    <string name="session_detail_stat_best">Best</string>
+    <string name="session_detail_stat_average">Average</string>
+    <string name="session_detail_stat_runs">Runs</string>
+    <string name="session_detail_athlete_label">Athlete</string>
+    <string name="session_detail_filter_all">All</string>
+    <string name="session_detail_run_number">Run %d</string>
+    <string name="session_detail_run_thumbnail_cd">Run %d</string>
+    <string name="session_detail_badge_best">BEST</string>
+    <string name="session_detail_badge_pb">PB</string>
+    <string name="session_detail_badge_sb">SB</string>
+    <string name="session_detail_speed_format">%.1f m/s</string>
+
+    <!-- Session History Screen -->
+    <string name="session_history_title">History</string>
+    <string name="session_history_delete_title">Delete Session</string>
+    <string name="session_history_delete_message">Are you sure you want to delete this session? This cannot be undone.</string>
+    <string name="session_history_delete_confirm">Delete</string>
+    <string name="session_history_search_placeholder">Search sessions\u2026</string>
+    <string name="session_history_search_cd">Search</string>
+    <string name="session_history_clear_cd">Clear</string>
+    <string name="session_history_filter_distance">Distance</string>
+    <string name="session_history_filter_start_type">Start Type</string>
+    <string name="session_history_filter_sort">Sort by</string>
+    <string name="session_history_no_match">No sessions match your filters</string>
+    <string name="session_history_clear_filters">Clear Filters</string>
+    <string name="session_history_no_sessions">No sessions yet</string>
+    <string name="session_history_no_sessions_subtitle">Your timing sessions will appear here</string>
+    <string name="session_history_session_thumbnail_cd">Session thumbnail</string>
+    <string name="session_history_session_name_default">Practice Session</string>
+    <string name="session_history_run_count">%d runs</string>
+    <string name="session_history_run_count_singular">%d run</string>
+    <string name="session_history_delete_session_cd">Delete session</string>
+    <string name="session_history_group_today">Today</string>
+    <string name="session_history_group_yesterday">Yesterday</string>
+    <string name="session_history_group_this_week">This Week</string>
+    <string name="session_history_group_earlier">Earlier</string>
+    <string name="session_history_filter_all">All</string>
+    <string name="session_history_sort_newest">Newest First</string>
+    <string name="session_history_sort_oldest">Oldest First</string>
+    <string name="session_history_sort_fastest">Fastest First</string>
+    <string name="session_history_sort_slowest">Slowest First</string>
+
+    <!-- Run Detail Screen -->
+    <string name="run_detail_title_format">Run %d</string>
+    <string name="run_detail_title_default">Run Details</string>
+    <string name="run_detail_back_cd">Back</string>
+    <string name="run_detail_not_found">Run not found</string>
+    <string name="run_detail_seconds_label">seconds</string>
+    <string name="run_detail_badge_personal_best">Personal Best</string>
+    <string name="run_detail_badge_season_best">Season Best</string>
+    <string name="run_detail_performance">Performance</string>
+    <string name="run_detail_speed_label">Speed</string>
+    <string name="run_detail_speed_ms">%.1f m/s</string>
+    <string name="run_detail_speed_kmh">%.1f km/h</string>
+    <string name="run_detail_distance_label">Distance</string>
+    <string name="run_detail_distance_value">%dm</string>
+    <string name="run_detail_reaction_time_label">Reaction Time</string>
+    <string name="run_detail_reaction_time_value">%.3fs</string>
+    <string name="run_detail_gate_crossing">Gate Crossing</string>
+    <string name="run_detail_crossing_frame_cd">Run %d crossing frame</string>
+    <string name="run_detail_details">Details</string>
+    <string name="run_detail_date_label">Date</string>
+    <string name="run_detail_session_label">Session</string>
+    <string name="run_detail_start_type_label">Start Type</string>
+    <string name="run_detail_mode_label">Mode</string>
+    <string name="run_detail_mode_value">1-Phone</string>
+    <string name="run_detail_gate_images">Gate Images</string>
+    <string name="run_detail_crossing_label">Crossing</string>
+    <string name="run_detail_athlete_label">Athlete</string>
+    <string name="run_detail_edit_distance">Edit Distance</string>
+    <string name="run_detail_delete_run">Delete Run</string>
+    <string name="run_detail_delete_confirm_title">Delete Run?</string>
+    <string name="run_detail_delete_confirm_message">This action cannot be undone.</string>
+    <string name="run_detail_delete_confirm">Delete</string>
+    <string name="run_detail_custom_distance">Custom</string>
+    <string name="run_detail_distance_hint">Distance (m)</string>
+    <string name="run_detail_save">Save</string>
+    <string name="run_detail_speed_mph">%.1f mph</string>
+
+    <!-- Session Detail - Table -->
+    <string name="session_detail_header_num">#</string>
+    <string name="session_detail_header_time">Time</string>
+    <string name="session_detail_header_speed">Speed</string>
+    <string name="session_detail_header_dist">Dist</string>
+    <string name="session_detail_header_type">Type</string>
+    <string name="session_detail_header_athlete">Athlete</string>
+    <string name="session_detail_run_count">%d runs</string>
+
+    <!-- Share Result Screen -->
+    <string name="share_title">Share Result</string>
+    <string name="share_back_cd">Back</string>
+    <string name="share_data_not_found">Run data not found</string>
+    <string name="share_style_label">STYLE</string>
+    <string name="share_button">Share\u2026</string>
+    <string name="share_save_to_gallery">Save to Gallery</string>
+    <string name="share_saved">Saved</string>
+    <string name="share_saved_toast">Saved to gallery</string>
+    <string name="share_save_failed_toast">Failed to save image</string>
+    <string name="share_chooser_title">Share Result</string>
+    <string name="share_theme_selected_cd">Selected: %s</string>
+
+    <!-- Race Mode Screen -->
+    <string name="race_back_cd">Back</string>
+    <string name="race_dismiss">Dismiss</string>
+    <string name="race_phase_multi_device">Multi-Device Timing</string>
+    <string name="race_phase_pairing">Device Pairing</string>
+    <string name="race_phase_clock_sync">Clock Sync</string>
+    <string name="race_phase_race_ready">Race Ready</string>
+    <string name="race_phase_active_race">Active Race</string>
+    <string name="race_phase_result">Result</string>
+    <string name="race_pill_setup">Setup</string>
+    <string name="race_pill_pairing">Pairing</string>
+    <string name="race_pill_syncing">Syncing</string>
+    <string name="race_pill_ready">Ready</string>
+    <string name="race_pill_live">Live</string>
+    <string name="race_pill_done">Done</string>
+    <string name="race_pill_code">Code</string>
+
+    <!-- Session Code Phase -->
+    <string name="race_phase_session_code">Session Code</string>
+    <string name="race_your_session_code">Your Session Code</string>
+    <string name="race_share_this_code">Share this code with your partner</string>
+    <string name="race_waiting_for_partner">Waiting for partner to join\u2026</string>
+    <string name="race_share_code">Share Code</string>
+    <string name="race_code_copied">Code copied to clipboard</string>
+    <string name="race_enter_session_code">Enter Session Code</string>
+    <string name="race_enter_code_desc">Enter the 6-digit code shown on the other device</string>
+    <string name="race_join_session">Join Session</string>
+    <string name="race_generating_code">Generating code\u2026</string>
+    <string name="race_cloud_only_warning">Connected via cloud relay (BLE unavailable). Timing may have higher uncertainty.</string>
+
+    <string name="race_choose_role">Choose Your Role</string>
+    <string name="race_choose_role_desc">Each phone acts as a timing gate. Choose which position this phone will be at.</string>
+    <string name="race_start_subtitle">Detects when the runner leaves the start line. Acts as the reference clock.</string>
+    <string name="race_finish_subtitle">Detects when the runner crosses the finish line. Syncs clock to start phone.</string>
+    <string name="race_bluetooth_required">Bluetooth permissions required for device pairing</string>
+    <string name="race_how_it_works">How It Works</string>
+    <string name="race_step_1">Choose roles and pair devices via Bluetooth</string>
+    <string name="race_step_2">Clocks sync automatically (&lt; 5ms accuracy)</string>
+    <string name="race_step_3">Point cameras at the track and start the session</string>
+    <string name="race_step_4">Crossing detection triggers timing automatically</string>
+    <string name="race_pairing_waiting">Waiting for Connection</string>
+    <string name="race_pairing_searching">Searching for Start Phone</string>
+    <string name="race_pairing_start_desc">This phone is advertising as the reference clock. Start the other phone as \'Finish Phone\' to connect.</string>
+    <string name="race_pairing_finish_desc">Scanning for a Start Phone nearby\u2026</string>
+    <string name="race_role_start">Start Phone</string>
+    <string name="race_role_finish">Finish Phone</string>
+    <string name="race_role_unknown">Unknown</string>
+    <string name="race_cancel">Cancel</string>
+    <string name="race_syncing_title">Synchronizing Clocks</string>
+    <string name="race_syncing_percent">%d%% complete</string>
+    <string name="race_syncing_desc">Exchanging timing samples to calculate clock offset between devices\u2026</string>
+    <string name="race_clock_synced">Clock Synced</string>
+    <string name="race_offset_label">Offset</string>
+    <string name="race_uncertainty_label">Uncertainty</string>
+    <string name="race_ms_format">%.2f ms</string>
+    <string name="race_distance_label">Distance</string>
+    <string name="race_camera_permission_needed">Camera permission needed</string>
+    <string name="race_position_instruction">Position this phone at the %s and point the camera at the track.</string>
+    <string name="race_position_instruction_gate">gate</string>
+    <string name="race_start_session">START SESSION</string>
+    <string name="race_quality_excellent">Excellent</string>
+    <string name="race_quality_good">Good</string>
+    <string name="race_quality_fair">Fair</string>
+    <string name="race_quality_poor">Poor</string>
+    <string name="race_quality_bad">Bad</string>
+    <string name="race_banner_hold_steady">HOLD STEADY</string>
+    <string name="race_banner_too_far">TOO FAR</string>
+    <string name="race_banner_triggered">TRIGGERED</string>
+    <string name="race_banner_cooldown">COOLDOWN</string>
+    <string name="race_banner_ready">READY</string>
+    <string name="race_camera_not_available">Camera not available</string>
+    <string name="race_waiting_for_crossing">Waiting for crossing\u2026</string>
+    <string name="race_complete">Race Complete</string>
+    <string name="race_result_distance">Distance</string>
+    <string name="race_result_avg_speed">Average Speed</string>
+    <string name="race_result_speed_format">%.2f m/s</string>
+    <string name="race_result_uncertainty">Timing Uncertainty</string>
+    <string name="race_result_uncertainty_format">+/- %.1f ms</string>
+    <string name="race_result_sync_quality">Sync Quality</string>
+    <string name="race_result_role">Role</string>
+    <string name="race_no_timing_data">No timing data recorded</string>
+    <string name="race_new_race">New Race</string>
+    <string name="race_exit">Exit</string>
+    <string name="race_status_waiting">Waiting for crossing\u2026</string>
+    <string name="race_status_started">Runner started! Waiting for finish\u2026</string>
+    <string name="race_status_finished">Finished!</string>
+    <string name="race_timer_distance">%dm</string>
+
+    <!-- Clock Sync Screen -->
+    <string name="sync_title">Clock Sync</string>
+    <string name="sync_instruction">Sync clocks between devices for accurate timing.</string>
+    <string name="sync_instruction_auto">Place both devices nearby and tap Pair. Clocks will synchronize automatically.</string>
+    <string name="sync_pair_button">Pair</string>
+    <string name="sync_choose_role">Choose role:</string>
+    <string name="sync_start_reference">Start as Reference Clock</string>
+    <string name="sync_start_reference_desc">(Other devices sync to this)</string>
+    <string name="sync_to_device">Sync to Another Device</string>
+    <string name="sync_to_device_desc">(Find and sync to reference)</string>
+    <string name="sync_bluetooth_required">Bluetooth permissions required</string>
+    <string name="sync_searching">Searching for nearby device\u2026</string>
+    <string name="sync_searching_hint">Make sure both devices have the app open on this screen</string>
+    <string name="sync_waiting_server">Waiting for other device to connect\u2026</string>
+    <string name="sync_waiting_server_hint">Start the other device as \'Sync to Another Device\'</string>
+    <string name="sync_searching_client">Searching for reference clock\u2026</string>
+    <string name="sync_searching_client_hint">Make sure the other device is set as \'Reference Clock\'</string>
+    <string name="sync_cancel">Cancel</string>
+    <string name="sync_connecting">Connecting to device\u2026</string>
+    <string name="sync_syncing">Synchronizing clocks\u2026</string>
+    <string name="sync_progress_percent">%d%%</string>
+    <string name="sync_continue">Continue to Timing</string>
+    <string name="sync_try_again">Try Again</string>
+    <string name="sync_status_not_synced">Not Synced</string>
+    <string name="sync_status_searching">Searching\u2026</string>
+    <string name="sync_status_advertising">Advertising\u2026</string>
+    <string name="sync_status_scanning">Scanning\u2026</string>
+    <string name="sync_status_connecting">Connecting\u2026</string>
+    <string name="sync_status_syncing">Syncing\u2026</string>
+    <string name="sync_status_synced">Synced</string>
+    <string name="sync_status_error">Error</string>
+    <string name="sync_reference_clock_label">(Reference Clock)</string>
+    <string name="sync_synced_cd">Synced</string>
+    <string name="sync_error_cd">Error</string>
+    <string name="sync_details_title">Sync Details</string>
+    <string name="sync_details_offset">Clock Offset</string>
+    <string name="sync_details_uncertainty">Uncertainty</string>
+    <string name="sync_details_quality">Quality</string>
+    <string name="sync_details_ms_format">%.2f ms</string>
+
+    <!-- Common: Onboarding shared strings -->
+    <string name="common_continue">Continue</string>
+    <string name="common_skip">Skip</string>
+    <string name="common_skip_for_now">Skip for now</string>
+    <string name="common_next">Next</string>
+    <string name="common_not_now">Not now</string>
+
+    <!-- Onboarding Screen -->
+    <string name="onboarding_skip">Skip</string>
+
+    <!-- Onboarding: Welcome Step -->
+    <string name="onboarding_welcome_logo_description">TrackSpeed</string>
+    <string name="onboarding_welcome_title">TrackSpeed</string>
+    <string name="onboarding_welcome_subtitle">Precision Sprint Timing</string>
+    <string name="onboarding_welcome_tagline">Turn your phone into a\nprofessional timing system</string>
+    <string name="onboarding_welcome_get_started">Get Started</string>
+    <string name="onboarding_welcome_sign_in">Already have an account? Sign In</string>
+    <string name="onboarding_welcome_join_session">Join Session</string>
+
+    <!-- Onboarding: How It Works Step -->
+    <string name="onboarding_howitworks_title">How It Works</string>
+    <string name="onboarding_howitworks_step1_label">Step 1</string>
+    <string name="onboarding_howitworks_step1_title">Connect</string>
+    <string name="onboarding_howitworks_step1_description">Set up one or two phones at the track</string>
+    <string name="onboarding_howitworks_step2_label">Step 2</string>
+    <string name="onboarding_howitworks_step2_title">Start</string>
+    <string name="onboarding_howitworks_step2_description">Begin timing with a tap or voice command</string>
+    <string name="onboarding_howitworks_step3_label">Step 3</string>
+    <string name="onboarding_howitworks_step3_title">Position</string>
+    <string name="onboarding_howitworks_step3_description">Camera detects the runner crossing the line</string>
+    <string name="onboarding_howitworks_step4_label">Step 4</string>
+    <string name="onboarding_howitworks_step4_title">Get Time</string>
+    <string name="onboarding_howitworks_step4_description">Instant photo-finish accurate results</string>
+
+    <!-- Onboarding: Value Proposition Step -->
+    <string name="onboarding_value_title">Photo Finish Precision</string>
+    <string name="onboarding_value_description">Get millisecond-accurate sprint times using your phone\'s camera — no expensive equipment needed.</string>
+    <string name="onboarding_value_image_description">Photo Finish</string>
+
+    <!-- Onboarding: Competitor Comparison Step -->
+    <string name="onboarding_comparison_title_top">Professional timing</string>
+    <string name="onboarding_comparison_title_bottom">without the price tag</string>
+    <string name="onboarding_comparison_trackspeed_logo_description">TrackSpeed</string>
+    <string name="onboarding_comparison_trackspeed_name">TrackSpeed</string>
+    <string name="onboarding_comparison_price">$4.17/month</string>
+    <string name="onboarding_comparison_save_badge">Save $1,000+</string>
+    <string name="onboarding_comparison_pill_photo_finish">Photo Finish</string>
+    <string name="onboarding_comparison_pill_setup">&lt; 1 min setup</string>
+    <string name="onboarding_comparison_pill_phone_only">Phone only</string>
+    <string name="onboarding_comparison_vs_divider">vs traditional timing systems</string>
+    <string name="onboarding_comparison_hardware_image_description">Traditional timing hardware</string>
+    <string name="onboarding_comparison_hardware_price">$500 – $5,000+</string>
+    <string name="onboarding_comparison_hardware_subtitle">for traditional timing equipment</string>
+
+    <!-- Onboarding: Camera Permission Step -->
+    <string name="onboarding_camera_headline_granted">Camera Access Granted</string>
+    <string name="onboarding_camera_headline_denied">Camera Access Needed</string>
+    <string name="onboarding_camera_headline_undetermined">Camera Access Needed</string>
+    <string name="onboarding_camera_desc_granted">You\'re all set! TrackSpeed can now detect when athletes cross the finish line.</string>
+    <string name="onboarding_camera_desc_denied">TrackSpeed needs camera access to detect finish line crossings. Please enable it in Settings.</string>
+    <string name="onboarding_camera_desc_undetermined">TrackSpeed uses your camera to detect athletes crossing the finish line.</string>
+    <string name="onboarding_camera_allow">Allow Camera</string>
+    <string name="onboarding_camera_open_settings">Open Settings</string>
+
+    <!-- Onboarding: Track Preview Step -->
+    <string name="onboarding_preview_title">How Timing Works</string>
+    <string name="onboarding_preview_description">Place your phone at the finish line.\nThe camera detects athletes as they cross.</string>
+    <string name="onboarding_preview_start_label">S</string>
+    <string name="onboarding_preview_finish_label">F</string>
+    <string name="onboarding_preview_start_text">START</string>
+    <string name="onboarding_preview_finish_text">FINISH</string>
+    <string name="onboarding_preview_one_phone_title">1 Phone</string>
+    <string name="onboarding_preview_one_phone_subtitle">Solo practice mode</string>
+    <string name="onboarding_preview_two_phones_title">2 Phones</string>
+    <string name="onboarding_preview_two_phones_subtitle">Start + finish gates</string>
+
+    <!-- Onboarding: Athlete Details Step -->
+    <string name="onboarding_athlete_title">Tell Us About You</string>
+    <string name="onboarding_athlete_role_label">I am a\u2026</string>
+    <string name="onboarding_athlete_event_label">Primary event</string>
+    <string name="onboarding_athlete_event_placeholder">Select your event</string>
+
+    <!-- Onboarding: Flying Time Step -->
+    <string name="onboarding_flying_title">Flying Sprint</string>
+    <string name="onboarding_flying_subtitle">What\'s your flying time?</string>
+    <string name="onboarding_flying_time_label">Time (seconds)</string>
+    <string name="onboarding_flying_speed_format">That\'s %1$.1f m/s (%2$.1f km/h)</string>
+
+    <!-- Onboarding: Goal Time Step -->
+    <string name="onboarding_goal_title">Set Your Goal</string>
+    <string name="onboarding_goal_subtitle_event">Your %s times</string>
+    <string name="onboarding_goal_subtitle_default">Enter your times</string>
+    <string name="onboarding_goal_pr_label">Current Personal Record (s)</string>
+    <string name="onboarding_goal_time_label">Goal Time (s)</string>
+
+    <!-- Onboarding: Goal Motivation Step -->
+    <string name="onboarding_motivation_title">Your Journey</string>
+    <string name="onboarding_motivation_subtitle">TrackSpeed will help you get there</string>
+    <string name="onboarding_motivation_current">Current: %ss</string>
+    <string name="onboarding_motivation_goal">Goal: %ss</string>
+    <string name="onboarding_motivation_improvement">Improvement: %ss</string>
+    <string name="onboarding_motivation_empty">Set your PR and goal time\nto see your journey</string>
+
+    <!-- Onboarding: Start Types Step -->
+    <string name="onboarding_starttypes_title">Start Types</string>
+    <string name="onboarding_starttypes_subtitle">Multiple ways to start your sprint</string>
+    <string name="onboarding_starttypes_touch_name">Touch Release</string>
+    <string name="onboarding_starttypes_touch_desc">Hands on ground \u2014 timer starts when you lift off</string>
+    <string name="onboarding_starttypes_countdown_name">Countdown</string>
+    <string name="onboarding_starttypes_countdown_desc">3-2-1-GO with audio cues</string>
+    <string name="onboarding_starttypes_flying_name">Flying Start</string>
+    <string name="onboarding_starttypes_flying_desc">Timer starts when crossing the gate at full speed</string>
+    <string name="onboarding_starttypes_voice_name">Voice Command</string>
+    <string name="onboarding_starttypes_voice_desc">\&quot;On your marks\u2026 Set\u2026 GO!\&quot;</string>
+    <string name="onboarding_starttypes_auto_name">Automatic</string>
+    <string name="onboarding_starttypes_auto_desc">Camera detects motion to start timing</string>
+
+    <!-- Onboarding: Multi-Device Step -->
+    <string name="onboarding_multidevice_title">Multi-Device Timing</string>
+    <string name="onboarding_multidevice_description">Use two phones for separate start and finish gates \u2014 wirelessly synced for precision timing.</string>
+    <string name="onboarding_multidevice_wireless">Wireless</string>
+    <string name="onboarding_multidevice_clock_synced">Clock Synced</string>
+
+    <!-- Onboarding: Track Progress Step -->
+    <string name="onboarding_progress_title">Long-Term Results</string>
+    <string name="onboarding_progress_subtitle">See your improvement over time</string>
+    <string name="onboarding_progress_chart_title">Flying 10m Sprint</string>
+    <string name="onboarding_progress_research_label">RESEARCH-BACKED</string>
+    <string name="onboarding_progress_research_body">Athletes who track their times improve faster than those who train without timing data.</string>
+    <string name="onboarding_progress_research_detail">Studies show that objective performance feedback significantly enhances motor learning. Without results tracking, improvement slows dramatically.</string>
+
+    <!-- Onboarding: Profile Setup Step -->
+    <string name="onboarding_profile_title">What\'s your name?</string>
+    <string name="onboarding_profile_subtitle">This helps us personalize your experience</string>
+    <string name="onboarding_profile_name_label">Full Name</string>
+    <string name="onboarding_profile_name_placeholder">Your name</string>
+    <string name="onboarding_profile_team_label">Team / Club (optional)</string>
+    <string name="onboarding_profile_team_placeholder">e.g. Springfield Track Club</string>
+
+    <!-- Onboarding: Promo Code Step -->
+    <string name="onboarding_promo_title">Enter referral code\n(optional)</string>
+    <string name="onboarding_promo_subtitle">You can skip this step</string>
+    <string name="onboarding_promo_field_label">Referral Code</string>
+    <string name="onboarding_promo_field_placeholder">Enter code here</string>
+    <string name="onboarding_promo_applied">Referral Code Applied!</string>
+
+    <!-- Onboarding: Referral Step -->
+    <string name="onboarding_referral_title">Get 1 Month Free</string>
+    <string name="onboarding_referral_subtitle">for every friend referred</string>
+    <string name="onboarding_referral_body">Training alone is tough. Together, you\'ll hit your goals faster.</string>
+    <string name="onboarding_referral_link_label">Your referral link</string>
+    <string name="onboarding_referral_copied">Copied</string>
+    <string name="onboarding_referral_copy">Copy</string>
+    <string name="onboarding_referral_how_title">How it works</string>
+    <string name="onboarding_referral_step1_title">Share your link</string>
+    <string name="onboarding_referral_step1_desc">Send your referral link to friends who run</string>
+    <string name="onboarding_referral_step2_title">They subscribe</string>
+    <string name="onboarding_referral_step2_desc">When a friend starts a TrackSpeed subscription</string>
+    <string name="onboarding_referral_step3_title">You earn</string>
+    <string name="onboarding_referral_step3_desc">Get 1 free month for each friend who subscribes</string>
+    <string name="onboarding_referral_share_button">Share Invite Link</string>
+    <string name="onboarding_referral_share_text">Check out TrackSpeed - turn your phone into a sprint timer! Use my referral link: %s</string>
+    <string name="onboarding_referral_share_chooser">Share Invite Link</string>
+
+    <!-- Onboarding: Auth Step -->
+    <string name="onboarding_auth_title">Create Account</string>
+    <string name="onboarding_auth_description">Sign in to sync your data across devices and unlock cloud features.</string>
+    <string name="onboarding_auth_google">Continue with Google</string>
+    <string name="onboarding_auth_email">Continue with Email</string>
+
+    <!-- Onboarding: Attribution Step -->
+    <string name="onboarding_attribution_title">How did you hear\nabout us?</string>
+    <string name="onboarding_attribution_instagram">Instagram</string>
+    <string name="onboarding_attribution_tiktok">TikTok</string>
+    <string name="onboarding_attribution_youtube">YouTube</string>
+    <string name="onboarding_attribution_google">Google Search</string>
+    <string name="onboarding_attribution_friend">Friend/Coach</string>
+    <string name="onboarding_attribution_appstore">App Store</string>
+    <string name="onboarding_attribution_trackclub">Track Club</string>
+    <string name="onboarding_attribution_other">Other</string>
+    <string name="onboarding_attribution_promo_label">Promo code (optional)</string>
+
+    <!-- Onboarding: Rating Step -->
+    <string name="onboarding_rating_title">Loved by Athletes</string>
+    <string name="onboarding_rating_quote1">\&quot;Finally an affordable timing system!\&quot;</string>
+    <string name="onboarding_rating_author1">Track Coach, California</string>
+    <string name="onboarding_rating_quote2">\&quot;Accurate results that match our Freelap\&quot;</string>
+    <string name="onboarding_rating_author2">Sprint Coach, Texas</string>
+    <string name="onboarding_rating_quote3">\&quot;My athletes love seeing instant times\&quot;</string>
+    <string name="onboarding_rating_author3">High School Coach, Florida</string>
+    <string name="onboarding_rating_author_format">\u2014 %s</string>
+
+    <!-- Onboarding: Notification Step -->
+    <string name="onboarding_notification_title">Stay Updated</string>
+    <string name="onboarding_notification_description">Get notified about trial expiry, new features, and timing results.</string>
+    <string name="onboarding_notification_enable">Enable Notifications</string>
+
+    <!-- Onboarding: Trial Intro Step -->
+    <string name="onboarding_trial_logo_description">TrackSpeed</string>
+    <string name="onboarding_trial_title">We want you to track\nyour sprints for free</string>
+    <string name="onboarding_trial_benefit1_title">Full access for 7 days</string>
+    <string name="onboarding_trial_benefit1_desc">Every Pro feature, completely free</string>
+    <string name="onboarding_trial_benefit2_title">We\'ll remind you before it ends</string>
+    <string name="onboarding_trial_benefit2_desc">Get notified 2 days before your trial expires</string>
+    <string name="onboarding_trial_benefit3_title">Cancel anytime, no questions asked</string>
+    <string name="onboarding_trial_benefit3_desc">One tap in settings and you\'re done</string>
+
+    <!-- Onboarding: Trial Reminder Step -->
+    <string name="onboarding_reminder_title">2 days before\nyour trial ends</string>
+    <string name="onboarding_reminder_description">We\'ll send you a reminder so you\'re never caught off guard. Your #1 concern, addressed.</string>
+
+    <!-- Onboarding: Paywall Step -->
+    <string name="onboarding_paywall_image_description">Photo Finish</string>
+    <string name="onboarding_paywall_badge">No Payment Due Now</string>
+    <string name="onboarding_paywall_trial_label">7-Day Free Trial</string>
+    <string name="onboarding_paywall_price">$4.17</string>
+    <string name="onboarding_paywall_price_period">/month</string>
+    <string name="onboarding_paywall_billed">Billed $49.99/year after trial</string>
+    <string name="onboarding_paywall_feature1">Millisecond precision timing</string>
+    <string name="onboarding_paywall_feature2">Multi-phone sync</string>
+    <string name="onboarding_paywall_feature3">Unlimited session history</string>
+    <string name="onboarding_paywall_feature4">Athlete profiles &amp; tracking</string>
+    <string name="onboarding_paywall_feature5">Video export with time overlay</string>
+    <string name="onboarding_paywall_start_trial">Start Free Trial</string>
+    <string name="onboarding_paywall_limited_access">Continue with limited access</string>
+
+    <!-- Onboarding: Spin Wheel Step -->
+    <string name="onboarding_spin_title">Spin to Win!</string>
+    <string name="onboarding_spin_subtitle">Try your luck for a special offer</string>
+    <string name="onboarding_spin_segment_20_off">20%</string>
+    <string name="onboarding_spin_segment_no_luck">No Luck</string>
+    <string name="onboarding_spin_won_title">You won 20% OFF!</string>
+    <string name="onboarding_spin_original_price">$49.99</string>
+    <string name="onboarding_spin_discount_price">$39.99/year</string>
+    <string name="onboarding_spin_monthly_price">$3.33/month</string>
+    <string name="onboarding_spin_button_ready">Spin the Wheel</string>
+    <string name="onboarding_spin_button_spinning">Spinning\u2026</string>
+    <string name="onboarding_spin_button_landed">Claim 20% OFF</string>
+
+    <!-- Onboarding: Completion Step -->
+    <string name="onboarding_completion_logo_description">TrackSpeed</string>
+    <string name="onboarding_completion_title">You\'re All Set!</string>
+    <string name="onboarding_completion_solo_timing">Solo Timing</string>
+    <string name="onboarding_completion_photo_finish">Photo Finish</string>
+    <string name="onboarding_completion_multi_phone">Multi-Phone Sync</string>
+    <string name="onboarding_completion_unlimited_history">Unlimited History</string>
+    <string name="onboarding_completion_athlete_profiles">Athlete Profiles</string>
+    <string name="onboarding_completion_video_export">Video Export</string>
+    <string name="onboarding_completion_tier_free">Free</string>
+    <string name="onboarding_completion_tier_pro">Pro</string>
+    <string name="onboarding_completion_try_solo">Try Solo Mode</string>
+
+    <!-- Voice Start Overlay -->
+    <string name="voice_overlay_title">VOICE START</string>
+    <string name="voice_overlay_description">"\"On your marks, Set, GO!\""</string>
+    <string name="voice_overlay_begin">Begin Commands</string>
+    <string name="voice_overlay_get_ready">GET READY\u2026</string>
+    <string name="voice_overlay_set_phone_down">Set phone down and\nget into position</string>
+    <string name="voice_overlay_on_your_marks">ON YOUR\nMARKS</string>
+    <string name="voice_overlay_get_into_position">Get into position</string>
+    <string name="voice_overlay_set">SET</string>
+    <string name="voice_overlay_hold_position">Hold position\u2026</string>
+    <string name="voice_overlay_go_cd">Go!</string>
+    <string name="voice_overlay_go">GO!</string>
+    <string name="voice_overlay_cancelled">CANCELLED</string>
+
+    <!-- Countdown Overlay -->
+    <string name="countdown_title">COUNTDOWN START</string>
+    <string name="countdown_description">3\u2026 2\u2026 1\u2026 BEEP!</string>
+    <string name="countdown_start_button">Start Countdown</string>
+    <string name="countdown_get_ready">GET READY\u2026</string>
+    <string name="countdown_set_phone_down">Set phone down and\nget into position</string>
+    <string name="countdown_go_cd">Go!</string>
+    <string name="countdown_go">GO!</string>
+
+    <!-- Billing Issue Banner -->
+    <string name="billing_default_message">There\'s an issue with your subscription. Tap to resolve.</string>
+    <string name="billing_default_action">Fix</string>
+    <string name="billing_payment_issue">Payment Issue</string>
+    <string name="billing_dismiss">Dismiss</string>
+
+    <!-- Touch Start Overlay -->
+    <string name="touch_start_touch_cd">Touch to start</string>
+    <string name="touch_start_touch_anywhere">TOUCH ANYWHERE</string>
+    <string name="touch_start_hold_then_lift">Hold, then lift to start</string>
+    <string name="touch_start_holding">HOLDING</string>
+    <string name="touch_start_lift_to_start">LIFT TO START</string>
+    <string name="touch_start_go_cd">Go!</string>
+    <string name="touch_start_go">GO!</string>
+
+    <!-- In-Frame Start Overlay -->
+    <string name="inframe_waiting_cd">Waiting for athlete</string>
+    <string name="inframe_stand_in_front">STAND IN FRONT\nOF THE CAMERA</string>
+    <string name="inframe_waiting_desc">Step into the camera view, then step away to start the timer</string>
+    <string name="inframe_detected_cd">Athlete detected</string>
+    <string name="inframe_detected">DETECTED</string>
+    <string name="inframe_step_away">STEP AWAY TO START</string>
+    <string name="inframe_go_cd">Go!</string>
+    <string name="inframe_go">GO!</string>
+
+    <!-- Start Overlay Selector -->
+    <string name="start_selector_title">Start Mode</string>
+    <string name="start_selector_standard">Standard</string>
+    <string name="start_selector_standard_desc">Gate-triggered start. Timer starts when athlete crosses the gate line.</string>
+    <string name="start_selector_countdown">Countdown</string>
+    <string name="start_selector_countdown_desc">3\u2026 2\u2026 1\u2026 BEEP! Visual countdown with automatic start.</string>
+    <string name="start_selector_voice">Voice Command</string>
+    <string name="start_selector_voice_desc">"\"On your marks\u2026 Set\u2026 GO!\" Spoken commands like a real starter."</string>
+    <string name="start_selector_touch">Touch Start</string>
+    <string name="start_selector_touch_desc">Touch screen, hold, then lift finger to start the timer.</string>
+
+    <!-- Athlete Chip Selector -->
+    <string name="athlete_chip_header">ATHLETE</string>
+    <string name="athlete_chip_add_cd">Add athlete</string>
+    <string name="athlete_chip_add">Add</string>
+    <string name="athlete_chip_no_athlete">No Athlete</string>
+    <plurals name="athlete_chip_run_count">
+        <item quantity="one">%d run</item>
+        <item quantity="other">%d runs</item>
+    </plurals>
+
+    <!-- Connection Health Indicator -->
+    <string name="connection_connected">Connected</string>
+    <string name="connection_weak">Weak</string>
+    <string name="connection_disconnected">Disconnected</string>
+    <string name="connection_latency_format">%dms</string>
+    <string name="connection_latency_uncertainty_format">%1$dms | \u00B1%2$.1fms</string>
+
+    <!-- Device Role Card -->
+    <string name="device_role_start">Start</string>
+    <string name="device_role_finish">Finish</string>
+    <string name="device_role_split">Split</string>
+    <string name="device_role_connecting">Connecting\u2026</string>
+    <string name="device_role_tap_to_assign">Tap to assign role</string>
+    <string name="device_role_disconnected">Disconnected</string>
+
+    <!-- Start Type Selector Row -->
+    <string name="start_type_standing">Standing</string>
+    <string name="start_type_flying">Flying</string>
+    <string name="start_type_block">Block</string>
+    <string name="start_type_standing_desc">Camera detects athlete crossing</string>
+    <string name="start_type_flying_desc">Timer starts on first crossing</string>
+    <string name="start_type_block_desc">Timer starts from block release</string>
+
+    <!-- Track Visualization Card -->
+    <string name="track_viz_header">TRACK LAYOUT</string>
+    <plurals name="track_viz_phone_count">
+        <item quantity="one">%d phone</item>
+        <item quantity="other">%d phones</item>
+    </plurals>
+
+    <!-- Bubble Level View -->
+    <string name="bubble_level_tilt">Tilt</string>
+    <string name="bubble_level_locked">Horizon level - Locked!</string>
+    <string name="bubble_level_hold_steady">Horizon level - Hold steady\u2026</string>
+    <string name="bubble_level_almost">Almost level - adjust left/right</string>
+    <string name="bubble_level_tilt_device">Tilt device left or right</string>
+
+    <!-- Shareable Result Card -->
+    <string name="share_card_branding">TrackSpeed</string>
+    <string name="share_card_seconds_unit">s</string>
+    <string name="share_card_pb">PB</string>
+    <string name="share_card_sb">SB</string>
+    <string name="share_card_watermark">Timed with TrackSpeed</string>
+    <string name="share_card_theme_midnight">Midnight</string>
+    <string name="share_card_theme_ember">Ember</string>
+    <string name="share_card_theme_ocean">Ocean</string>
+    <string name="share_card_theme_forest">Forest</string>
+    <string name="share_card_theme_slate">Slate</string>
+
+    <!-- Thumbnail Viewer -->
+    <string name="thumbnail_viewer_cd">Expanded crossing frame</string>
+
+    <!-- Camera Preview -->
+    <string name="camera_fps_format">%d FPS</string>
+    <string name="camera_status_hold_steady">HOLD STEADY</string>
+    <string name="camera_status_ready">READY</string>
+    <string name="camera_status_too_far">TOO FAR</string>
+    <string name="camera_status_triggered">TRIGGERED</string>
+    <string name="camera_status_cooldown">COOLDOWN</string>
+    <string name="camera_not_available">Camera not available</string>
+
+    <!-- Tools Screen -->
+    <string name="tools_title">Tools</string>
+    <string name="tools_section_calculators">CALCULATORS</string>
+    <string name="tools_wind_adjustment">Wind Adjustment</string>
+    <string name="tools_wind_adjustment_desc">Calculate wind-adjusted sprint times using the Moinat et al. model</string>
+    <string name="tools_distance_converter">Distance Converter</string>
+    <string name="tools_distance_converter_desc">Convert between meters, yards, feet, miles, and kilometers</string>
+
+    <!-- Wind Adjustment Screen -->
+    <string name="wind_title">Wind Adjustment</string>
+    <string name="wind_section_input">Input</string>
+    <string name="wind_event_label">Event</string>
+    <string name="wind_time_label">Time (seconds)</string>
+    <string name="wind_time_placeholder">10.25</string>
+    <string name="wind_time_suffix">s</string>
+    <string name="wind_wind_label">Wind (m/s)</string>
+    <string name="wind_wind_placeholder">-1.2</string>
+    <string name="wind_wind_suffix">m/s</string>
+    <string name="wind_help_text">Positive wind = tailwind, negative = headwind. Legal limit: +2.0 m/s.</string>
+    <string name="wind_section_adjusted_times">Adjusted Times</string>
+    <string name="wind_zero_wind_time">Zero-wind time</string>
+    <string name="wind_zero_wind_subtitle">0.0 m/s</string>
+    <string name="wind_tailwind">At +2.0 tailwind</string>
+    <string name="wind_tailwind_subtitle">+2.0 m/s</string>
+    <string name="wind_headwind">At -2.0 headwind</string>
+    <string name="wind_headwind_subtitle">-2.0 m/s</string>
+    <string name="wind_legal_format">Wind legal for records (%+.1f m/s)</string>
+    <string name="wind_illegal_format">Wind illegal for records (%+.1f m/s)</string>
+    <string name="wind_section_about">About</string>
+    <string name="wind_how_it_works">How it works</string>
+    <string name="wind_formula_description">Uses the formula \u0394P = a\u00B7w + b\u00B7w\u00B2 from Moinat, Fabius &amp; Emanuel (2018), derived from 150,169 competition results.</string>
+    <string name="wind_asymmetry_description">Tailwind helps less than headwind hurts due to quadratic air drag. For 100m, the correction also scales with performance level -- amateur athletes benefit more from wind than elites.</string>
+    <string name="wind_event_100m">100m</string>
+    <string name="wind_event_200m">200m</string>
+    <string name="wind_event_hurdles">100/110m Hurdles</string>
+
+    <!-- Distance Converter Screen -->
+    <string name="converter_title">Distance Converter</string>
+    <string name="converter_section_convert">Convert</string>
+    <string name="converter_value_label">Value</string>
+    <string name="converter_value_placeholder">100</string>
+    <string name="converter_from">From</string>
+    <string name="converter_to">To</string>
+    <string name="converter_swap_units">Swap units</string>
+    <string name="converter_result">Result</string>
+    <string name="converter_section_presets">Common Presets</string>
+    <string name="converter_apply">Apply</string>
+    <string name="converter_unit_meters">Meters</string>
+    <string name="converter_unit_yards">Yards</string>
+    <string name="converter_unit_feet">Feet</string>
+    <string name="converter_unit_miles">Miles</string>
+    <string name="converter_unit_kilometers">Kilometers</string>
+    <string name="converter_preset_40yd">40yd = 36.576m</string>
+    <string name="converter_preset_100m">100m = 109.36yd</string>
+    <string name="converter_preset_60m">60m = 65.62yd</string>
+
+    <!-- Stats Screen -->
+    <string name="stats_title">Stats</string>
+    <string name="stats_no_data">No Data Yet</string>
+    <string name="stats_no_data_subtitle">Complete some timing sessions\nto see your stats here.</string>
+    <string name="stats_progress">PROGRESS</string>
+    <string name="stats_more_sessions_hint">Complete more sessions to see\nyour progress chart.</string>
+    <string name="stats_best">Best</string>
+    <string name="stats_average">Average</string>
+    <string name="stats_runs">Runs</string>
+    <string name="stats_sessions">Sessions</string>
+
+    <!-- Referral Screen -->
+    <string name="referral_title">Invite Friends</string>
+    <string name="referral_earn_month">Earn 1 free month</string>
+    <string name="referral_for_every_friend">for every friend who subscribes</string>
+    <string name="referral_they_get_free">They get 30 days free</string>
+    <string name="referral_friends_joined">Friends Joined</string>
+    <string name="referral_free_months">Free Months</string>
+    <string name="referral_your_code">Your Referral Code</string>
+    <string name="referral_copied">Copied!</string>
+    <string name="referral_copy_link">Copy Link</string>
+    <string name="referral_share_invite">Share Invite Link</string>
+    <string name="referral_share_chooser">Share Invite</string>
+    <string name="referral_how_it_works">How it works</string>
+    <string name="referral_step_1">Share your referral code with friends</string>
+    <string name="referral_step_2">They sign up using your code and get 30 days free</string>
+    <string name="referral_step_3">When they subscribe, you earn 1 free month</string>
+
+    <!-- Auth Screen -->
+    <string name="auth_create_account">Create Account</string>
+    <string name="auth_welcome_back">Welcome Back</string>
+    <string name="auth_continue_google">Continue with Google</string>
+    <string name="auth_or">or</string>
+    <string name="auth_email">Email</string>
+    <string name="auth_password">Password</string>
+    <string name="auth_confirm_password">Confirm Password</string>
+    <string name="auth_toggle_password">Toggle password</string>
+    <string name="auth_sign_up">Sign Up</string>
+    <string name="auth_sign_in">Sign In</string>
+    <string name="auth_has_account">Already have an account? Sign In</string>
+    <string name="auth_no_account">Don\'t have an account? Sign Up</string>
+    <string name="auth_error_fill_fields">Please fill in all fields</string>
+    <string name="auth_error_passwords_mismatch">Passwords don\'t match</string>
+    <string name="auth_error_password_short">Password must be at least 6 characters</string>
+
+    <!-- Debug Tools Screen -->
+    <string name="debug_title">Debug Tools</string>
+    <string name="debug_reset_db_title">Reset Database?</string>
+    <string name="debug_reset_db_message">This will permanently delete all sessions, runs, and athletes. This action cannot be undone.</string>
+    <string name="debug_reset">Reset</string>
+    <string name="debug_clear_thumbnails_title">Clear Thumbnails?</string>
+    <string name="debug_clear_thumbnails_message">This will delete all locally saved crossing thumbnails.</string>
+    <string name="debug_clear">Clear</string>
+    <string name="debug_warning">Debug build only. These tools are not available in production.</string>
+    <string name="debug_section_device_info">Device Info</string>
+    <string name="debug_section_database_stats">Database Stats</string>
+    <string name="debug_section_detection_config">Detection Config</string>
+    <string name="debug_section_clock_sync">Clock Sync</string>
+    <string name="debug_section_test_controls">Test Controls</string>
+    <string name="debug_section_danger_zone">Danger Zone</string>
+    <string name="debug_label_sessions">Sessions</string>
+    <string name="debug_label_runs">Runs</string>
+    <string name="debug_label_db_size">DB Size</string>
+    <string name="debug_label_thumbnail_storage">Thumbnail Storage</string>
+    <string name="debug_label_status">Status</string>
+    <string name="debug_label_quality">Quality</string>
+    <string name="debug_label_offset">Offset</string>
+    <string name="debug_detection_test_mode">Detection Test Mode</string>
+    <string name="debug_detection_test_desc">Shows debug overlay on camera preview</string>
+    <string name="debug_reset_database">Reset Database</string>
+    <string name="debug_reset_database_desc">Delete all sessions, runs, and athletes</string>
+    <string name="debug_clear_thumbnails">Clear Thumbnails</string>
+    <string name="debug_clear_thumbnails_desc">Delete all locally stored crossing images</string>
+    <string name="debug_default_not_connected">Not connected</string>
+    <string name="debug_default_na">N/A</string>
+    <string name="debug_default_placeholder">---</string>
 </resources>

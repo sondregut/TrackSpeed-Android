@@ -16,5 +16,7 @@ data class TrainingSessionEntity(
     val startType: String,
     val thumbnailPath: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val cloudId: String? = null,
+    val lastSyncedAt: Long? = null
 )

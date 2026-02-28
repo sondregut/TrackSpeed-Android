@@ -17,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.res.stringResource
+import com.trackspeed.android.R
 import com.trackspeed.android.sync.SyncQuality
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,7 +68,7 @@ fun ClockSyncScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Clock Sync") }
+                title = { Text(stringResource(R.string.sync_title)) }
             )
         }
     ) { padding ->
@@ -87,55 +89,24 @@ fun ClockSyncScreen(
             when (uiState.status) {
                 SyncStatus.NOT_SYNCED -> {
                     Text(
-                        "Sync clocks between devices for accurate timing.",
+                        stringResource(R.string.sync_instruction_auto),
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyLarge
                     )
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Role selection buttons
-                    Text(
-                        "Choose role:",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
                     Button(
-                        onClick = { viewModel.startAsServer() },
+                        onClick = { viewModel.startSync() },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = hasBluetoothPermission
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Start as Reference Clock")
-                            Text(
-                                "(Other devices sync to this)",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedButton(
-                        onClick = { viewModel.startAsClient() },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = hasBluetoothPermission
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Sync to Another Device")
-                            Text(
-                                "(Find and sync to reference)",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
+                        Text(stringResource(R.string.sync_pair_button))
                     }
 
                     if (!hasBluetoothPermission) {
                         Text(
-                            "Bluetooth permissions required",
+                            stringResource(R.string.sync_bluetooth_required),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -143,27 +114,15 @@ fun ClockSyncScreen(
                 }
 
                 SyncStatus.WAITING_FOR_PEER -> {
-                    if (uiState.isServer) {
-                        Text(
-                            "Waiting for other device to connect...",
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            "Start the other device as 'Sync to Another Device'",
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center
-                        )
-                    } else {
-                        Text(
-                            "Searching for reference clock...",
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            "Make sure the other device is set as 'Reference Clock'",
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    Text(
+                        stringResource(R.string.sync_searching),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        stringResource(R.string.sync_searching_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -172,22 +131,22 @@ fun ClockSyncScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     TextButton(onClick = { viewModel.stop() }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.sync_cancel))
                     }
                 }
 
                 SyncStatus.CONNECTING -> {
-                    Text("Connecting to device...")
+                    Text(stringResource(R.string.sync_connecting))
                     CircularProgressIndicator()
 
                     TextButton(onClick = { viewModel.stop() }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.sync_cancel))
                     }
                 }
 
                 SyncStatus.SYNCING -> {
                     Text(
-                        "Synchronizing clocks...",
+                        stringResource(R.string.sync_syncing),
                         style = MaterialTheme.typography.titleMedium
                     )
 
@@ -199,12 +158,12 @@ fun ClockSyncScreen(
                     )
 
                     Text(
-                        "${(uiState.progress * 100).toInt()}%",
+                        stringResource(R.string.sync_progress_percent, (uiState.progress * 100).toInt()),
                         style = MaterialTheme.typography.bodySmall
                     )
 
                     TextButton(onClick = { viewModel.stop() }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.sync_cancel))
                     }
                 }
 
@@ -214,13 +173,13 @@ fun ClockSyncScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(onClick = onSyncComplete) {
-                        Text("Continue to Timing")
+                        Text(stringResource(R.string.sync_continue))
                     }
                 }
 
                 SyncStatus.ERROR -> {
                     Text(
-                        uiState.errorMessage ?: "Unknown error",
+                        uiState.errorMessage ?: stringResource(R.string.sync_status_error),
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center
                     )
@@ -228,7 +187,7 @@ fun ClockSyncScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(onClick = { viewModel.stop() }) {
-                        Text("Try Again")
+                        Text(stringResource(R.string.sync_try_again))
                     }
                 }
             }
@@ -259,7 +218,7 @@ private fun SyncStatusCard(uiState: ClockSyncUiState) {
                 SyncStatus.SYNCED -> {
                     Icon(
                         Icons.Default.Check,
-                        contentDescription = "Synced",
+                        contentDescription = stringResource(R.string.sync_synced_cd),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp)
                     )
@@ -267,7 +226,7 @@ private fun SyncStatusCard(uiState: ClockSyncUiState) {
                 SyncStatus.ERROR -> {
                     Icon(
                         Icons.Default.Close,
-                        contentDescription = "Error",
+                        contentDescription = stringResource(R.string.sync_error_cd),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(48.dp)
                     )
@@ -281,12 +240,12 @@ private fun SyncStatusCard(uiState: ClockSyncUiState) {
 
             Text(
                 text = when (uiState.status) {
-                    SyncStatus.NOT_SYNCED -> "Not Synced"
-                    SyncStatus.WAITING_FOR_PEER -> if (uiState.isServer) "Advertising..." else "Scanning..."
-                    SyncStatus.CONNECTING -> "Connecting..."
-                    SyncStatus.SYNCING -> "Syncing..."
-                    SyncStatus.SYNCED -> "Synced"
-                    SyncStatus.ERROR -> "Error"
+                    SyncStatus.NOT_SYNCED -> stringResource(R.string.sync_status_not_synced)
+                    SyncStatus.WAITING_FOR_PEER -> stringResource(R.string.sync_status_searching)
+                    SyncStatus.CONNECTING -> stringResource(R.string.sync_status_connecting)
+                    SyncStatus.SYNCING -> stringResource(R.string.sync_status_syncing)
+                    SyncStatus.SYNCED -> stringResource(R.string.sync_status_synced)
+                    SyncStatus.ERROR -> stringResource(R.string.sync_status_error)
                 },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
@@ -294,7 +253,7 @@ private fun SyncStatusCard(uiState: ClockSyncUiState) {
 
             if (uiState.isServer && uiState.status != SyncStatus.NOT_SYNCED) {
                 Text(
-                    "(Reference Clock)",
+                    stringResource(R.string.sync_reference_clock_label),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -313,16 +272,16 @@ private fun SyncSuccessDetails(uiState: ClockSyncUiState) {
                 .padding(16.dp)
         ) {
             Text(
-                "Sync Details",
+                stringResource(R.string.sync_details_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            DetailRow("Clock Offset", "%.2f ms".format(uiState.offsetMs))
-            DetailRow("Uncertainty", "%.2f ms".format(uiState.uncertaintyMs))
-            DetailRow("Quality", uiState.quality.name, getQualityColor(uiState.quality))
+            DetailRow(stringResource(R.string.sync_details_offset), String.format(stringResource(R.string.sync_details_ms_format), uiState.offsetMs))
+            DetailRow(stringResource(R.string.sync_details_uncertainty), String.format(stringResource(R.string.sync_details_ms_format), uiState.uncertaintyMs))
+            DetailRow(stringResource(R.string.sync_details_quality), uiState.quality.name, getQualityColor(uiState.quality))
         }
     }
 }

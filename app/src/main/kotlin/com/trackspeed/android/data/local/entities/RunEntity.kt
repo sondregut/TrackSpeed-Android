@@ -31,6 +31,7 @@ data class RunEntity(
     val startType: String,
     val reactionTime: Double? = null,
     val isPersonalBest: Boolean = false,
+    val isSeasonBest: Boolean = false,
     val thumbnailPath: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )

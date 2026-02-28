@@ -36,10 +36,10 @@ class PhotoFinishDetector(context: Context) : SensorEventListener {
         const val WORK_H = 284
 
         // IMU stability threshold (rad/s) - gyroscope based
-        // iOS uses 0.15 - allows slow movement, rejects shakes (~0.3-0.5 rad/s)
-        private const val GYRO_THRESHOLD = 0.3
-        // Duration phone must be stable before detection enabled (~1.0s matches iOS)
-        private const val STABLE_DURATION_TO_ARM_S = 1.0
+        // Higher = more forgiving of small hand movements, lower = stricter
+        private const val GYRO_THRESHOLD = 0.55
+        // Duration phone must be stable before detection enabled
+        private const val STABLE_DURATION_TO_ARM_S = 0.6
 
         // Minimum blob height for crossing confirmation
         private const val MIN_BLOB_HEIGHT_FOR_CROSSING = 0.33f

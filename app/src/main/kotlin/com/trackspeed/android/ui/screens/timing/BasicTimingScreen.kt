@@ -38,13 +38,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trackspeed.android.R
 import com.trackspeed.android.camera.CameraManager
 import com.trackspeed.android.detection.PhotoFinishDetector
 import com.trackspeed.android.ui.components.CameraPreview
 import com.trackspeed.android.ui.components.CameraPreviewPlaceholder
+import com.trackspeed.android.ui.components.CountdownOverlay
 import com.trackspeed.android.ui.components.ExpandedThumbnail
+import com.trackspeed.android.ui.components.InFrameStartOverlay
+import com.trackspeed.android.ui.components.ProFeatureGateDialog
+import com.trackspeed.android.ui.components.StartMode
+import com.trackspeed.android.ui.components.StartOverlaySelector
 import com.trackspeed.android.ui.components.ThumbnailViewerDialog
+import com.trackspeed.android.ui.components.TouchStartOverlay
+import com.trackspeed.android.ui.components.VoiceStartOverlay
+import com.trackspeed.android.ui.util.formatDistance
+import com.trackspeed.android.ui.util.formatTime
 
 // Color constants matching iOS TrackSpeed design
 private val ScreenBackground = Color(0xFF000000)
@@ -63,6 +75,7 @@ private val TabUnselectedColor = Color(0xFF8E8E93)
 @Composable
 fun BasicTimingScreen(
     onNavigateBack: () -> Unit,
+    onPaywallClick: () -> Unit = {},
     distance: Double = 60.0,
     startType: String = "standing",
     viewModel: BasicTimingViewModel = hiltViewModel()
@@ -73,10 +86,19 @@ fun BasicTimingScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val isProUser by viewModel.isProUser.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var expandedThumbnail by remember { mutableStateOf<ExpandedThumbnail?>(null) }
     var selectedTab by remember { mutableIntStateOf(0) }
     var showFullscreenCamera by remember { mutableStateOf(false) }
+
+    // Start mode state
+    var currentStartMode by remember { mutableStateOf(StartMode.FLYING) }
+    var activeStartOverlay by remember { mutableStateOf<StartMode?>(null) }
+    var showStartModeSelector by remember { mutableStateOf(false) }
+
+    // Pro feature gate dialog state
+    var proGateDialogMode by remember { mutableStateOf<StartMode?>(null) }
 
     // Fullscreen thumbnail viewer
     ThumbnailViewerDialog(
@@ -84,12 +106,58 @@ fun BasicTimingScreen(
         onDismiss = { expandedThumbnail = null }
     )
 
+    // Pro feature gate dialog for start modes
+    proGateDialogMode?.let { mode ->
+        ProFeatureGateDialog(
+            featureName = "${mode.displayName} Start",
+            featureDescription = mode.description,
+            onUpgrade = {
+                proGateDialogMode = null
+                onPaywallClick()
+            },
+            onDismiss = {
+                proGateDialogMode = null
+            }
+        )
+    }
+
+    // Paywall prompt when free session limit reached
+    if (uiState.showPaywallPrompt) {
+        ProFeatureGateDialog(
+            featureName = "Unlimited Sessions",
+            featureDescription = "You've reached the free session limit. Upgrade to Pro to save unlimited training sessions.",
+            onUpgrade = {
+                viewModel.onPaywallPromptConsumed()
+                onPaywallClick()
+            },
+            onDismiss = {
+                viewModel.onPaywallPromptConsumed()
+            }
+        )
+    }
+
+    // Start mode selector bottom sheet
+    if (showStartModeSelector) {
+        StartOverlaySelector(
+            currentMode = currentStartMode,
+            onModeSelected = { mode ->
+                if (viewModel.canUseStartMode(mode.name)) {
+                    currentStartMode = mode
+                } else {
+                    proGateDialogMode = mode
+                }
+            },
+            onDismiss = { showStartModeSelector = false }
+        )
+    }
+
     // Note: showFullscreenCamera is used below to expand the camera preview area
 
     // Show snackbar when session saved
+    val sessionSavedMessage = stringResource(R.string.timing_session_saved)
     LaunchedEffect(uiState.sessionSaved) {
         if (uiState.sessionSaved) {
-            snackbarHostState.showSnackbar("Session saved!")
+            snackbarHostState.showSnackbar(sessionSavedMessage)
             viewModel.onSessionSavedConsumed()
         }
     }
@@ -147,9 +215,30 @@ fun BasicTimingScreen(
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
                 Text(
-                    text = "Tap to close",
+                    text = stringResource(R.string.timing_tap_to_close),
                     color = Color.White.copy(alpha = 0.8f),
                     style = MaterialTheme.typography.labelMedium
+                )
+            }
+
+            // Camera flip button
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 16.dp, end = 16.dp)
+                    .size(44.dp)
+                    .background(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(22.dp)
+                    )
+                    .clickable { viewModel.switchCamera() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Sync,
+                    contentDescription = stringResource(R.string.timing_flip_camera),
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
@@ -219,11 +308,18 @@ fun BasicTimingScreen(
                 // Bottom button area
                 BottomButtonBar(
                     uiState = uiState,
-                    onStart = viewModel::startTiming,
+                    startMode = currentStartMode,
+                    onStart = {
+                        when (currentStartMode) {
+                            StartMode.FLYING -> viewModel.startTiming()
+                            else -> activeStartOverlay = currentStartMode
+                        }
+                    },
                     onStop = viewModel::stopTiming,
                     onReset = viewModel::resetTiming,
                     onSave = viewModel::saveSession,
-                    onNavigateBack = onNavigateBack
+                    onNavigateBack = onNavigateBack,
+                    onStartModeClick = { showStartModeSelector = true }
                 )
             }
 
@@ -232,6 +328,46 @@ fun BasicTimingScreen(
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
+        }
+    }
+
+    // Active start overlay (renders on top of everything, including camera)
+    activeStartOverlay?.let { mode ->
+        when (mode) {
+            StartMode.TOUCH -> TouchStartOverlay(
+                onStart = { timestamp ->
+                    viewModel.handleExternalStart(timestamp)
+                    activeStartOverlay = null
+                },
+                onCancel = { activeStartOverlay = null }
+            )
+            StartMode.COUNTDOWN -> CountdownOverlay(
+                onCountdownComplete = { timestamp ->
+                    viewModel.handleExternalStart(timestamp)
+                    activeStartOverlay = null
+                },
+                onCancel = { activeStartOverlay = null }
+            )
+            StartMode.VOICE -> VoiceStartOverlay(
+                voiceStartService = viewModel.voiceStartService,
+                onStart = { timestamp ->
+                    viewModel.handleExternalStart(timestamp)
+                    activeStartOverlay = null
+                },
+                onCancel = { activeStartOverlay = null }
+            )
+            StartMode.INFRAME -> InFrameStartOverlay(
+                detectionState = viewModel.detectionStateFlow,
+                onStart = { timestamp ->
+                    viewModel.handleExternalStart(timestamp)
+                    activeStartOverlay = null
+                },
+                onCancel = { activeStartOverlay = null }
+            )
+            StartMode.FLYING -> {
+                // Flying mode doesn't use an overlay
+                activeStartOverlay = null
+            }
         }
     }
 }
@@ -246,7 +382,7 @@ private fun TopBar(
     onEndClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pillLabel = formatDistanceLabel(distance)
+    val pillLabel = stringResource(R.string.timing_practice_label, formatDistance(distance))
 
     Row(
         modifier = modifier
@@ -294,7 +430,7 @@ private fun TopBar(
         ) {
             Icon(
                 imageVector = Icons.Default.Settings,
-                contentDescription = "Settings",
+                contentDescription = stringResource(R.string.common_settings),
                 tint = TextSecondary,
                 modifier = Modifier.size(18.dp)
             )
@@ -314,7 +450,7 @@ private fun TopBar(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "End",
+                text = stringResource(R.string.timing_end),
                 color = Color.White,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.Bold
@@ -341,7 +477,7 @@ private fun TimingTabRow(
     ) {
         // Record tab
         TabPill(
-            label = "Record",
+            label = stringResource(R.string.timing_tab_record),
             icon = Icons.Default.PlayArrow,
             isSelected = selectedTab == 0,
             onClick = { onTabSelected(0) },
@@ -350,7 +486,7 @@ private fun TimingTabRow(
 
         // Results tab
         TabPill(
-            label = "Results",
+            label = stringResource(R.string.timing_tab_results),
             icon = Icons.AutoMirrored.Filled.List,
             isSelected = selectedTab == 1,
             onClick = { onTabSelected(1) },
@@ -489,22 +625,22 @@ private data class BannerInfo(
 private fun getStatusBannerInfo(uiState: BasicTimingUiState): BannerInfo? {
     return when {
         uiState.detectionState == PhotoFinishDetector.State.UNSTABLE ->
-            BannerInfo("HOLD STILL", Icons.Default.Vibration, StatusRed)
+            BannerInfo(stringResource(R.string.timing_banner_hold_still), Icons.Default.Vibration, StatusRed)
 
         uiState.detectionState == PhotoFinishDetector.State.ATHLETE_TOO_FAR ->
-            BannerInfo("TOO FAR", Icons.AutoMirrored.Filled.DirectionsRun, Color(0xFFFF9500))
+            BannerInfo(stringResource(R.string.timing_banner_too_far), Icons.AutoMirrored.Filled.DirectionsRun, Color(0xFFFF9500))
 
         uiState.isRunning && !uiState.waitingForStart ->
-            BannerInfo("RUNNING", Icons.Default.FiberManualRecord, StatusGreen)
+            BannerInfo(stringResource(R.string.timing_banner_running), Icons.Default.FiberManualRecord, StatusGreen)
 
         uiState.isRunning && uiState.waitingForStart ->
-            BannerInfo("READY", Icons.Default.FiberManualRecord, StatusGreen)
+            BannerInfo(stringResource(R.string.timing_banner_ready), Icons.Default.FiberManualRecord, StatusGreen)
 
         !uiState.isRunning && uiState.isArmed && uiState.laps.isEmpty() ->
-            BannerInfo("READY", Icons.Default.FiberManualRecord, StatusGreen)
+            BannerInfo(stringResource(R.string.timing_banner_ready), Icons.Default.FiberManualRecord, StatusGreen)
 
         !uiState.isRunning && uiState.laps.isNotEmpty() ->
-            BannerInfo("STOPPED", Icons.Default.Pause, Color(0xFF636366))
+            BannerInfo(stringResource(R.string.timing_banner_stopped), Icons.Default.Pause, Color(0xFF636366))
 
         else -> null
     }
@@ -537,7 +673,7 @@ private fun TimerCameraRow(
         ) {
             // Run number label
             Text(
-                text = "Run #$runNumber",
+                text = stringResource(R.string.timing_run_number, runNumber),
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -562,7 +698,7 @@ private fun TimerCameraRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Speed",
+                    text = stringResource(R.string.timing_label_speed),
                     color = TextTertiary,
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -583,13 +719,13 @@ private fun TimerCameraRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Distance",
+                    text = stringResource(R.string.timing_label_distance),
                     color = TextTertiary,
                     style = MaterialTheme.typography.bodySmall
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = formatDistanceValue(uiState.distance),
+                    text = formatDistance(uiState.distance),
                     color = TextSecondary,
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Medium
@@ -645,7 +781,7 @@ private fun TimerCameraRow(
                 }
                 else -> {
                     CameraPreviewPlaceholder(
-                        message = "Camera permission required",
+                        message = stringResource(R.string.timing_camera_permission_required),
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -670,6 +806,27 @@ private fun TimerCameraRow(
                     modifier = Modifier.size(16.dp)
                 )
             }
+
+            // Camera flip button in top-right
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(28.dp)
+                    .background(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(6.dp)
+                    )
+                    .clickable { viewModel.switchCamera() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Sync,
+                    contentDescription = stringResource(R.string.timing_flip_camera),
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
@@ -682,7 +839,7 @@ private fun PracticeSectionHeader(
     lapCount: Int,
     modifier: Modifier = Modifier
 ) {
-    val sectionLabel = formatDistanceLabel(distance)
+    val sectionLabel = stringResource(R.string.timing_practice_label, formatDistance(distance))
 
     Row(
         modifier = modifier
@@ -705,7 +862,7 @@ private fun PracticeSectionHeader(
             )
         )
         Text(
-            text = " \u00B7 ${if (lapCount == 0) "0" else lapCount.toString()} lap${if (lapCount != 1) "s" else ""}",
+            text = " \u00B7 ${pluralStringResource(R.plurals.timing_lap_count, lapCount, lapCount)}",
             color = TextSecondary,
             style = MaterialTheme.typography.titleSmall
         )
@@ -740,7 +897,7 @@ private fun LapsList(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "No laps yet",
+                    text = stringResource(R.string.timing_no_laps_yet),
                     color = TextSecondary,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Medium
@@ -748,7 +905,7 @@ private fun LapsList(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Run through the gate to start recording",
+                    text = stringResource(R.string.timing_run_through_gate),
                     color = TextTertiary,
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center
@@ -836,18 +993,26 @@ private fun LapCard(
             if (lap.thumbnail != null) {
                 Image(
                     bitmap = lap.thumbnail.asImageBitmap(),
-                    contentDescription = "Crossing frame",
+                    contentDescription = stringResource(R.string.timing_crossing_frame),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-                // Gate line overlay on thumbnail
+                // Gate line overlay on thumbnail (live session — two-layer style matching iOS)
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val x = size.width * lap.gatePosition
+                    // Shadow layer
                     drawLine(
-                        color = Color.Red.copy(alpha = 0.8f),
+                        color = Color.Black.copy(alpha = 0.5f),
                         start = Offset(x, 0f),
                         end = Offset(x, size.height),
-                        strokeWidth = 2f
+                        strokeWidth = 4f
+                    )
+                    // Core layer
+                    drawLine(
+                        color = Color.Red.copy(alpha = 0.9f),
+                        start = Offset(x, 0f),
+                        end = Offset(x, size.height),
+                        strokeWidth = 2.5f
                     )
                 }
             } else {
@@ -858,7 +1023,7 @@ private fun LapCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (isStart) "GO" else "--",
+                        text = if (isStart) stringResource(R.string.timing_go) else stringResource(R.string.timing_no_thumbnail),
                         color = TextTertiary,
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontWeight = FontWeight.Bold
@@ -873,7 +1038,7 @@ private fun LapCard(
             modifier = Modifier.weight(1f)
         ) {
             Text(
-                text = if (isStart) "Start" else "Lap ${lap.lapNumber}",
+                text = if (isStart) stringResource(R.string.timing_start) else stringResource(R.string.timing_lap_number, lap.lapNumber),
                 color = TextPrimary,
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold
@@ -881,7 +1046,7 @@ private fun LapCard(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = if (isStart) "Timer started" else "Total: ${formatTime(lap.totalTimeSeconds)}",
+                text = if (isStart) stringResource(R.string.timing_timer_started) else stringResource(R.string.timing_total_time, formatTime(lap.totalTimeSeconds)),
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -935,7 +1100,7 @@ private fun ResultsTabContent(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "No results yet",
+                    text = stringResource(R.string.timing_no_results_yet),
                     color = TextSecondary,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Medium
@@ -943,7 +1108,7 @@ private fun ResultsTabContent(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Complete some laps to see your stats",
+                    text = stringResource(R.string.timing_complete_laps_hint),
                     color = TextTertiary,
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center
@@ -981,7 +1146,7 @@ private fun ResultsTabContent(
             // Section header
             item(key = "header") {
                 Text(
-                    text = "Lap Comparison",
+                    text = stringResource(R.string.timing_lap_comparison),
                     color = TextPrimary,
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
@@ -1028,7 +1193,7 @@ private fun ResultsSummaryCard(
     ) {
         // Title row
         Text(
-            text = "Session Summary",
+            text = stringResource(R.string.timing_session_summary),
             color = TextPrimary,
             style = MaterialTheme.typography.titleSmall.copy(
                 fontWeight = FontWeight.Bold
@@ -1046,12 +1211,12 @@ private fun ResultsSummaryCard(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 StatItem(
-                    label = "Best",
+                    label = stringResource(R.string.timing_stat_best),
                     value = formatTime(bestLapTime),
                     valueColor = StatusGreen
                 )
                 StatItem(
-                    label = "Total Time",
+                    label = stringResource(R.string.timing_stat_total_time),
                     value = formatTime(totalTime),
                     valueColor = TextPrimary
                 )
@@ -1063,12 +1228,12 @@ private fun ResultsSummaryCard(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 StatItem(
-                    label = "Average",
+                    label = stringResource(R.string.timing_stat_average),
                     value = formatTime(averageLapTime),
                     valueColor = TimerBlue
                 )
                 StatItem(
-                    label = "Laps",
+                    label = stringResource(R.string.timing_stat_laps),
                     value = lapCount.toString(),
                     valueColor = TextPrimary
                 )
@@ -1087,12 +1252,12 @@ private fun ResultsSummaryCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Best Speed",
+                    text = stringResource(R.string.timing_best_speed),
                     color = TextSecondary,
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    text = String.format(java.util.Locale.US, "%.2f m/s", bestSpeed),
+                    text = stringResource(R.string.timing_speed_ms_format, bestSpeed),
                     color = StatusGreen,
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = FontFamily.Monospace,
@@ -1215,16 +1380,16 @@ private fun LapComparisonRow(
             ) {
                 Text(
                     text = if (speed != null) {
-                        String.format(java.util.Locale.US, "%.2f m/s", speed)
+                        stringResource(R.string.timing_speed_ms_format, speed)
                     } else {
-                        "-- m/s"
+                        stringResource(R.string.timing_no_speed_ms)
                     },
                     color = TextSecondary,
                     style = MaterialTheme.typography.labelSmall
                 )
                 if (!isBest) {
                     Text(
-                        text = String.format(java.util.Locale.US, "+%.2fs", delta),
+                        text = stringResource(R.string.timing_delta_format, delta),
                         color = StatusRed.copy(alpha = 0.8f),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = FontFamily.Monospace
@@ -1232,7 +1397,7 @@ private fun LapComparisonRow(
                     )
                 } else {
                     Text(
-                        text = "BEST",
+                        text = stringResource(R.string.timing_best_label),
                         color = StatusGreen,
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold
@@ -1259,11 +1424,13 @@ private fun LapComparisonRow(
 @Composable
 private fun BottomButtonBar(
     uiState: BasicTimingUiState,
+    startMode: StartMode,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onReset: () -> Unit,
     onSave: () -> Unit,
     onNavigateBack: () -> Unit,
+    onStartModeClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val hasActualLaps = uiState.laps.count { it.lapNumber > 0 } >= 1
@@ -1280,7 +1447,7 @@ private fun BottomButtonBar(
             // Running with laps: show Cancel Run
             uiState.isRunning && hasActualLaps -> {
                 PillButton(
-                    text = "Cancel Run",
+                    text = stringResource(R.string.timing_btn_cancel_run),
                     backgroundColor = StatusRed,
                     onClick = onStop
                 )
@@ -1289,7 +1456,7 @@ private fun BottomButtonBar(
             // Running, waiting for start or just started: show Pause
             uiState.isRunning -> {
                 PillButton(
-                    text = "Pause",
+                    text = stringResource(R.string.timing_btn_pause),
                     backgroundColor = DarkGray,
                     onClick = onStop
                 )
@@ -1299,7 +1466,7 @@ private fun BottomButtonBar(
             !uiState.isRunning && uiState.laps.isNotEmpty() -> {
                 if (hasActualLaps) {
                     PillButton(
-                        text = "Save Session",
+                        text = stringResource(R.string.timing_btn_save_session),
                         backgroundColor = TimerBlue,
                         onClick = onSave
                     )
@@ -1309,13 +1476,13 @@ private fun BottomButtonBar(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     PillButton(
-                        text = "Restart",
+                        text = stringResource(R.string.timing_btn_restart),
                         backgroundColor = StatusGreen,
                         onClick = onReset,
                         modifier = Modifier.weight(1f)
                     )
                     PillButton(
-                        text = "Exit",
+                        text = stringResource(R.string.timing_btn_exit),
                         backgroundColor = DarkGray,
                         onClick = onNavigateBack,
                         modifier = Modifier.weight(1f)
@@ -1323,10 +1490,37 @@ private fun BottomButtonBar(
                 }
             }
 
-            // Initial state: show Start
+            // Initial state: show Start mode chip + Start button
             else -> {
+                // Start mode chip
+                Row(
+                    modifier = Modifier
+                        .background(
+                            color = DarkGray,
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .clickable { onStartModeClick() }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = startMode.icon,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = startMode.displayName,
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+
                 PillButton(
-                    text = "Start",
+                    text = stringResource(R.string.timing_btn_start),
                     backgroundColor = StatusGreen,
                     onClick = onStart
                 )
@@ -1365,41 +1559,6 @@ private fun PillButton(
 
 // -- Utilities --
 
-private fun formatDistanceLabel(distance: Double): String {
-    val distanceStr = if (distance == 36.576) {
-        "40yd"
-    } else if (distance == distance.toLong().toDouble()) {
-        "${distance.toLong()}m"
-    } else {
-        "${distance}m"
-    }
-    return "$distanceStr Practice"
-}
-
-private fun formatDistanceValue(distance: Double): String {
-    return if (distance == 36.576) {
-        "40 yd"
-    } else if (distance == distance.toLong().toDouble()) {
-        "${distance.toLong()}m"
-    } else {
-        "${distance}m"
-    }
-}
-
-private fun formatTime(seconds: Double): String {
-    if (seconds <= 0) return "0.00"
-
-    val totalMs = (seconds * 1000).toLong()
-    val mins = totalMs / 60000
-    val secs = (totalMs % 60000) / 1000
-    val hundredths = (totalMs % 1000) / 10
-
-    return if (mins > 0) {
-        String.format("%d:%02d.%02d", mins, secs, hundredths)
-    } else {
-        String.format("%d.%02d", secs, hundredths)
-    }
-}
 
 private fun formatSpeed(speedMs: Double, speedUnit: String): String {
     if (speedMs <= 0.0) return "-- $speedUnit"

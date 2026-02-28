@@ -2,6 +2,9 @@ package com.trackspeed.android.ui.screens.sync
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.data.repository.SettingsRepository
+import com.trackspeed.android.protocol.TimingRole
+import com.trackspeed.android.protocol.TimingSessionConfig
 import com.trackspeed.android.sync.ClockSyncManager
 import com.trackspeed.android.sync.SyncQuality
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,7 +14,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ClockSyncViewModel @Inject constructor(
-    private val clockSyncManager: ClockSyncManager
+    private val clockSyncManager: ClockSyncManager,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ClockSyncUiState())
@@ -69,9 +73,37 @@ class ClockSyncViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Start auto-sync in dual-mode: advertise + scan simultaneously.
+     * Role is resolved automatically when a peer connects.
+     */
+    fun startSync() {
+        viewModelScope.launch {
+            val distance = settingsRepository.defaultDistance.first()
+            val startType = settingsRepository.startType.first()
+            val config = TimingSessionConfig(
+                distance = distance,
+                startType = startType,
+                numberOfGates = 2,
+                hostRole = TimingRole.START_LINE
+            )
+            clockSyncManager.startAutoSync(config)
+        }
+    }
+
     fun startAsServer() {
-        clockSyncManager.startAsServer()
-        _uiState.update { it.copy(isServer = true) }
+        viewModelScope.launch {
+            val distance = settingsRepository.defaultDistance.first()
+            val startType = settingsRepository.startType.first()
+            val config = TimingSessionConfig(
+                distance = distance,
+                startType = startType,
+                numberOfGates = 2,
+                hostRole = TimingRole.START_LINE
+            )
+            clockSyncManager.startAsServer(config)
+            _uiState.update { it.copy(isServer = true) }
+        }
     }
 
     fun startAsClient() {

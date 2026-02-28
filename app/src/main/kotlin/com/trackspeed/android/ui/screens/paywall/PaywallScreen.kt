@@ -1,8 +1,14 @@
 package com.trackspeed.android.ui.screens.paywall
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,40 +30,49 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.trackspeed.android.R
 import com.trackspeed.android.billing.ProFeature
 import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import kotlinx.coroutines.delay
 
 private val AccentGreen = Color(0xFF00E676)
 private val CardBackground = Color(0xFF2C2C2E)
-private val CardSelectedBorder = Color(0xFF00E676)
 private val TextSecondary = Color(0xFF8E8E93)
-private val TextTertiary = Color(0xFF636366)
-private val BadgeBackground = Color(0xFF00E676)
-private val BadgeText = Color.Black
+private val TextMuted = Color(0xFF636366)
+private val SuccessGreen = Color(0xFF30D158)
 private val ErrorRed = Color(0xFFFF5252)
+
+private const val PRIVACY_URL = "https://mytrackspeed.com/privacy"
+private const val TERMS_URL = "https://mytrackspeed.com/terms"
 
 @Composable
 fun PaywallScreen(
@@ -72,7 +87,6 @@ fun PaywallScreen(
 
     val activity = LocalContext.current as? Activity
 
-    // Close on successful purchase or if already pro
     LaunchedEffect(purchaseState) {
         if (purchaseState is PurchaseState.Success) {
             onClose()
@@ -103,6 +117,7 @@ fun PaywallScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PaywallContent(
     selectedPlan: PlanType,
@@ -118,183 +133,153 @@ private fun PaywallContent(
     onRetry: () -> Unit,
     onClearError: () -> Unit
 ) {
-    Column(
+    val context = LocalContext.current
+    var showCloseButton by remember { mutableStateOf(false) }
+    var showAllPlansSheet by remember { mutableStateOf(false) }
+    // Show close button after 2-second delay
+    LaunchedEffect(Unit) {
+        delay(2000)
+        showCloseButton = true
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .verticalScroll(rememberScrollState())
     ) {
-        // Top bar with close button
-        Box(
+        // Scrollable content
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp, end = 8.dp)
+                .fillMaxSize()
+                .padding(bottom = 200.dp) // space for fixed bottom section
+                .verticalScroll(rememberScrollState())
         ) {
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier.align(Alignment.TopEnd)
+            // Hero image with gradient overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(340.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
+                Image(
+                    painter = painterResource(R.drawable.paywall_hero),
+                    contentDescription = "TrackSpeed Pro",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
+
+                // Gradient overlay fading into background
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.8f),
+                                    Color.Black
+                                )
+                            )
+                        )
+                )
+
+                // Close button (top-right, appears after 2s)
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showCloseButton,
+                    enter = fadeIn(),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 48.dp, end = 16.dp)
+                ) {
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.4f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                // Title at bottom of hero
+                Text(
+                    text = "TrackSpeed Pro",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 32.sp
+                    ),
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp)
+                )
+            }
+
+            // Legal links below title
+            LegalLinksSection(
+                onRestore = onRestore,
+                onHaveCode = {
+                    // Open Google Play subscription redeem or promo code flow
+                    val intent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://play.google.com/redeem")
+                    )
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.padding(top = 8.dp)
+            )
+
+            // Features section
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 40.dp)
+            ) {
+                ProFeature.entries.forEach { feature ->
+                    FeatureRow(
+                        title = feature.displayName,
+                        description = feature.description
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
             }
         }
 
-        // Hero area
+        // Fixed bottom section
         Column(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // App icon placeholder
+            // Gradient fade above fixed section
             Box(
                 modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(AccentGreen.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "TS",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = AccentGreen
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = "TrackSpeed Pro",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 32.sp
-                ),
-                color = Color.White
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Unlock your full potential",
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Feature list
-            ProFeature.entries.forEach { feature ->
-                FeatureRow(
-                    title = feature.displayName,
-                    description = feature.description
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Plan selector or loading/error states
-            if (isLoadingOfferings) {
-                CircularProgressIndicator(
-                    color = AccentGreen,
-                    modifier = Modifier
-                        .padding(vertical = 32.dp)
-                        .size(40.dp)
-                )
-            } else if (offeringsError != null) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Unable to load subscription options",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = ErrorRed,
-                        textAlign = TextAlign.Center
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black)
+                        )
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = onRetry,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = CardBackground,
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Retry")
-                    }
-                }
-            } else {
-                // Plan cards
-                PlanCard(
-                    planName = "Yearly",
-                    price = yearlyPlan.priceDisplay,
-                    period = "/ ${yearlyPlan.periodDisplay}",
-                    badge = "BEST VALUE",
-                    subtitle = "${yearlyPlan.monthlyEquivalent ?: ""} - Save ${yearlyPlan.savingsPercent ?: 0}%",
-                    isSelected = selectedPlan == PlanType.YEARLY,
-                    onClick = { onSelectPlan(PlanType.YEARLY) }
-                )
+            )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                PlanCard(
-                    planName = "Monthly",
-                    price = monthlyPlan.priceDisplay,
-                    period = "/ ${monthlyPlan.periodDisplay}",
-                    badge = null,
-                    subtitle = null,
-                    isSelected = selectedPlan == PlanType.MONTHLY,
-                    onClick = { onSelectPlan(PlanType.MONTHLY) }
-                )
-
-                Spacer(modifier = Modifier.height(28.dp))
-
-                // CTA button
-                Button(
-                    onClick = onPurchase,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AccentGreen,
-                        contentColor = Color.Black,
-                        disabledContainerColor = AccentGreen.copy(alpha = 0.4f)
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    enabled = purchaseState !is PurchaseState.Loading
-                ) {
-                    if (purchaseState is PurchaseState.Loading) {
-                        CircularProgressIndicator(
-                            color = Color.Black,
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.5.dp
-                        )
-                    } else {
-                        Text(
-                            text = "Subscribe",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
-                            )
-                        )
-                    }
-                }
-
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black)
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 // Error message
                 if (purchaseState is PurchaseState.Error) {
-                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = (purchaseState as PurchaseState.Error).message,
                         style = MaterialTheme.typography.bodySmall,
@@ -303,66 +288,166 @@ private fun PaywallContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onClearError() }
+                            .padding(bottom = 8.dp)
                     )
+                }
+
+                // No commitment badge
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = SuccessGreen,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "No commitment, cancel anytime",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Get Started button (yearly, with chevron)
+                Button(
+                    onClick = {
+                        onSelectPlan(PlanType.YEARLY)
+                        onPurchase()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AccentGreen,
+                        contentColor = Color.Black,
+                        disabledContainerColor = AccentGreen.copy(alpha = 0.4f)
+                    ),
+                    shape = RoundedCornerShape(28.dp),
+                    enabled = purchaseState !is PurchaseState.Loading && !isLoadingOfferings
+                ) {
+                    if (purchaseState is PurchaseState.Loading) {
+                        CircularProgressIndicator(
+                            color = Color.Black,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.5.dp
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                text = "Get Started",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                text = "\u203A", // right angle bracket
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 20.sp
+                                ),
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Billing info
                 Text(
-                    text = "No commitment, cancel anytime",
+                    text = "billed ${yearlyPlan.priceDisplay} per year",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextTertiary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Footer links
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Restore Purchases",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            textDecoration = TextDecoration.Underline
-                        ),
-                        color = TextSecondary,
-                        modifier = Modifier.clickable { onRestore() }
-                    )
-                    Text(
-                        text = "  |  ",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiary
-                    )
-                    Text(
-                        text = "Terms",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            textDecoration = TextDecoration.Underline
-                        ),
-                        color = TextSecondary,
-                        modifier = Modifier.clickable { /* Open terms URL */ }
-                    )
-                    Text(
-                        text = "  |  ",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiary
-                    )
-                    Text(
-                        text = "Privacy",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            textDecoration = TextDecoration.Underline
-                        ),
-                        color = TextSecondary,
-                        modifier = Modifier.clickable { /* Open privacy URL */ }
-                    )
-                }
+                // See all plans link
+                Text(
+                    text = "See all plans",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.clickable { showAllPlansSheet = true }
+                )
             }
-
-            Spacer(modifier = Modifier.height(40.dp))
         }
+    }
+
+    // All Plans bottom sheet
+    if (showAllPlansSheet) {
+        AllPlansSheet(
+            monthlyPlan = monthlyPlan,
+            yearlyPlan = yearlyPlan,
+            selectedPlan = selectedPlan,
+            purchaseState = purchaseState,
+            onSelectPlan = onSelectPlan,
+            onPurchase = {
+                showAllPlansSheet = false
+                onPurchase()
+            },
+            onDismiss = { showAllPlansSheet = false },
+            onRestore = onRestore
+        )
+    }
+}
+
+@Composable
+private fun LegalLinksSection(
+    onRestore: () -> Unit,
+    onHaveCode: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Privacy",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+            modifier = Modifier.clickable {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL)))
+            }
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = "Restore",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+            modifier = Modifier.clickable { onRestore() }
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = "Have a code?",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+            modifier = Modifier.clickable { onHaveCode() }
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = "Terms",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+            modifier = Modifier.clickable {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TERMS_URL)))
+            }
+        )
     }
 }
 
@@ -379,7 +464,7 @@ private fun FeatureRow(
             imageVector = Icons.Default.CheckCircle,
             contentDescription = null,
             tint = AccentGreen,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(28.dp)
         )
 
         Spacer(modifier = Modifier.width(14.dp))
@@ -401,134 +486,261 @@ private fun FeatureRow(
     }
 }
 
+// ---------- All Plans Bottom Sheet ----------
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PlanCard(
-    planName: String,
-    price: String,
-    period: String,
-    badge: String?,
-    subtitle: String?,
-    isSelected: Boolean,
-    onClick: () -> Unit
+private fun AllPlansSheet(
+    monthlyPlan: PlanInfo,
+    yearlyPlan: PlanInfo,
+    selectedPlan: PlanType,
+    purchaseState: PurchaseState,
+    onSelectPlan: (PlanType) -> Unit,
+    onPurchase: () -> Unit,
+    onDismiss: () -> Unit,
+    onRestore: () -> Unit
 ) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = CardBackground
-        ),
-        border = if (isSelected) {
-            BorderStroke(2.dp, CardSelectedBorder)
-        } else {
-            BorderStroke(1.dp, Color(0xFF48484A))
-        }
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            // Badge
-            if (badge != null) {
-                Text(
-                    text = badge,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    ),
-                    color = BadgeText,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 12.dp, end = 12.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(BadgeBackground)
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                )
-            }
+    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
-            ) {
-                Text(
-                    text = planName,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = Color.White
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    Text(
-                        text = price,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = period,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
-                    )
-                }
-
-                if (subtitle != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AccentGreen
-                    )
-                }
-            }
-
-            // Selection indicator
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color(0xFF1C1C1E),
+        dragHandle = {
             Box(
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 16.dp)
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (isSelected) AccentGreen else Color.Transparent
-                    )
-                    .then(
-                        if (!isSelected) {
-                            Modifier
-                                .clip(CircleShape)
-                                .background(Color.Transparent)
-                        } else {
-                            Modifier
-                        }
-                    ),
-                contentAlignment = Alignment.Center
+                    .padding(top = 12.dp)
+                    .width(36.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color(0xFF48484A))
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Header
+            Text(
+                text = "TrackSpeed Pro",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color.White
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Not ready to commit for a year?\nWe have plans for everyone.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Yearly plan card
+            AllPlansPlanCard(
+                title = "Yearly",
+                subtitle = "billed ${yearlyPlan.priceDisplay} per year",
+                trailingPrice = yearlyPlan.monthlyEquivalent ?: yearlyPlan.priceDisplay,
+                trailingLabel = "per month",
+                isSelected = selectedPlan == PlanType.YEARLY,
+                onClick = { onSelectPlan(PlanType.YEARLY) }
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Monthly plan card
+            AllPlansPlanCard(
+                title = "Monthly",
+                subtitle = null,
+                trailingPrice = monthlyPlan.priceDisplay,
+                trailingLabel = "per month",
+                isSelected = selectedPlan == PlanType.MONTHLY,
+                onClick = { onSelectPlan(PlanType.MONTHLY) }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // No commitment badge
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
             ) {
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Selected",
-                        tint = Color.Black,
-                        modifier = Modifier.size(24.dp)
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = SuccessGreen,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "No commitment, cancel anytime",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Get Started button
+            Button(
+                onClick = onPurchase,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AccentGreen,
+                    contentColor = Color.Black,
+                    disabledContainerColor = AccentGreen.copy(alpha = 0.4f)
+                ),
+                shape = RoundedCornerShape(28.dp),
+                enabled = purchaseState !is PurchaseState.Loading
+            ) {
+                if (purchaseState is PurchaseState.Loading) {
+                    CircularProgressIndicator(
+                        color = Color.Black,
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.5.dp
                     )
                 } else {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(Color.Transparent)
-                            .padding(2.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF48484A))
+                    Text(
+                        text = "Get Started",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Not now
+            Text(
+                text = "Not now, thanks",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMuted,
+                modifier = Modifier.clickable { onDismiss() }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Legal links
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Privacy",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.clickable {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL)))
+                    }
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = "Restore",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.clickable { onRestore() }
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = "Terms",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.clickable {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TERMS_URL)))
+                    }
+                )
             }
         }
     }
 }
+
+@Composable
+private fun AllPlansPlanCard(
+    title: String,
+    subtitle: String?,
+    trailingPrice: String,
+    trailingLabel: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardBackground)
+            .then(
+                if (isSelected) {
+                    Modifier.border(
+                        border = BorderStroke(2.dp, AccentGreen),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                } else Modifier
+            )
+            .clickable { onClick() }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Selection indicator
+        Icon(
+            imageVector = if (isSelected) Icons.Default.CheckCircle
+            else Icons.Default.CheckCircle,
+            contentDescription = if (isSelected) "Selected" else "Not selected",
+            tint = if (isSelected) AccentGreen else TextMuted,
+            modifier = Modifier.size(24.dp)
+        )
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        // Plan name + subtitle
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.SemiBold
+                ),
+                color = Color.White
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        }
+
+        // Price
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = trailingPrice,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color.White
+            )
+            Text(
+                text = trailingLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+        }
+    }
+}
+
+// ---------- Previews ----------
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
@@ -550,64 +762,6 @@ private fun PaywallScreenPreview() {
                 periodDisplay = "year",
                 monthlyEquivalent = "$4.17/mo",
                 savingsPercent = 54
-            ),
-            onClose = {},
-            onSelectPlan = {},
-            onPurchase = {},
-            onRestore = {},
-            onRetry = {},
-            onClearError = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
-@Composable
-private fun PaywallScreenLoadingPreview() {
-    TrackSpeedTheme(darkTheme = true) {
-        PaywallContent(
-            selectedPlan = PlanType.YEARLY,
-            purchaseState = PurchaseState.Idle,
-            isLoadingOfferings = true,
-            offeringsError = null,
-            monthlyPlan = PlanInfo(
-                type = PlanType.MONTHLY,
-                priceDisplay = "$8.99",
-                periodDisplay = "month"
-            ),
-            yearlyPlan = PlanInfo(
-                type = PlanType.YEARLY,
-                priceDisplay = "$49.99",
-                periodDisplay = "year"
-            ),
-            onClose = {},
-            onSelectPlan = {},
-            onPurchase = {},
-            onRestore = {},
-            onRetry = {},
-            onClearError = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
-@Composable
-private fun PaywallScreenErrorPreview() {
-    TrackSpeedTheme(darkTheme = true) {
-        PaywallContent(
-            selectedPlan = PlanType.YEARLY,
-            purchaseState = PurchaseState.Idle,
-            isLoadingOfferings = false,
-            offeringsError = "Network error",
-            monthlyPlan = PlanInfo(
-                type = PlanType.MONTHLY,
-                priceDisplay = "$8.99",
-                periodDisplay = "month"
-            ),
-            yearlyPlan = PlanInfo(
-                type = PlanType.YEARLY,
-                priceDisplay = "$49.99",
-                periodDisplay = "year"
             ),
             onClose = {},
             onSelectPlan = {},

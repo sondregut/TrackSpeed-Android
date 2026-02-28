@@ -75,8 +75,18 @@ class CameraManager @Inject constructor(
     /** Sensor orientation in degrees (0, 90, 180, 270) */
     fun getSensorOrientation(): Int = sensorOrientation
 
+    /** Selected camera resolution (landscape, e.g. 1280×720). Null before initialize(). */
+    fun getPreviewSize(): Size? = selectedSize
+
     // Frame callback
     private var frameCallback: FrameCallback? = null
+
+    // Pre-allocated frame buffers — resized only when dimensions change
+    private var luminanceBuffer = ByteArray(0)
+    private var uData = ByteArray(0)
+    private var vData = ByteArray(0)
+    private var lastBufferWidth = 0
+    private var lastBufferHeight = 0
 
     // Frame statistics
     private var frameCount = 0L
@@ -92,9 +102,13 @@ class CameraManager @Inject constructor(
 
     data class FrameData(
         val yPlane: ByteArray,
+        val uPlane: ByteArray,
+        val vPlane: ByteArray,
         val width: Int,
         val height: Int,
         val rowStride: Int,
+        val uvRowStride: Int,
+        val uvPixelStride: Int,
         val timestampNanos: Long,
         val frameIndex: Long
     )
@@ -385,21 +399,49 @@ class CameraManager @Inject constructor(
             val yPlane = image.planes[0]
             val yBuffer = yPlane.buffer
             val yRowStride = yPlane.rowStride
-            val yPixelStride = yPlane.pixelStride
 
             val width = image.width
             val height = image.height
-            val luminanceBuffer = ByteArray(yRowStride * height)
+
+            // Resize pre-allocated buffers only when dimensions change
+            val yBufSize = yRowStride * height
+            if (width != lastBufferWidth || height != lastBufferHeight) {
+                luminanceBuffer = ByteArray(yBufSize)
+                lastBufferWidth = width
+                lastBufferHeight = height
+            } else if (luminanceBuffer.size < yBufSize) {
+                luminanceBuffer = ByteArray(yBufSize)
+            }
 
             yBuffer.rewind()
             val bytesToRead = minOf(luminanceBuffer.size, yBuffer.remaining())
             yBuffer.get(luminanceBuffer, 0, bytesToRead)
 
+            // Extract U and V planes for color thumbnails
+            val uPlaneObj = image.planes[1]
+            val vPlaneObj = image.planes[2]
+            val uvRowStride = uPlaneObj.rowStride
+            val uvPixelStride = uPlaneObj.pixelStride
+            val uBuffer = uPlaneObj.buffer
+            val vBuffer = vPlaneObj.buffer
+            uBuffer.rewind()
+            vBuffer.rewind()
+            val uSize = uBuffer.remaining()
+            val vSize = vBuffer.remaining()
+            if (uData.size < uSize) uData = ByteArray(uSize)
+            if (vData.size < vSize) vData = ByteArray(vSize)
+            uBuffer.get(uData, 0, uSize)
+            vBuffer.get(vData, 0, vSize)
+
             val frameData = FrameData(
-                yPlane = luminanceBuffer,
+                yPlane = luminanceBuffer.copyOf(bytesToRead),
+                uPlane = uData.copyOf(uSize),
+                vPlane = vData.copyOf(vSize),
                 width = width,
                 height = height,
                 rowStride = yRowStride,
+                uvRowStride = uvRowStride,
+                uvPixelStride = uvPixelStride,
                 timestampNanos = timestamp,
                 frameIndex = frameCount
             )
@@ -445,6 +487,8 @@ class CameraManager @Inject constructor(
 
         frameCount = 0
         lastFrameTimestamp = 0
+        lastBufferWidth = 0
+        lastBufferHeight = 0
 
         _cameraState.value = CameraState.Closed
         Log.i(TAG, "Camera closed")

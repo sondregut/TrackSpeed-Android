@@ -7,6 +7,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.audio.CrossingFeedback
+import com.trackspeed.android.audio.VoiceStartService
+import com.trackspeed.android.billing.SubscriptionManager
 import com.trackspeed.android.camera.CameraManager
 import com.trackspeed.android.data.local.dao.AthleteDao
 import com.trackspeed.android.data.local.entities.AthleteEntity
@@ -31,7 +33,9 @@ class BasicTimingViewModel @Inject constructor(
     private val crossingFeedback: CrossingFeedback,
     private val sessionRepository: SessionRepository,
     private val settingsRepository: SettingsRepository,
-    private val athleteDao: AthleteDao
+    private val athleteDao: AthleteDao,
+    val voiceStartService: VoiceStartService,
+    private val subscriptionManager: SubscriptionManager
 ) : ViewModel() {
 
     // Session configuration from navigation arguments (overrides settings defaults)
@@ -41,6 +45,11 @@ class BasicTimingViewModel @Inject constructor(
     // Athletes selected for this session
     private val athleteIdsRaw: String = savedStateHandle.get<String>("athleteIds") ?: ""
     private var sessionAthletes: List<AthleteEntity> = emptyList()
+
+    val isProUser: StateFlow<Boolean> = subscriptionManager.isProUser
+
+    /** Raw StateFlow for InFrameStartOverlay (needs StateFlow, not snapshot). */
+    val detectionStateFlow: StateFlow<PhotoFinishDetector.State> = gateEngine.detectionState
 
     private val _uiState = MutableStateFlow(BasicTimingUiState(
         distance = sessionDistance,
@@ -151,28 +160,31 @@ class BasicTimingViewModel @Inject constructor(
             }
         }
 
-        // Apply preferred FPS from settings before initializing camera
+        // Initialize camera early so preview dimensions are available for configureTransform.
+        // No suspend before initialize() — runs synchronously via Dispatchers.Main.immediate,
+        // completing before the TextureView surface is created (matches RaceMode pattern).
+        viewModelScope.launch {
+            val initialized = cameraManager.initialize()
+            if (initialized) {
+                val previewSize = cameraManager.getPreviewSize()
+                _uiState.update {
+                    it.copy(
+                        sensorOrientation = cameraManager.getSensorOrientation(),
+                        previewWidth = previewSize?.width ?: 0,
+                        previewHeight = previewSize?.height ?: 0
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(cameraState = CameraManager.CameraState.Error("No suitable camera found."))
+                }
+            }
+        }
+
+        // Load preferred FPS from settings (async, OK to be late — default is 120fps)
         viewModelScope.launch {
             val fps = settingsRepository.getPreferredFpsOnce()
             cameraManager.preferredFps = fps
-            initializeCamera()
-        }
-    }
-
-    private fun initializeCamera() {
-        val initialized = cameraManager.initialize()
-        if (!initialized) {
-            _uiState.update {
-                it.copy(
-                    cameraState = CameraManager.CameraState.Error(
-                        "No suitable camera found."
-                    )
-                )
-            }
-        } else {
-            _uiState.update {
-                it.copy(sensorOrientation = cameraManager.getSensorOrientation())
-            }
         }
     }
 
@@ -184,9 +196,7 @@ class BasicTimingViewModel @Inject constructor(
         if (!_uiState.value.hasPermission) return
         previewSurface = surface
         frameCount = 0
-        cameraManager.openCamera(surface) { frameData ->
-            processFrame(frameData)
-        }
+        cameraManager.openCamera(surface) { frameData -> processFrame(frameData) }
     }
 
     fun onSurfaceDestroyed() {
@@ -200,8 +210,15 @@ class BasicTimingViewModel @Inject constructor(
         cameraManager.switchCamera(previewSurface) { frameData ->
             processFrame(frameData)
         }
+        // Re-read dimensions after switch (switchCamera calls initialize internally)
+        val previewSize = cameraManager.getPreviewSize()
         _uiState.update {
-            it.copy(sensorOrientation = cameraManager.getSensorOrientation())
+            it.copy(
+                sensorOrientation = cameraManager.getSensorOrientation(),
+                isFrontCamera = cameraManager.isFrontCamera.value,
+                previewWidth = previewSize?.width ?: 0,
+                previewHeight = previewSize?.height ?: 0
+            )
         }
     }
 
@@ -266,6 +283,37 @@ class BasicTimingViewModel @Inject constructor(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Handle an external start event from Touch, Countdown, Voice, or InFrame overlays.
+     * Sets the start timestamp directly and begins the timer tick.
+     */
+    fun handleExternalStart(timestampNanos: Long) {
+        viewModelScope.launch {
+            timingMutex.withLock {
+                _laps.clear()
+                lapCounter = 0
+                startTimeNanos = timestampNanos
+                val startLap = SoloLapResult(
+                    lapNumber = 0,
+                    totalTimeSeconds = 0.0,
+                    lapTimeSeconds = 0.0,
+                    thumbnail = null,
+                    gatePosition = _uiState.value.gatePosition
+                )
+                _laps.add(startLap)
+                _uiState.update {
+                    it.copy(
+                        isRunning = true,
+                        waitingForStart = false,
+                        currentTime = 0.0,
+                        laps = _laps.toList()
+                    )
+                }
+                startTimerTick()
             }
         }
     }
@@ -381,6 +429,9 @@ class BasicTimingViewModel @Inject constructor(
                                 currentSpeedMs = lapSpeedMs
                             )
                         }
+
+                        // Announce the lap time via voice if enabled
+                        crossingFeedback.announceTime(lapTime)
                     }
                 }
 
@@ -390,14 +441,9 @@ class BasicTimingViewModel @Inject constructor(
     }
 
     /**
-     * Capture a thumbnail - prefers the photo finish composite slit-scan,
-     * falls back to a grayscale snapshot from the latest camera frame.
+     * Capture a thumbnail from the latest camera frame at the moment of crossing.
      */
     private fun captureThumbnail(): Bitmap? {
-        // Try composite slit-scan first (photo finish style)
-        gateEngine.getComposite()?.let { return it }
-
-        // Fallback: capture from latest camera frame
         val frame = latestFrameData ?: return null
         return try {
             val orientation = cameraManager.getSensorOrientation()
@@ -414,8 +460,20 @@ class BasicTimingViewModel @Inject constructor(
                 val srcY = (sy * scaleY).toInt().coerceIn(0, frame.height - 1)
                 for (sx in 0 until sampleW) {
                     val srcX = (sx * scaleX).toInt().coerceIn(0, frame.width - 1)
-                    val luma = frame.yPlane[srcY * frame.rowStride + srcX].toInt() and 0xFF
-                    pixels[sy * sampleW + sx] = (0xFF shl 24) or (luma shl 16) or (luma shl 8) or luma
+                    val yVal = frame.yPlane[srcY * frame.rowStride + srcX].toInt() and 0xFF
+
+                    // UV is subsampled 2x2
+                    val uvRow = srcY / 2
+                    val uvCol = srcX / 2
+                    val uvIdx = uvRow * frame.uvRowStride + uvCol * frame.uvPixelStride
+                    val uVal = if (uvIdx < frame.uPlane.size) (frame.uPlane[uvIdx].toInt() and 0xFF) - 128 else 0
+                    val vVal = if (uvIdx < frame.vPlane.size) (frame.vPlane[uvIdx].toInt() and 0xFF) - 128 else 0
+
+                    val r = (yVal + 1.370705f * vVal).toInt().coerceIn(0, 255)
+                    val g = (yVal - 0.337633f * uVal - 0.698001f * vVal).toInt().coerceIn(0, 255)
+                    val b = (yVal + 1.732446f * uVal).toInt().coerceIn(0, 255)
+
+                    pixels[sy * sampleW + sx] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
                 }
             }
 
@@ -448,10 +506,22 @@ class BasicTimingViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Check if a start mode is available to the current user.
+     */
+    fun canUseStartMode(modeName: String): Boolean {
+        return subscriptionManager.canUseStartMode(modeName)
+    }
+
     fun saveSession() {
         viewModelScope.launch {
             val laps = _laps.toList()
             if (laps.size <= 1) return@launch // Need at least one actual lap
+
+            if (!subscriptionManager.canSaveSession()) {
+                _uiState.update { it.copy(showPaywallPrompt = true) }
+                return@launch
+            }
 
             sessionRepository.saveSession(
                 name = null,
@@ -462,6 +532,10 @@ class BasicTimingViewModel @Inject constructor(
             )
             _uiState.update { it.copy(sessionSaved = true) }
         }
+    }
+
+    fun onPaywallPromptConsumed() {
+        _uiState.update { it.copy(showPaywallPrompt = false) }
     }
 
     fun onSessionSavedConsumed() {
@@ -501,8 +575,11 @@ data class BasicTimingUiState(
     val currentTime: Double = 0.0,
     val laps: List<SoloLapResult> = emptyList(),
     val sessionSaved: Boolean = false,
+    val showPaywallPrompt: Boolean = false,
     val sensorOrientation: Int = 90,
     val isFrontCamera: Boolean = false,
+    val previewWidth: Int = 0,
+    val previewHeight: Int = 0,
     val distance: Double = 60.0,
     val startType: String = "standing",
     val currentSpeedMs: Double = 0.0,

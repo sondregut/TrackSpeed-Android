@@ -38,4 +38,13 @@ interface TrainingSessionDao {
 
     @Query("SELECT * FROM training_sessions ORDER BY date DESC LIMIT :limit")
     fun getRecentSessions(limit: Int = 3): Flow<List<TrainingSessionEntity>>
+
+    @Query("SELECT * FROM training_sessions WHERE cloudId IS NULL OR lastSyncedAt < updatedAt")
+    suspend fun getUnsyncedSessions(): List<TrainingSessionEntity>
+
+    @Query("SELECT COUNT(*) FROM training_sessions WHERE date >= :sinceMillis")
+    fun getSessionCountSince(sinceMillis: Long): Flow<Int>
+
+    @Query("SELECT DISTINCT startType FROM training_sessions ORDER BY startType ASC")
+    fun getDistinctStartTypes(): Flow<List<String>>
 }

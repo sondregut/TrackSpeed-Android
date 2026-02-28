@@ -26,6 +26,7 @@ android {
 
         // RevenueCat API key - loaded from local.properties
         buildConfigField("String", "REVENUECAT_API_KEY", "\"${findProperty("REVENUECAT_API_KEY") ?: ""}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${findProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
     }
 
     buildTypes {
@@ -97,8 +98,19 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
 
+    // Splash Screen
+    implementation(libs.androidx.splashscreen)
+
+    // AppCompat (per-app language support on API < 33)
+    implementation("androidx.appcompat:appcompat:1.7.0")
+
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Credential Manager (Google Sign-In)
+    implementation(libs.credential.manager)
+    implementation(libs.credential.manager.play.services)
+    implementation(libs.google.id)
 
     // Camera (Camera2 only - no CameraX needed for Photo Finish mode)
     implementation(libs.camera.camera2)

@@ -17,7 +17,7 @@ import com.trackspeed.android.data.local.entities.TrainingSessionEntity
         RunEntity::class,
         AthleteEntity::class
     ],
-    version = 2,
+    version = 4,
     exportSchema = false
 )
 abstract class TrackSpeedDatabase : RoomDatabase() {
@@ -30,6 +30,19 @@ abstract class TrackSpeedDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE runs ADD COLUMN athleteId TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE runs ADD COLUMN athleteColor TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE training_sessions ADD COLUMN cloudId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE training_sessions ADD COLUMN lastSyncedAt INTEGER DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE runs ADD COLUMN isSeasonBest INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

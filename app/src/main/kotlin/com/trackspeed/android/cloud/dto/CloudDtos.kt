@@ -113,3 +113,25 @@ data class AthleteDto(
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null
 )
+
+/**
+ * DTO for the `profiles` Supabase table.
+ * User profiles synced to cloud.
+ */
+@Serializable
+data class ProfileDto(
+    val id: String? = null,
+    @SerialName("supabase_user_id") val supabaseUserId: String,
+    @SerialName("full_name") val fullName: String? = null,
+    val email: String? = null,
+    @SerialName("date_of_birth") val dateOfBirth: String? = null,
+    val role: String? = null,
+    @SerialName("primary_event") val primaryEvent: String? = null,
+    @SerialName("personal_record") val personalRecord: Double? = null,
+    @SerialName("flying_pr_distance") val flyingPrDistance: String? = null,
+    @SerialName("flying_pr") val flyingPr: Double? = null,
+    @SerialName("photo_url") val photoUrl: String? = null,
+    @SerialName("onboarding_completed") val onboardingCompleted: Boolean = false,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null
+)

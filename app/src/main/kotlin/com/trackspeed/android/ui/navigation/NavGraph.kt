@@ -101,6 +101,7 @@ sealed class Screen(val route: String) {
     data object DistanceConverter : Screen("distance_converter")
     data object Referral : Screen("referral")
     data object DebugTools : Screen("debug_tools")
+    data object GuestJoinSession : Screen("guest_join_session")
 }
 
 @Composable
@@ -140,6 +141,9 @@ fun TrackSpeedNavHost(
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
+                },
+                onGuestJoinSession = {
+                    navController.navigate(Screen.GuestJoinSession.route)
                 }
             )
         }
@@ -419,6 +423,14 @@ fun TrackSpeedNavHost(
 
         composable(Screen.DebugTools.route) {
             DebugToolsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.GuestJoinSession.route) {
+            RaceModeScreen(
                 onNavigateBack = {
                     navController.popBackStack()
                 }

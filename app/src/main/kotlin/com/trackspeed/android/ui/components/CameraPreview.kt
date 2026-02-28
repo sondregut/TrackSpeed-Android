@@ -6,8 +6,6 @@ import android.view.Surface
 import android.view.TextureView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -16,10 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
+import com.trackspeed.android.R
 import com.trackspeed.android.detection.PhotoFinishDetector
 import android.util.Log
 
@@ -113,14 +111,10 @@ fun CameraPreview(
 }
 
 /**
- * Configure the TextureView transform matrix to display the camera preview
- * in the correct portrait orientation.
+ * Configure the TextureView transform matrix.
  *
- * Camera2 delivers frames in the sensor's native (landscape) orientation.
- * SENSOR_ORIENTATION is the CW angle through which the output image needs to be
- * rotated to be upright on the device screen in its natural (portrait) orientation.
- *
- * Order matters: rotate first, then scale to fix aspect ratio.
+ * TextureView's internal SurfaceTexture transform already handles
+ * sensor-to-display rotation. We only need to apply front camera mirror.
  */
 private fun configureTransform(
     textureView: TextureView,
@@ -132,30 +126,16 @@ private fun configureTransform(
     if (viewWidth == 0 || viewHeight == 0) return
 
     val matrix = Matrix()
-    val centerX = viewWidth / 2f
-    val centerY = viewHeight / 2f
+    val cx = viewWidth / 2f
+    val cy = viewHeight / 2f
 
-    // Step 1: Rotate by sensorOrientation to make the image upright.
-    // Per Android docs, sensorOrientation is the CW rotation needed to display upright.
-    // Back camera: typically 90° CW, Front camera: typically 270° CW.
-    if (sensorOrientation != 0) {
-        matrix.postRotate(sensorOrientation.toFloat(), centerX, centerY)
-    }
-
-    // Step 2: Fix aspect ratio. TextureView stretches the camera buffer (landscape)
-    // to fill the view (portrait). After rotation, we need to scale to compensate.
-    if (sensorOrientation == 90 || sensorOrientation == 270) {
-        val scaleX = viewHeight.toFloat() / viewWidth
-        val scaleY = viewWidth.toFloat() / viewHeight
-        matrix.postScale(scaleX, scaleY, centerX, centerY)
-    }
-
-    // Step 3: Mirror for front camera (selfie mirror effect)
+    // TextureView's internal SurfaceTexture transform already handles
+    // sensor-to-display rotation. Only apply front camera mirror.
     if (isFrontCamera) {
-        matrix.postScale(-1f, 1f, centerX, centerY)
+        matrix.postScale(-1f, 1f, cx, cy)
     }
 
-    Log.d("CameraPreview", "Transform: sensor=$sensorOrientation, view=${viewWidth}x${viewHeight}, front=$isFrontCamera")
+    Log.d("CameraPreview", "Transform: sensor=$sensorOrientation view=${viewWidth}x${viewHeight} front=$isFrontCamera")
     textureView.setTransform(matrix)
 }
 
@@ -166,8 +146,6 @@ private fun GateLineOverlay(
     detectionState: PhotoFinishDetector.State,
     modifier: Modifier = Modifier
 ) {
-    var isDragging by remember { mutableStateOf(false) }
-
     val lineColor = when (detectionState) {
         PhotoFinishDetector.State.UNSTABLE -> Color.Yellow
         PhotoFinishDetector.State.NO_ATHLETE -> Color.White
@@ -177,82 +155,16 @@ private fun GateLineOverlay(
         PhotoFinishDetector.State.COOLDOWN -> Color.Red
     }
 
-    val lineAlpha = if (isDragging) 1f else 0.8f
-
-    Canvas(
-        modifier = modifier
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    val newPosition = (offset.x / size.width).coerceIn(0.05f, 0.95f)
-                    onGatePositionChanged(newPosition)
-                }
-            }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragStart = { isDragging = true },
-                    onDragEnd = { isDragging = false },
-                    onDragCancel = { isDragging = false },
-                    onHorizontalDrag = { change, _ ->
-                        val newPosition = (change.position.x / size.width).coerceIn(0.05f, 0.95f)
-                        onGatePositionChanged(newPosition)
-                    }
-                )
-            }
-    ) {
+    Canvas(modifier = modifier) {
         val x = size.width * gatePosition
 
-        // Main gate line
+        // Gate line (fixed at center)
         drawLine(
-            color = lineColor.copy(alpha = lineAlpha),
+            color = lineColor.copy(alpha = 0.8f),
             start = Offset(x, 0f),
             end = Offset(x, size.height),
-            strokeWidth = if (isDragging) 6f else 4f
+            strokeWidth = 4f
         )
-
-        // Handle indicator
-        val handleY = size.height / 2
-        val handleRadius = if (isDragging) 24f else 16f
-
-        drawCircle(
-            color = lineColor.copy(alpha = lineAlpha),
-            radius = handleRadius,
-            center = Offset(x, handleY),
-            style = Stroke(width = 3f)
-        )
-
-        drawCircle(
-            color = lineColor.copy(alpha = 0.3f),
-            radius = handleRadius - 3f,
-            center = Offset(x, handleY)
-        )
-
-        if (isDragging) {
-            val arrowSize = 12f
-            drawLine(
-                color = Color.White.copy(alpha = 0.6f),
-                start = Offset(x - 40f, handleY),
-                end = Offset(x - 40f - arrowSize, handleY - arrowSize),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = Color.White.copy(alpha = 0.6f),
-                start = Offset(x - 40f, handleY),
-                end = Offset(x - 40f - arrowSize, handleY + arrowSize),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = Color.White.copy(alpha = 0.6f),
-                start = Offset(x + 40f, handleY),
-                end = Offset(x + 40f + arrowSize, handleY - arrowSize),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = Color.White.copy(alpha = 0.6f),
-                start = Offset(x + 40f, handleY),
-                end = Offset(x + 40f + arrowSize, handleY + arrowSize),
-                strokeWidth = 2f
-            )
-        }
     }
 }
 
@@ -277,7 +189,7 @@ private fun FpsIndicator(
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Text(
-            text = "$fps FPS",
+            text = stringResource(R.string.camera_fps_format, fps),
             style = MaterialTheme.typography.labelMedium,
             color = fpsColor
         )
@@ -290,12 +202,12 @@ private fun StatusIndicator(
     modifier: Modifier = Modifier
 ) {
     val (text, color) = when (detectionState) {
-        PhotoFinishDetector.State.UNSTABLE -> "HOLD STEADY" to Color.Yellow
-        PhotoFinishDetector.State.NO_ATHLETE -> "READY" to Color.Green
-        PhotoFinishDetector.State.ATHLETE_TOO_FAR -> "TOO FAR" to Color(0xFFFF9800)
-        PhotoFinishDetector.State.READY -> "READY" to Color.Green
-        PhotoFinishDetector.State.TRIGGERED -> "TRIGGERED" to Color.Red
-        PhotoFinishDetector.State.COOLDOWN -> "COOLDOWN" to Color.Red
+        PhotoFinishDetector.State.UNSTABLE -> stringResource(R.string.camera_status_hold_steady) to Color.Yellow
+        PhotoFinishDetector.State.NO_ATHLETE -> stringResource(R.string.camera_status_ready) to Color.Green
+        PhotoFinishDetector.State.ATHLETE_TOO_FAR -> stringResource(R.string.camera_status_too_far) to Color(0xFFFF9800)
+        PhotoFinishDetector.State.READY -> stringResource(R.string.camera_status_ready) to Color.Green
+        PhotoFinishDetector.State.TRIGGERED -> stringResource(R.string.camera_status_triggered) to Color.Red
+        PhotoFinishDetector.State.COOLDOWN -> stringResource(R.string.camera_status_cooldown) to Color.Red
     }
 
     Box(
@@ -328,7 +240,7 @@ private fun StatusIndicator(
 @Composable
 fun CameraPreviewPlaceholder(
     modifier: Modifier = Modifier,
-    message: String = "Camera not available"
+    message: String = stringResource(R.string.camera_not_available)
 ) {
     Box(
         modifier = modifier

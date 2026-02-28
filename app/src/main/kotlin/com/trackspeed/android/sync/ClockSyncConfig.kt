@@ -49,6 +49,11 @@ object ClockSyncConfig {
 
     // Sync age warnings
     const val SYNC_STALE_WARNING_SECONDS = 600L    // Warn after 10 minutes
+
+    // Default session configuration (used when starting as host without explicit setup)
+    const val DEFAULT_SESSION_DISTANCE = 100.0
+    const val DEFAULT_SESSION_START_TYPE = "standing"
+    const val DEFAULT_SESSION_NUMBER_OF_GATES = 2
 }
 
 /**
