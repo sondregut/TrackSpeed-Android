@@ -66,7 +66,8 @@ private data class WorkoutTemplate(
     val startType: String,
     val description: String,
     val icon: ImageVector,
-    val category: TemplateCategory
+    val category: TemplateCategory,
+    val minPhones: Int = 1
 )
 
 private val builtInTemplates = listOf(
@@ -77,7 +78,8 @@ private val builtInTemplates = listOf(
         startType = "standing",
         description = "Short acceleration test",
         icon = Icons.Outlined.RocketLaunch,
-        category = TemplateCategory.ACCELERATION
+        category = TemplateCategory.ACCELERATION,
+        minPhones = 2
     ),
     WorkoutTemplate(
         name = "20m Sprint",
@@ -85,7 +87,8 @@ private val builtInTemplates = listOf(
         startType = "standing",
         description = "Acceleration phase evaluation",
         icon = Icons.Outlined.RocketLaunch,
-        category = TemplateCategory.ACCELERATION
+        category = TemplateCategory.ACCELERATION,
+        minPhones = 2
     ),
     WorkoutTemplate(
         name = "30m Sprint",
@@ -93,7 +96,8 @@ private val builtInTemplates = listOf(
         startType = "standing",
         description = "Block start acceleration test",
         icon = Icons.Outlined.RocketLaunch,
-        category = TemplateCategory.ACCELERATION
+        category = TemplateCategory.ACCELERATION,
+        minPhones = 2
     ),
     WorkoutTemplate(
         name = "40yd Dash",
@@ -101,7 +105,8 @@ private val builtInTemplates = listOf(
         startType = "standing",
         description = "40-yard dash from standing start",
         icon = Icons.Outlined.RocketLaunch,
-        category = TemplateCategory.ACCELERATION
+        category = TemplateCategory.ACCELERATION,
+        minPhones = 2
     ),
 
     // --- Max Speed (Blue) ---
@@ -111,7 +116,8 @@ private val builtInTemplates = listOf(
         startType = "flying",
         description = "Peak velocity over 10m",
         icon = Icons.Outlined.ElectricBolt,
-        category = TemplateCategory.SPEED
+        category = TemplateCategory.SPEED,
+        minPhones = 2
     ),
     WorkoutTemplate(
         name = "Flying 20m",
@@ -119,7 +125,8 @@ private val builtInTemplates = listOf(
         startType = "flying",
         description = "Maximum velocity test",
         icon = Icons.Outlined.ElectricBolt,
-        category = TemplateCategory.SPEED
+        category = TemplateCategory.SPEED,
+        minPhones = 2
     ),
     WorkoutTemplate(
         name = "Flying 30m",
@@ -127,7 +134,8 @@ private val builtInTemplates = listOf(
         startType = "flying",
         description = "Extended max velocity test",
         icon = Icons.Outlined.ElectricBolt,
-        category = TemplateCategory.SPEED
+        category = TemplateCategory.SPEED,
+        minPhones = 2
     ),
     WorkoutTemplate(
         name = "60m Sprint",
@@ -135,7 +143,8 @@ private val builtInTemplates = listOf(
         startType = "standing",
         description = "Standard 60m sprint",
         icon = Icons.AutoMirrored.Filled.DirectionsRun,
-        category = TemplateCategory.SPEED
+        category = TemplateCategory.SPEED,
+        minPhones = 2
     ),
     WorkoutTemplate(
         name = "100m Dash",
@@ -143,7 +152,8 @@ private val builtInTemplates = listOf(
         startType = "standing",
         description = "Full 100m with reaction time",
         icon = Icons.Outlined.Timer,
-        category = TemplateCategory.SPEED
+        category = TemplateCategory.SPEED,
+        minPhones = 2
     ),
     WorkoutTemplate(
         name = "200m Sprint",
@@ -151,10 +161,11 @@ private val builtInTemplates = listOf(
         startType = "standing",
         description = "Half-lap speed endurance",
         icon = Icons.Outlined.Timer,
-        category = TemplateCategory.SPEED
+        category = TemplateCategory.SPEED,
+        minPhones = 2
     ),
 
-    // --- Agility (Orange) ---
+    // --- Agility (Orange) — single-phone in-frame start ---
     WorkoutTemplate(
         name = "Pro Agility (5-10-5)",
         distance = 36.576,
@@ -179,7 +190,8 @@ private val builtInTemplates = listOf(
         startType = "standing",
         description = "NFL Combine 40-yard dash",
         icon = Icons.Outlined.EmojiEvents,
-        category = TemplateCategory.COMBINE
+        category = TemplateCategory.COMBINE,
+        minPhones = 2
     )
 )
 
@@ -206,7 +218,7 @@ private fun formatStartType(startType: String): String {
 
 @Composable
 fun TemplatesScreen(
-    onTemplateClick: (distance: Double, startType: String) -> Unit = { _, _ -> }
+    onTemplateClick: (distance: Double, startType: String, minPhones: Int) -> Unit = { _, _, _ -> }
 ) {
     val templatesByCategory = builtInTemplates.groupBy { it.category }
 
@@ -259,7 +271,7 @@ fun TemplatesScreen(
             ) { template ->
                 TemplateCard(
                     template = template,
-                    onClick = { onTemplateClick(template.distance, template.startType) }
+                    onClick = { onTemplateClick(template.distance, template.startType, template.minPhones) }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }

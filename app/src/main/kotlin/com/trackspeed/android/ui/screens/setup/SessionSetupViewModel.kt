@@ -17,10 +17,8 @@ import javax.inject.Inject
 enum class SetupStep(val index: Int) {
     ATHLETES(0),
     DISTANCE(1),
-    START_TYPE(2);
-
-    fun next(): SetupStep? = entries.getOrNull(index + 1)
-    fun previous(): SetupStep? = entries.getOrNull(index - 1)
+    START_TYPE(2),
+    CONNECT(3)
 }
 
 data class PresetDistance(
@@ -40,6 +38,8 @@ val PRESET_DISTANCES = listOf(
 
 data class SessionSetupUiState(
     val currentStep: SetupStep = SetupStep.ATHLETES,
+    val activeSteps: List<SetupStep> = listOf(SetupStep.ATHLETES, SetupStep.DISTANCE, SetupStep.START_TYPE),
+    val isMultiPhone: Boolean = false,
     val athletes: List<AthleteEntity> = emptyList(),
     val selectedAthleteIds: Set<String> = emptySet(),
     val selectedDistance: Double = 60.0,
@@ -57,6 +57,15 @@ class SessionSetupViewModel @Inject constructor(
     private val initialDistance = savedStateHandle.get<Float>("distance")
         ?.toDouble()?.takeIf { it > 0 }
     private val initialStartType = savedStateHandle.get<String>("startType")?.ifBlank { null }
+    private val minPhones = savedStateHandle.get<Int>("minPhones") ?: 1
+    private val isMultiPhone = minPhones >= 2
+
+    val activeSteps: List<SetupStep> = buildList {
+        add(SetupStep.ATHLETES)
+        add(SetupStep.DISTANCE)
+        add(SetupStep.START_TYPE)
+        if (isMultiPhone) add(SetupStep.CONNECT)
+    }
 
     private val _currentStep = MutableStateFlow(SetupStep.ATHLETES)
     private val _selectedAthleteIds = MutableStateFlow<Set<String>>(emptySet())
@@ -73,6 +82,8 @@ class SessionSetupViewModel @Inject constructor(
     ) { step, athletes, selectedIds, distance, (customText, startType) ->
         SessionSetupUiState(
             currentStep = step,
+            activeSteps = activeSteps,
+            isMultiPhone = isMultiPhone,
             athletes = athletes,
             selectedAthleteIds = selectedIds,
             selectedDistance = distance,
@@ -85,18 +96,26 @@ class SessionSetupViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SessionSetupUiState(
             selectedDistance = initialDistance ?: 60.0,
-            selectedStartType = initialStartType ?: "standing"
+            selectedStartType = initialStartType ?: "standing",
+            activeSteps = activeSteps,
+            isMultiPhone = isMultiPhone
         )
     )
 
     val currentStep: StateFlow<SetupStep> = _currentStep.asStateFlow()
 
     fun goToNextStep() {
-        _currentStep.value.next()?.let { _currentStep.value = it }
+        val currentIndex = activeSteps.indexOf(_currentStep.value)
+        if (currentIndex >= 0 && currentIndex < activeSteps.size - 1) {
+            _currentStep.value = activeSteps[currentIndex + 1]
+        }
     }
 
     fun goToPreviousStep() {
-        _currentStep.value.previous()?.let { _currentStep.value = it }
+        val currentIndex = activeSteps.indexOf(_currentStep.value)
+        if (currentIndex > 0) {
+            _currentStep.value = activeSteps[currentIndex - 1]
+        }
     }
 
     fun toggleAthlete(athleteId: String) {

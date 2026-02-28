@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -110,6 +111,8 @@ fun SessionSetupScreen(
         bottomBar = {
             BottomBar(
                 currentStep = uiState.currentStep,
+                activeSteps = uiState.activeSteps,
+                isMultiPhone = uiState.isMultiPhone,
                 onBack = viewModel::goToPreviousStep,
                 onNext = viewModel::goToNextStep,
                 onStart = {
@@ -130,6 +133,7 @@ fun SessionSetupScreen(
         ) {
             StepIndicator(
                 currentStep = uiState.currentStep,
+                activeSteps = uiState.activeSteps,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp)
@@ -162,6 +166,7 @@ fun SessionSetupScreen(
                         selectedStartType = uiState.selectedStartType,
                         onSelect = viewModel::selectStartType
                     )
+                    SetupStep.CONNECT -> ConnectPhonesStep()
                 }
             }
         }
@@ -173,15 +178,18 @@ fun SessionSetupScreen(
 @Composable
 private fun StepIndicator(
     currentStep: SetupStep,
+    activeSteps: List<SetupStep> = SetupStep.entries.toList(),
     modifier: Modifier = Modifier
 ) {
+    val currentActiveIndex = activeSteps.indexOf(currentStep)
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SetupStep.entries.forEachIndexed { index, step ->
-            val isCompleted = step.index < currentStep.index
+        activeSteps.forEachIndexed { index, step ->
+            val isCompleted = index < currentActiveIndex
             val isCurrent = step == currentStep
 
             val circleColor = when {
@@ -206,7 +214,7 @@ private fun StepIndicator(
                     )
                 } else {
                     Text(
-                        text = "${step.index + 1}",
+                        text = "${index + 1}",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold
                         ),
@@ -215,13 +223,13 @@ private fun StepIndicator(
                 }
             }
 
-            if (index < SetupStep.entries.size - 1) {
+            if (index < activeSteps.size - 1) {
                 Box(
                     modifier = Modifier
                         .width(40.dp)
                         .height(2.dp)
                         .background(
-                            if (step.index < currentStep.index) AccentGreen
+                            if (index < currentActiveIndex) AccentGreen
                             else StepGray
                         )
                 )
@@ -606,12 +614,15 @@ private fun StartTypeCard(
 @Composable
 private fun BottomBar(
     currentStep: SetupStep,
+    activeSteps: List<SetupStep> = SetupStep.entries.toList(),
+    isMultiPhone: Boolean = false,
     onBack: () -> Unit,
     onNext: () -> Unit,
     onStart: () -> Unit
 ) {
-    val isFirstStep = currentStep == SetupStep.ATHLETES
-    val isLastStep = currentStep == SetupStep.START_TYPE
+    val isFirstStep = currentStep == activeSteps.first()
+    val isLastStep = currentStep == activeSteps.last()
+    val lastStepLabel = if (isMultiPhone) "Start Pairing" else "Start Session"
 
     Row(
         modifier = Modifier
@@ -668,7 +679,7 @@ private fun BottomBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isLastStep) "Start Session" else "Next",
+                    text = if (isLastStep) lastStepLabel else "Next",
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Bold
                     ),
@@ -676,6 +687,120 @@ private fun BottomBar(
                 )
             }
         }
+    }
+}
+
+// -- Step 4: Connect Phones (multi-phone only) --
+
+@Composable
+private fun ConnectPhonesStep() {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(
+            text = "Connect Phones",
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = Color.White,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        Text(
+            text = "This session requires 2 phones \u2014 one at the start line and one at the finish.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = SecondaryText,
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
+
+        // Two-phone gate layout diagram
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = CardBackground)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Start phone
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(AccentGreen.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.PhoneAndroid,
+                            contentDescription = null,
+                            tint = AccentGreen,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Start Line",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = AccentGreen
+                    )
+                }
+
+                // Dashed line between phones
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "\u2022 \u2022 \u2022 \u2022 \u2022",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = StepGray,
+                        letterSpacing = 4.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "BLE Sync",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = StepGray
+                    )
+                }
+
+                // Finish phone
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(AccentBlue.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.PhoneAndroid,
+                            contentDescription = null,
+                            tint = AccentBlue,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Finish Line",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = AccentBlue
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "On the next screen you\u2019ll pair the two phones using Bluetooth and synchronize their clocks for accurate timing.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = SecondaryText,
+            lineHeight = 22.sp
+        )
     }
 }
 

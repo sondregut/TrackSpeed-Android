@@ -5,10 +5,12 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.camera.CameraManager
 import com.trackspeed.android.cloud.RaceEventService
+import com.trackspeed.android.cloud.SessionCodeGenerator
 import com.trackspeed.android.cloud.dto.RaceEventDto
 import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.detection.CrossingEvent
@@ -37,12 +39,19 @@ class RaceModeViewModel @Inject constructor(
     private val clockSyncManager: ClockSyncManager,
     private val bleClockSyncService: BleClockSyncService,
     private val raceEventService: RaceEventService,
-    private val sessionRepository: SessionRepository
+    private val sessionCodeGenerator: SessionCodeGenerator,
+    private val sessionRepository: SessionRepository,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "RaceModeViewModel"
     }
+
+    private val preConfiguredDistance = savedStateHandle.get<Float>("distance")
+        ?.toDouble()?.takeIf { it > 0 }
+    private val preConfiguredStartType = savedStateHandle.get<String>("startType")
+        ?.ifBlank { null }
 
     private val deviceId: String by lazy {
         val prefs = context.getSharedPreferences("trackspeed", Context.MODE_PRIVATE)
@@ -57,11 +66,21 @@ class RaceModeViewModel @Inject constructor(
     // Session ID for cloud sync (generated per race session)
     private var sessionId: String = UUID.randomUUID().toString()
 
-    private val _uiState = MutableStateFlow(RaceModeUiState())
+    private val _uiState = MutableStateFlow(
+        RaceModeUiState(
+            distanceMeters = preConfiguredDistance ?: 60.0
+        )
+    )
     val uiState: StateFlow<RaceModeUiState> = _uiState.asStateFlow()
 
     // Timer job
     private var timerJob: Job? = null
+    // Realtime race event subscription
+    private var raceEventSubscriptionJob: Job? = null
+    // Pairing request watcher
+    private var pairingWatcherJob: Job? = null
+    // BLE timeout for cloud-only fallback
+    private var bleTimeoutJob: Job? = null
 
     // Timing state
     private var localStartTimeNanos: Long? = null
@@ -115,16 +134,16 @@ class RaceModeViewModel @Inject constructor(
                 when (bleState) {
                     is BleClockSyncService.State.Scanning -> {
                         if (currentPhase == RacePhase.PAIRING) {
-                            _uiState.update { it.copy(pairingStatus = "Searching for devices...") }
+                            _uiState.update { it.copy(pairingStatus = "scanning") }
                         }
                     }
                     is BleClockSyncService.State.Connecting -> {
-                        _uiState.update { it.copy(pairingStatus = "Connecting...") }
+                        _uiState.update { it.copy(pairingStatus = "connecting") }
                     }
                     is BleClockSyncService.State.Connected -> {
                         _uiState.update {
                             it.copy(
-                                pairingStatus = "Connected",
+                                pairingStatus = "connected",
                                 isDeviceConnected = true,
                                 phase = RacePhase.SYNCING
                             )
@@ -153,12 +172,20 @@ class RaceModeViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 errorMessage = bleState.message,
-                                pairingStatus = "Error: ${bleState.message}"
+                                pairingStatus = "error"
                             )
                         }
                     }
                     is BleClockSyncService.State.Idle -> {
                         // No action needed
+                    }
+                    is BleClockSyncService.State.Pairing -> {
+                        if (currentPhase == RacePhase.PAIRING) {
+                            _uiState.update { it.copy(pairingStatus = "searching") }
+                        }
+                    }
+                    is BleClockSyncService.State.ClientReady -> {
+                        // Server-side: client ready for notifications, handshake proceeding
                     }
                 }
             }
@@ -212,22 +239,156 @@ class RaceModeViewModel @Inject constructor(
                 handleRemoteMessage(message.payload)
             }
         }
+
+        // Initialize camera early so preview dimensions are available for configureTransform
+        viewModelScope.launch {
+            initializeCamera()
+        }
+    }
+
+    private fun initializeCamera() {
+        if (!cameraManager.initialize()) {
+            _uiState.update {
+                it.copy(cameraState = CameraManager.CameraState.Error("No suitable camera found."))
+            }
+        } else {
+            val previewSize = cameraManager.getPreviewSize()
+            _uiState.update {
+                it.copy(
+                    sensorOrientation = cameraManager.getSensorOrientation(),
+                    previewWidth = previewSize?.width ?: 0,
+                    previewHeight = previewSize?.height ?: 0
+                )
+            }
+        }
     }
 
     // === Role Selection ===
 
     fun selectRole(role: DeviceRole) {
-        _uiState.update { it.copy(role = role, phase = RacePhase.PAIRING) }
-
-        // Start BLE based on role
         when (role) {
             DeviceRole.START -> {
-                // Start phone acts as BLE server (reference clock)
-                clockSyncManager.startAsServer()
+                // Host: generate a session code and create pairing request
+                _uiState.update {
+                    it.copy(
+                        role = role,
+                        isHostingSession = true,
+                        phase = RacePhase.SESSION_CODE,
+                        pairingError = null
+                    )
+                }
+                viewModelScope.launch {
+                    try {
+                        val code = sessionCodeGenerator.generateSessionCode()
+                        sessionId = code
+                        raceEventService.createPairingRequest(code, deviceId, deviceName)
+                        _uiState.update { it.copy(sessionCode = code) }
+                        startPairingWatcher(code)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to generate session code", e)
+                        _uiState.update {
+                            it.copy(
+                                pairingError = e.message ?: "Failed to create session",
+                                phase = RacePhase.ROLE_SELECTION
+                            )
+                        }
+                    }
+                }
             }
             DeviceRole.FINISH -> {
-                // Finish phone acts as BLE client (syncs to start phone)
+                // Joiner: show code entry UI
+                _uiState.update {
+                    it.copy(
+                        role = role,
+                        isHostingSession = false,
+                        phase = RacePhase.SESSION_CODE,
+                        pairingError = null
+                    )
+                }
+            }
+        }
+    }
+
+    // === Session Code Pairing ===
+
+    fun joinSession(code: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(pairingError = null) }
+            try {
+                raceEventService.joinPairingRequest(code, deviceId, deviceName)
+                sessionId = code
+                _uiState.update {
+                    it.copy(
+                        sessionCode = code,
+                        phase = RacePhase.PAIRING
+                    )
+                }
+                // Start BLE scanning as client
                 clockSyncManager.startAsClient()
+                startBleTimeoutFallback()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to join session", e)
+                _uiState.update {
+                    it.copy(pairingError = "Invalid code or session not found")
+                }
+            }
+        }
+    }
+
+    fun clearPairingError() {
+        _uiState.update { it.copy(pairingError = null) }
+    }
+
+    private fun startPairingWatcher(code: String) {
+        pairingWatcherJob?.cancel()
+        pairingWatcherJob = viewModelScope.launch {
+            try {
+                raceEventService.watchPairingRequest(code).collect { dto ->
+                    if (dto.status == "matched") {
+                        val remoteName = if (_uiState.value.isHostingSession) {
+                            dto.joinerDeviceName
+                        } else {
+                            dto.hostDeviceName
+                        }
+                        _uiState.update {
+                            it.copy(
+                                remoteDeviceName = remoteName,
+                                connectedDeviceName = remoteName ?: "Other Device",
+                                phase = RacePhase.PAIRING
+                            )
+                        }
+                        // Host starts BLE advertising after pairing match
+                        if (_uiState.value.isHostingSession) {
+                            clockSyncManager.startAsServer()
+                            startBleTimeoutFallback()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Pairing watcher error (non-critical)", e)
+            }
+        }
+    }
+
+    /**
+     * If BLE connection doesn't complete within 15s after Supabase pairing,
+     * fall back to cloud-only mode using Supabase Realtime.
+     */
+    private fun startBleTimeoutFallback() {
+        bleTimeoutJob?.cancel()
+        bleTimeoutJob = viewModelScope.launch {
+            delay(15_000)
+            val current = _uiState.value
+            if (current.phase == RacePhase.PAIRING && !current.isDeviceConnected) {
+                Log.w(TAG, "BLE timeout - falling back to cloud-only mode")
+                _uiState.update {
+                    it.copy(
+                        phase = RacePhase.RACE_READY,
+                        isCloudOnlyMode = true,
+                        syncUncertaintyMs = 50.0,
+                        syncProgress = 1f
+                    )
+                }
             }
         }
     }
@@ -242,18 +403,7 @@ class RaceModeViewModel @Inject constructor(
         if (!_uiState.value.hasPermission) return
         previewSurface = surface
         frameCount = 0
-
-        if (!cameraManager.initialize()) {
-            _uiState.update {
-                it.copy(cameraState = CameraManager.CameraState.Error("No suitable camera found."))
-            }
-            return
-        }
-        _uiState.update { it.copy(sensorOrientation = cameraManager.getSensorOrientation()) }
-
-        cameraManager.openCamera(surface) { frameData ->
-            processFrame(frameData)
-        }
+        cameraManager.openCamera(surface) { frameData -> processFrame(frameData) }
     }
 
     fun onSurfaceDestroyed() {
@@ -287,11 +437,14 @@ class RaceModeViewModel @Inject constructor(
     // === Session Start ===
 
     fun startSession() {
-        sessionId = UUID.randomUUID().toString()
+        // Use existing sessionId from pairing code if set, otherwise generate new
+        if (sessionId.isBlank()) {
+            sessionId = UUID.randomUUID().toString()
+        }
         _uiState.update {
             it.copy(
                 phase = RacePhase.ACTIVE_RACE,
-                raceStatus = "Waiting for crossing...",
+                raceStatus = "waiting",
                 elapsedTimeSeconds = 0.0,
                 resultTimeSeconds = null,
                 resultUncertaintyMs = null,
@@ -302,6 +455,30 @@ class RaceModeViewModel @Inject constructor(
         localFinishTimeNanos = null
         remoteStartTimeNanos = null
         gateEngine.reset()
+
+        // Subscribe to cloud race events as backup to BLE
+        raceEventSubscriptionJob?.cancel()
+        raceEventSubscriptionJob = viewModelScope.launch {
+            try {
+                raceEventService.subscribeToRaceEvents(sessionId)
+                    .filter { it.deviceId != deviceId }
+                    .collect { event ->
+                        when (event.eventType) {
+                            "start" -> {
+                                if (localStartTimeNanos == null) {
+                                    Log.i(TAG, "Remote start received via cloud relay")
+                                    onRemoteStartReceived(event.crossingTimeNanos)
+                                }
+                            }
+                            "finish" -> {
+                                Log.i(TAG, "Remote finish via cloud: ${event.crossingTimeNanos}")
+                            }
+                        }
+                    }
+            } catch (e: Exception) {
+                Log.w(TAG, "Race event subscription failed (non-critical)", e)
+            }
+        }
     }
 
     // === Crossing Handling ===
@@ -319,7 +496,7 @@ class RaceModeViewModel @Inject constructor(
                 Log.i(TAG, "START crossing detected at $crossingTimeNanos ns")
 
                 _uiState.update {
-                    it.copy(raceStatus = "Runner started! Waiting for finish...")
+                    it.copy(raceStatus = "started")
                 }
 
                 // Start the live timer
@@ -397,7 +574,7 @@ class RaceModeViewModel @Inject constructor(
         Log.i(TAG, "Remote start received: remote=$remoteTimestampNanos, local=$localStartTime")
 
         _uiState.update {
-            it.copy(raceStatus = "Runner started! Waiting for finish...")
+            it.copy(raceStatus = "started")
         }
 
         startTimerTick()
@@ -427,7 +604,7 @@ class RaceModeViewModel @Inject constructor(
                 resultTimeSeconds = splitSeconds,
                 resultUncertaintyMs = totalUncertaintyMs,
                 elapsedTimeSeconds = splitSeconds,
-                raceStatus = "Finished!"
+                raceStatus = "finished"
             )
         }
 
@@ -436,7 +613,7 @@ class RaceModeViewModel @Inject constructor(
             try {
                 sessionRepository.saveRaceResult(
                     distance = _uiState.value.distanceMeters,
-                    startType = "standing",
+                    startType = preConfiguredStartType ?: "standing",
                     timeSeconds = splitSeconds
                 )
                 Log.i(TAG, "Saved race result to local DB")
@@ -496,6 +673,12 @@ class RaceModeViewModel @Inject constructor(
 
     fun resetToRoleSelection() {
         stopTimerTick()
+        raceEventSubscriptionJob?.cancel()
+        raceEventSubscriptionJob = null
+        pairingWatcherJob?.cancel()
+        pairingWatcherJob = null
+        bleTimeoutJob?.cancel()
+        bleTimeoutJob = null
         clockSyncManager.stop()
         gateEngine.stopMotionUpdates()
         gateEngine.reset()
@@ -541,6 +724,9 @@ class RaceModeViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopTimerTick()
+        raceEventSubscriptionJob?.cancel()
+        pairingWatcherJob?.cancel()
+        bleTimeoutJob?.cancel()
         clockSyncManager.stop()
         gateEngine.stopMotionUpdates()
         cameraManager.closeCamera()
@@ -552,6 +738,7 @@ class RaceModeViewModel @Inject constructor(
 
 enum class RacePhase {
     ROLE_SELECTION,
+    SESSION_CODE,
     PAIRING,
     SYNCING,
     RACE_READY,
@@ -559,14 +746,21 @@ enum class RacePhase {
     RESULT
 }
 
-enum class DeviceRole(val label: String, val description: String) {
-    START("Start Phone", "Place at the start line"),
-    FINISH("Finish Phone", "Place at the finish line")
+enum class DeviceRole {
+    START,
+    FINISH
 }
 
 data class RaceModeUiState(
     val phase: RacePhase = RacePhase.ROLE_SELECTION,
     val role: DeviceRole? = null,
+
+    // Session code pairing
+    val sessionCode: String = "",
+    val isHostingSession: Boolean = false,
+    val pairingError: String? = null,
+    val remoteDeviceName: String? = null,
+    val isCloudOnlyMode: Boolean = false,
 
     // Pairing
     val pairingStatus: String = "",
@@ -587,6 +781,8 @@ data class RaceModeUiState(
     val detectionState: PhotoFinishDetector.State = PhotoFinishDetector.State.UNSTABLE,
     val sensorOrientation: Int = 90,
     val isFrontCamera: Boolean = false,
+    val previewWidth: Int = 0,
+    val previewHeight: Int = 0,
 
     // Race
     val distanceMeters: Double = 60.0,

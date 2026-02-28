@@ -39,15 +39,23 @@ import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.billing.SubscriptionManager
 import com.trackspeed.android.data.local.entities.TrainingSessionEntity
 import com.trackspeed.android.data.repository.SessionRepository
+import com.trackspeed.android.data.repository.SettingsRepository
+import com.trackspeed.android.ui.components.BillingIssueBanner
 import com.trackspeed.android.ui.screens.history.SessionHistoryScreen
 import com.trackspeed.android.ui.screens.profile.ProfileScreen
 import com.trackspeed.android.ui.screens.templates.TemplatesScreen
 import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.trackspeed.android.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
@@ -55,11 +63,13 @@ import javax.inject.Inject
 private val CardBackground = Color(0xFF2C2C2E)
 private val NavBarBackground = Color(0xFF1C1C1E)
 private val AccentGreen = Color(0xFF00E676)
+private val AccentBlue = Color(0xFF0A84FF)
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     subscriptionManager: SubscriptionManager,
-    sessionRepository: SessionRepository
+    sessionRepository: SessionRepository,
+    settingsRepository: SettingsRepository
 ) : ViewModel() {
     val isProUser: StateFlow<Boolean> = subscriptionManager.isProUser
 
@@ -70,13 +80,39 @@ class HomeViewModel @Inject constructor(
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = emptyList()
             )
+
+    val totalRunCount: StateFlow<Int> =
+        sessionRepository.getTotalRunCount()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = 0
+            )
+
+    val userName: StateFlow<String> =
+        settingsRepository.userName
+            .map { name ->
+                if (name.isNotBlank()) {
+                    // Extract first name only (matching iOS behavior)
+                    name.split(" ").firstOrNull() ?: name
+                } else {
+                    "" // Empty string signals composable to use default resource
+                }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = ""
+            )
+
+    val isInBillingGracePeriod: StateFlow<Boolean> = subscriptionManager.isInBillingGracePeriod
 }
 
-private enum class HomeTab(val label: String, val icon: ImageVector) {
-    HOME("Home", Icons.Default.Home),
-    TEMPLATES("Templates", Icons.Outlined.Style),
-    HISTORY("History", Icons.Default.Schedule),
-    PROFILE("Profile", Icons.Default.Person)
+private enum class HomeTab(@StringRes val labelRes: Int, val icon: ImageVector) {
+    HOME(R.string.home_tab_home, Icons.Default.Home),
+    TEMPLATES(R.string.home_tab_templates, Icons.Outlined.Style),
+    HISTORY(R.string.home_tab_history, Icons.Default.Schedule),
+    PROFILE(R.string.home_tab_profile, Icons.Default.Person)
 }
 
 @Composable
@@ -87,13 +123,23 @@ fun HomeScreen(
     onHistoryClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onSessionClick: (String) -> Unit = {},
-    onTemplateClick: (Double, String) -> Unit = { _, _ -> },
+    onTemplateClick: (Double, String, Int) -> Unit = { _, _, _ -> },
     onPaywallClick: () -> Unit = {},
     onAthletesClick: () -> Unit = {},
+    onAuthClick: () -> Unit = {},
+    onStatsClick: () -> Unit = {},
+    onReferralClick: () -> Unit = {},
+    onWindAdjustmentClick: () -> Unit = {},
+    onDistanceConverterClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val isProUser by viewModel.isProUser.collectAsStateWithLifecycle()
     val recentSessions by viewModel.recentSessions.collectAsStateWithLifecycle()
+    val totalRunCount by viewModel.totalRunCount.collectAsStateWithLifecycle()
+    val rawUserName by viewModel.userName.collectAsStateWithLifecycle()
+    val defaultName = stringResource(R.string.home_default_user_name)
+    val userName = rawUserName.ifEmpty { defaultName }
+    val isInBillingGracePeriod by viewModel.isInBillingGracePeriod.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(HomeTab.HOME) }
 
     Scaffold(
@@ -111,18 +157,18 @@ fun HomeScreen(
                         icon = {
                             Icon(
                                 imageVector = tab.icon,
-                                contentDescription = tab.label
+                                contentDescription = stringResource(tab.labelRes)
                             )
                         },
                         label = {
                             Text(
-                                text = tab.label,
+                                text = stringResource(tab.labelRes),
                                 fontSize = 10.sp
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF0A84FF),
-                            selectedTextColor = Color(0xFF0A84FF),
+                            selectedIconColor = AccentBlue,
+                            selectedTextColor = AccentBlue,
                             unselectedIconColor = Color(0xFF8E8E93),
                             unselectedTextColor = Color(0xFF8E8E93),
                             indicatorColor = Color.Transparent
@@ -140,14 +186,18 @@ fun HomeScreen(
         ) {
             when (selectedTab) {
                 HomeTab.HOME -> HomeContent(
-                    onSoloModeClick = { onTemplateClick(60.0, "standing") },
-                    onAccelerationClick = { onTemplateClick(10.0, "standing") },
-                    onSprintClick = { onTemplateClick(60.0, "standing") },
-                    onTakeOffClick = { onTemplateClick(20.0, "flying") },
+                    userName = userName,
+                    totalRunCount = totalRunCount,
+                    isInBillingGracePeriod = isInBillingGracePeriod,
+                    onSoloModeClick = { onTemplateClick(60.0, "standing", 2) },
+                    onAccelerationClick = { onTemplateClick(10.0, "standing", 2) },
+                    onSprintClick = { onTemplateClick(60.0, "standing", 2) },
+                    onTakeOffClick = { onTemplateClick(20.0, "flying", 2) },
                     onCustomSessionClick = onBasicModeClick,
-                    onJoinSessionClick = if (isProUser) onClockSyncClick else onPaywallClick,
+                    onJoinSessionClick = onClockSyncClick,
                     onSeeAllClick = { selectedTab = HomeTab.HISTORY },
                     onSessionClick = onSessionClick,
+                    onPaywallClick = onPaywallClick,
                     recentSessions = recentSessions,
                     isProUser = isProUser
                 )
@@ -159,15 +209,37 @@ fun HomeScreen(
                 )
                 HomeTab.PROFILE -> ProfileScreen(
                     onPaywallClick = onPaywallClick,
-                    onAthletesClick = onAthletesClick
+                    onAthletesClick = onAthletesClick,
+                    onSettingsClick = onSettingsClick,
+                    onReferralClick = onReferralClick,
+                    onWindAdjustmentClick = onWindAdjustmentClick,
+                    onDistanceConverterClick = onDistanceConverterClick
                 )
             }
         }
     }
 }
 
+/**
+ * Returns a time-of-day greeting string resource ID matching iOS DashboardHomeView.
+ * Morning: 5-12, Afternoon: 12-17, Evening: 17-5.
+ */
+@StringRes
+private fun getGreetingRes(): Int {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    return when (hour) {
+        in 5..11 -> R.string.home_greeting_morning
+        in 12..16 -> R.string.home_greeting_afternoon
+        in 17..21 -> R.string.home_greeting_evening
+        else -> R.string.home_greeting_default
+    }
+}
+
 @Composable
 private fun HomeContent(
+    userName: String = "",
+    totalRunCount: Int = 0,
+    isInBillingGracePeriod: Boolean = false,
     onSoloModeClick: () -> Unit,
     onAccelerationClick: () -> Unit,
     onSprintClick: () -> Unit,
@@ -176,6 +248,7 @@ private fun HomeContent(
     onJoinSessionClick: () -> Unit,
     onSeeAllClick: () -> Unit,
     onSessionClick: (String) -> Unit = {},
+    onPaywallClick: () -> Unit = {},
     recentSessions: List<TrainingSessionEntity> = emptyList(),
     isProUser: Boolean = false
 ) {
@@ -188,30 +261,45 @@ private fun HomeContent(
     ) {
         Spacer(modifier = Modifier.height(48.dp))
 
-        // Title
+        // Time-of-day greeting (matching iOS DashboardHomeView)
         Text(
-            text = "TrackSpeed",
+            text = stringResource(R.string.home_greeting_with_name, stringResource(getGreetingRes()), userName),
             style = MaterialTheme.typography.headlineLarge.copy(
                 fontWeight = FontWeight.Bold,
-                fontSize = 32.sp
+                fontSize = 28.sp
             ),
-            color = Color.White
+            color = Color.White,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(4.dp))
 
+        // Training run counter
         Text(
-            text = "Precision sprint timing",
+            text = if (totalRunCount == 0) {
+                stringResource(R.string.home_start_first_sprint)
+            } else {
+                pluralStringResource(R.plurals.home_sprints_recorded, totalRunCount, totalRunCount)
+            },
             style = MaterialTheme.typography.bodyLarge,
             color = Color(0xFF8E8E93),
-            textAlign = TextAlign.Center
+            modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(36.dp))
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Billing Issue Banner (dismissible, shown during grace period)
+        if (isInBillingGracePeriod) {
+            BillingIssueBanner(
+                onActionClick = onPaywallClick,
+                onDismiss = {}
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+        }
 
         // QUICK START section header
         Text(
-            text = "QUICK START",
+            text = stringResource(R.string.home_section_quick_start),
             style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.5.sp
@@ -228,16 +316,16 @@ private fun HomeContent(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             ModeCard(
-                title = "Solo Mode",
+                title = stringResource(R.string.home_solo_mode),
                 icon = Icons.Outlined.Sync,
                 iconBackgroundColor = Color(0xFF30D158),
                 onClick = onSoloModeClick,
                 modifier = Modifier.weight(1f)
             )
             ModeCard(
-                title = "10m Acceleration",
+                title = stringResource(R.string.home_10m_acceleration),
                 icon = Icons.Outlined.LocalFireDepartment,
-                iconBackgroundColor = Color(0xFF0A84FF),
+                iconBackgroundColor = AccentBlue,
                 onClick = onAccelerationClick,
                 modifier = Modifier.weight(1f)
             )
@@ -250,14 +338,14 @@ private fun HomeContent(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             ModeCard(
-                title = "60m Sprint",
+                title = stringResource(R.string.home_60m_sprint),
                 icon = Icons.AutoMirrored.Outlined.DirectionsRun,
                 iconBackgroundColor = Color(0xFF8E8E93),
                 onClick = onSprintClick,
                 modifier = Modifier.weight(1f)
             )
             ModeCard(
-                title = "Take Off Velocity",
+                title = stringResource(R.string.home_take_off_velocity),
                 icon = Icons.Outlined.RocketLaunch,
                 iconBackgroundColor = Color(0xFFBF8040),
                 onClick = onTakeOffClick,
@@ -269,21 +357,21 @@ private fun HomeContent(
 
         // Custom Session card (full-width)
         FullWidthActionCard(
-            title = "Custom Session",
-            subtitle = "Configure distance, start type & more",
+            title = stringResource(R.string.home_custom_session),
+            subtitle = stringResource(R.string.home_custom_session_subtitle),
             icon = Icons.Outlined.Tune,
             onClick = onCustomSessionClick
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Join Session card (full-width) - Pro feature
+        // Join Session card (full-width) - free for everyone
         FullWidthActionCard(
-            title = "Join Session",
-            subtitle = "Connect to another phone",
+            title = stringResource(R.string.home_join_session),
+            subtitle = stringResource(R.string.home_join_session_subtitle),
             icon = Icons.Outlined.Groups,
             onClick = onJoinSessionClick,
-            showProBadge = !isProUser
+            showProBadge = false
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -295,16 +383,16 @@ private fun HomeContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Recent Sessions",
+                text = stringResource(R.string.home_recent_sessions),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
                 color = Color.White
             )
             Text(
-                text = "See All",
+                text = stringResource(R.string.home_see_all),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF0A84FF),
+                color = AccentBlue,
                 modifier = Modifier.clickable { onSeeAllClick() }
             )
         }
@@ -324,7 +412,7 @@ private fun HomeContent(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No recent sessions",
+                        text = stringResource(R.string.home_no_recent_sessions),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFF8E8E93)
                     )
@@ -441,7 +529,7 @@ private fun FullWidthActionCard(
                     )
                     if (showProBadge) {
                         Text(
-                            text = "PRO",
+                            text = stringResource(R.string.common_pro_badge),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 9.sp,
