@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 
 @Composable
 fun AttributionStep(
@@ -42,7 +43,7 @@ fun AttributionStep(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(32.dp))
-        Text(stringResource(R.string.onboarding_attribution_title), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.onboarding_attribution_title), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextPrimary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
 
         LazyVerticalGrid(
@@ -55,12 +56,12 @@ fun AttributionStep(
                 OutlinedButton(
                     onClick = { selected = option; onAttributionSelected(option) },
                     modifier = Modifier.height(44.dp),
-                    border = BorderStroke(1.dp, if (selected == option) Color(0xFF0A84FF) else Color(0xFF3A3A3C)),
+                    border = BorderStroke(1.dp, if (selected == option) AccentNavy else BorderSubtle),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = if (selected == option) Color(0xFF0A84FF).copy(alpha = 0.15f) else Color.Transparent
+                        containerColor = if (selected == option) AccentNavy.copy(alpha = 0.15f) else Color.Transparent
                     )
                 ) {
-                    Text(option, color = if (selected == option) Color(0xFF0A84FF) else Color.White, fontSize = 14.sp)
+                    Text(option, color = if (selected == option) AccentNavy else TextPrimary, fontSize = 14.sp)
                 }
             }
         }
@@ -72,9 +73,9 @@ fun AttributionStep(
             label = { Text(stringResource(R.string.onboarding_attribution_promo_label)) },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                focusedBorderColor = Color(0xFF0A84FF), unfocusedBorderColor = Color(0xFF3A3A3C),
-                focusedLabelColor = Color(0xFF0A84FF), unfocusedLabelColor = Color(0xFF8E8E93)
+                focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                focusedBorderColor = AccentNavy, unfocusedBorderColor = BorderSubtle,
+                focusedLabelColor = AccentNavy, unfocusedLabelColor = TextSecondary
             ),
             singleLine = true
         )
@@ -84,7 +85,7 @@ fun AttributionStep(
         Button(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A84FF))
+            colors = ButtonDefaults.buttonColors(containerColor = AccentNavy)
         ) {
             Text(stringResource(R.string.common_continue), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         }

@@ -27,16 +27,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
 import java.util.UUID
 
-private val AccentBlue = Color(0xFF0A84FF)
-private val SuccessGreen = Color(0xFF30D158)
-private val SurfaceColor = Color(0xFF1C1C1E)
+private val AccentBlue = AccentNavy
+private val SuccessGreen = AccentGreen
+private val SurfaceColor = SurfaceDark
 
 // Avatar colors for social proof
 private val avatarColors = listOf(
-    Color(0xFF5C8DB8),
+    AccentNavy,
     Color(0xFF34A47A),
     Color(0xFFEC9732),
     Color(0xFF9333EA)
@@ -109,7 +110,7 @@ fun ReferralStep(
                             text = initial,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = TextPrimary
                         )
                     }
                 }
@@ -139,7 +140,7 @@ fun ReferralStep(
                 text = stringResource(R.string.onboarding_referral_title),
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = TextPrimary
             )
 
             Spacer(Modifier.height(4.dp))
@@ -148,7 +149,7 @@ fun ReferralStep(
                 text = stringResource(R.string.onboarding_referral_subtitle),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color.White
+                color = TextPrimary
             )
 
             Spacer(Modifier.height(8.dp))
@@ -156,7 +157,7 @@ fun ReferralStep(
             Text(
                 text = stringResource(R.string.onboarding_referral_body),
                 fontSize = 15.sp,
-                color = Color(0xFF8E8E93),
+                color = TextSecondary,
                 lineHeight = 22.sp
             )
 
@@ -166,14 +167,14 @@ fun ReferralStep(
             Text(
                 text = stringResource(R.string.onboarding_referral_link_label),
                 fontSize = 12.sp,
-                color = Color(0xFF8E8E93),
+                color = TextSecondary,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(20.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -184,7 +185,7 @@ fun ReferralStep(
                     Text(
                         text = referralLink,
                         fontSize = 14.sp,
-                        color = Color.White,
+                        color = TextPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
@@ -233,7 +234,7 @@ fun ReferralStep(
                 text = stringResource(R.string.onboarding_referral_how_title),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = TextPrimary,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
@@ -269,12 +270,12 @@ fun ReferralStep(
                             text = title,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            color = TextPrimary
                         )
                         Text(
                             text = description,
                             fontSize = 13.sp,
-                            color = Color(0xFF8E8E93)
+                            color = TextSecondary
                         )
                     }
                 }
@@ -287,7 +288,7 @@ fun ReferralStep(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF0A0A0A))
+                .background(BackgroundGradientBottom)
                 .padding(horizontal = 32.dp)
                 .padding(bottom = 32.dp, top = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -323,7 +324,7 @@ fun ReferralStep(
             Spacer(Modifier.height(12.dp))
 
             TextButton(onClick = onSkip) {
-                Text(stringResource(R.string.common_skip), color = Color(0xFF8E8E93), fontSize = 14.sp)
+                Text(stringResource(R.string.common_skip), color = TextSecondary, fontSize = 14.sp)
             }
         }
     }

@@ -13,7 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,12 +20,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.ui.screens.onboarding.steps.*
+import com.trackspeed.android.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
     onComplete: () -> Unit,
     onGuestJoinSession: () -> Unit = {},
+    onSignIn: () -> Unit = {},
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -34,7 +35,7 @@ fun OnboardingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A0A))
+            .gradientBackground()
     ) {
         // Top bar with back button + progress
         if (state.currentStep.showsProgressBar) {
@@ -50,7 +51,7 @@ fun OnboardingScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.common_back),
-                            tint = Color.White
+                            tint = TextPrimary
                         )
                     }
                 } else {
@@ -62,8 +63,8 @@ fun OnboardingScreen(
                         .weight(1f)
                         .height(4.dp)
                         .padding(horizontal = 8.dp),
-                    color = Color(0xFF0A84FF),
-                    trackColor = Color(0xFF2C2C2E)
+                    color = AccentNavy,
+                    trackColor = SurfaceDark
                 )
                 Spacer(Modifier.width(48.dp))
             }
@@ -84,7 +85,7 @@ fun OnboardingScreen(
                 OnboardingStep.WELCOME -> WelcomeStep(
                     onGetStarted = { viewModel.goForward() },
                     onJoinSession = onGuestJoinSession,
-                    onSignIn = { viewModel.goToStep(OnboardingStep.AUTH) }
+                    onSignIn = onSignIn
                 )
                 OnboardingStep.VALUE_PROPOSITION -> ValuePropositionStep(
                     onContinue = { viewModel.goForward() }
@@ -111,7 +112,8 @@ fun OnboardingScreen(
                     goalTime = state.profile.goalTime,
                     onPersonalRecordChanged = { viewModel.setPersonalRecord(it) },
                     onGoalTimeChanged = { viewModel.setGoalTime(it) },
-                    onContinue = { viewModel.goForward() }
+                    onContinue = { viewModel.goForward() },
+                    flyingDistance = state.profile.flyingDistance
                 )
                 OnboardingStep.GOAL_MOTIVATION -> GoalMotivationStep(
                     personalRecord = state.profile.personalRecord,

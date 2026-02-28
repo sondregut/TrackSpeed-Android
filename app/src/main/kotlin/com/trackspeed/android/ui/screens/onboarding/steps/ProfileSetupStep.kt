@@ -11,7 +11,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -19,9 +18,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = Color(0xFF0A84FF)
-private val SurfaceColor = Color(0xFF1C1C1E)
+private val AccentBlue = AccentNavy
+private val SurfaceColor = SurfaceDark
 
 @Composable
 fun ProfileSetupStep(
@@ -59,7 +59,7 @@ fun ProfileSetupStep(
             text = stringResource(R.string.onboarding_profile_title),
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = TextPrimary,
             textAlign = TextAlign.Center
         )
 
@@ -68,7 +68,7 @@ fun ProfileSetupStep(
         Text(
             text = stringResource(R.string.onboarding_profile_subtitle),
             fontSize = 15.sp,
-            color = Color(0xFF8E8E93),
+            color = TextSecondary,
             textAlign = TextAlign.Center
         )
 
@@ -82,22 +82,22 @@ fun ProfileSetupStep(
             Text(
                 text = stringResource(R.string.onboarding_profile_name_label),
                 fontSize = 13.sp,
-                color = Color(0xFF8E8E93),
+                color = TextSecondary,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
             OutlinedTextField(
                 value = displayName,
                 onValueChange = onDisplayNameChanged,
-                placeholder = { Text(stringResource(R.string.onboarding_profile_name_placeholder), color = Color(0xFF48484A)) },
+                placeholder = { Text(stringResource(R.string.onboarding_profile_name_placeholder), color = TextMuted) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { isNameFocused = it.isFocused },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
                     focusedBorderColor = AccentBlue,
-                    unfocusedBorderColor = Color(0xFF3A3A3C),
+                    unfocusedBorderColor = BorderSubtle,
                     focusedContainerColor = SurfaceColor,
                     unfocusedContainerColor = SurfaceColor,
                     cursorColor = AccentBlue
@@ -108,7 +108,7 @@ fun ProfileSetupStep(
                     Icon(
                         Icons.Default.Person,
                         contentDescription = null,
-                        tint = Color(0xFF8E8E93),
+                        tint = TextSecondary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -125,22 +125,22 @@ fun ProfileSetupStep(
             Text(
                 text = stringResource(R.string.onboarding_profile_team_label),
                 fontSize = 13.sp,
-                color = Color(0xFF8E8E93),
+                color = TextSecondary,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
             OutlinedTextField(
                 value = teamName,
                 onValueChange = onTeamNameChanged,
-                placeholder = { Text(stringResource(R.string.onboarding_profile_team_placeholder), color = Color(0xFF48484A)) },
+                placeholder = { Text(stringResource(R.string.onboarding_profile_team_placeholder), color = TextMuted) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { isTeamFocused = it.isFocused },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
                     focusedBorderColor = AccentBlue,
-                    unfocusedBorderColor = Color(0xFF3A3A3C),
+                    unfocusedBorderColor = BorderSubtle,
                     focusedContainerColor = SurfaceColor,
                     unfocusedContainerColor = SurfaceColor,
                     cursorColor = AccentBlue

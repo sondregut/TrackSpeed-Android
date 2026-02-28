@@ -53,6 +53,16 @@ class GateEngine @Inject constructor(
     private val _gatePosition = MutableStateFlow(0.5f)
     val gatePosition: StateFlow<Float> = _gatePosition.asStateFlow()
 
+    // Temporary frame data reference (only valid during processFrame call)
+    private var _currentYPlane: ByteArray? = null
+    private var _currentWidth: Int = 0
+    private var _currentHeight: Int = 0
+    private var _currentRowStride: Int = 0
+
+    // Last crossing thumbnail (captured synchronously in crossing callback)
+    var lastCrossingThumbnail: Bitmap? = null
+        private set
+
     enum class EngineState {
         READY,         // Photo Finish doesn't need calibration
         ARMED,
@@ -63,6 +73,9 @@ class GateEngine @Inject constructor(
     init {
         // Wire up crossing callback
         detector.onCrossingDetected = { adjustedPts, detectionPts, monotonicNanos, frameNumber, chestPositionNormalized ->
+            // Capture thumbnail from current frame data (still valid during this synchronous callback)
+            lastCrossingThumbnail = captureGrayscaleThumbnail()
+
             // Mark crossing in composite buffer
             compositeBuffer?.markCrossing()
 
@@ -127,6 +140,12 @@ class GateEngine @Inject constructor(
         }
         composite.addSlit(yPlane, width, height, rowStride, _gatePosition.value, ptsNanos)
 
+        // Store frame reference for thumbnail capture during crossing callback
+        _currentYPlane = yPlane
+        _currentWidth = width
+        _currentHeight = height
+        _currentRowStride = rowStride
+
         val result = detector.processFrame(
             yPlane = yPlane,
             width = width,
@@ -135,6 +154,9 @@ class GateEngine @Inject constructor(
             frameNumber = frameNumber,
             ptsNanos = ptsNanos
         )
+
+        // Clear reference after processing (buffer may be recycled by camera framework)
+        _currentYPlane = null
 
         // Update UI state
         _detectionState.value = result.state
@@ -167,7 +189,36 @@ class GateEngine @Inject constructor(
         detector.reset()
         compositeBuffer?.reset()
         compositeBuffer?.startRecording()
+        lastCrossingThumbnail = null
         _engineState.value = EngineState.READY
+    }
+
+    /**
+     * Capture a scaled-down grayscale thumbnail from current Y-plane data.
+     * Only valid during processFrame (called synchronously from crossing callback).
+     */
+    private fun captureGrayscaleThumbnail(): Bitmap? {
+        val yPlane = _currentYPlane ?: return null
+        val w = _currentWidth
+        val h = _currentHeight
+        val stride = _currentRowStride
+
+        // Scale down 4x for thumbnail
+        val scale = 4
+        val thumbW = w / scale
+        val thumbH = h / scale
+        if (thumbW <= 0 || thumbH <= 0) return null
+
+        val bitmap = Bitmap.createBitmap(thumbW, thumbH, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(thumbW * thumbH)
+        for (y in 0 until thumbH) {
+            for (x in 0 until thumbW) {
+                val lum = yPlane[(y * scale) * stride + (x * scale)].toInt() and 0xFF
+                pixels[y * thumbW + x] = (0xFF shl 24) or (lum shl 16) or (lum shl 8) or lum
+            }
+        }
+        bitmap.setPixels(pixels, 0, thumbW, 0, 0, thumbW, thumbH)
+        return bitmap
     }
 
     /**

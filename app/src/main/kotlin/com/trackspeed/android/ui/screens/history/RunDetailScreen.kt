@@ -75,6 +75,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.components.ExpandedThumbnail
 import com.trackspeed.android.ui.components.ThumbnailViewerDialog
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.TextPrimary as ThemeTextPrimary
+import com.trackspeed.android.ui.theme.TextSecondary as ThemeTextSecondary
+import com.trackspeed.android.ui.theme.SurfaceDark
+import com.trackspeed.android.ui.theme.gradientBackground
+import com.trackspeed.android.ui.theme.gunmetalCard
 import com.trackspeed.android.ui.util.formatTime
 import com.trackspeed.android.ui.util.parseAthleteColor
 import java.io.File
@@ -82,14 +88,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val ScreenBackground = Color(0xFF000000)
-private val CardBackground = Color(0xFF2C2C2E)
-private val TopBarBackground = Color(0xFF1C1C1E)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
+private val TextPrimary = ThemeTextPrimary
+private val TextSecondary = ThemeTextSecondary
 private val BestGreen = Color(0xFF4CAF50)
 private val SeasonGold = Color(0xFFFFD600)
-private val AccentBlue = Color(0xFF0A84FF)
+private val AccentBlue = AccentNavy
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -136,7 +139,7 @@ fun RunDetailScreen(
                     Text(stringResource(R.string.common_cancel))
                 }
             },
-            containerColor = CardBackground,
+            containerColor = SurfaceDark,
             titleContentColor = TextPrimary,
             textContentColor = TextSecondary
         )
@@ -155,7 +158,8 @@ fun RunDetailScreen(
     }
 
     Scaffold(
-        containerColor = ScreenBackground,
+        containerColor = Color.Transparent,
+        modifier = Modifier.gradientBackground(),
         topBar = {
             TopAppBar(
                 title = {
@@ -186,7 +190,7 @@ fun RunDetailScreen(
                         DropdownMenu(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false },
-                            containerColor = CardBackground
+                            containerColor = SurfaceDark
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.run_detail_edit_distance), color = TextPrimary) },
@@ -206,7 +210,7 @@ fun RunDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = TopBarBackground,
+                    containerColor = SurfaceDark,
                     titleContentColor = TextPrimary,
                     navigationIconContentColor = TextPrimary
                 )
@@ -217,7 +221,6 @@ fun RunDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(ScreenBackground)
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
@@ -231,7 +234,6 @@ fun RunDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(ScreenBackground)
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
@@ -247,7 +249,6 @@ fun RunDetailScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(ScreenBackground)
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -363,9 +364,11 @@ private fun MainStatsCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+        modifier = Modifier
+            .fillMaxWidth()
+            .gunmetalCard(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
         Column(
             modifier = Modifier
@@ -509,9 +512,11 @@ private fun GateImagesGallery(
     val currentBitmap = bitmap
     if (currentBitmap != null) {
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground)
+            modifier = Modifier
+                .fillMaxWidth()
+                .gunmetalCard(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
         ) {
             Column(
                 modifier = Modifier
@@ -602,9 +607,11 @@ private fun InfoCard(
     val dateFormat = SimpleDateFormat("EEEE, MMM d, yyyy  HH:mm", Locale.getDefault())
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+        modifier = Modifier
+            .fillMaxWidth()
+            .gunmetalCard(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
         Column(
             modifier = Modifier
@@ -679,7 +686,7 @@ private fun EditDistanceSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = CardBackground
+        containerColor = SurfaceDark
     ) {
         Column(
             modifier = Modifier

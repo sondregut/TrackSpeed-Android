@@ -2,6 +2,7 @@ package com.trackspeed.android.ui.screens.templates
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,11 +45,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 
-private val CardBackground = Color(0xFF2C2C2E)
-private val SecondaryText = Color(0xFF8E8E93)
-private val AccentBlue = Color(0xFF0A84FF)
+private val AccentBlue = AccentNavy
 private val AccentGreen = Color(0xFF30D158)
 private val AccentOrange = Color(0xFFFF9500)
 private val AccentPurple = Color(0xFFAF52DE)
@@ -225,7 +224,7 @@ fun TemplatesScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF000000))
+            .gradientBackground()
             .padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
@@ -238,13 +237,13 @@ fun TemplatesScreen(
                     fontWeight = FontWeight.Bold,
                     fontSize = 32.sp
                 ),
-                color = Color.White
+                color = TextPrimary
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "Pre-configured workout setups",
                 style = MaterialTheme.typography.bodyLarge,
-                color = SecondaryText
+                color = TextSecondary
             )
             Spacer(modifier = Modifier.height(32.dp))
         }
@@ -299,7 +298,7 @@ private fun SectionHeader(title: String) {
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.5.sp
         ),
-        color = SecondaryText
+        color = TextSecondary
     )
 }
 
@@ -311,11 +310,11 @@ private fun TemplateCard(
 ) {
     val accentColor = template.category.accentColor()
 
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .gunmetalCard()
+            .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
@@ -348,7 +347,7 @@ private fun TemplateCard(
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
-                    color = Color.White,
+                    color = TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -369,7 +368,7 @@ private fun TemplateCard(
                 Text(
                     text = template.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = SecondaryText,
+                    color = TextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -381,7 +380,7 @@ private fun TemplateCard(
             Icon(
                 imageVector = Icons.Outlined.ChevronRight,
                 contentDescription = "Start template",
-                tint = Color(0xFF48484A),
+                tint = TextMuted,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -419,14 +418,14 @@ private fun StartTypeBadge(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(6.dp),
-        color = Color(0xFF3A3A3C)
+        color = BorderSubtle
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 11.sp
             ),
-            color = SecondaryText,
+            color = TextSecondary,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
         )
     }
@@ -436,10 +435,10 @@ private fun StartTypeBadge(
 private fun AddTemplateCard(
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .gunmetalCard()
     ) {
         Row(
             modifier = Modifier
@@ -471,13 +470,13 @@ private fun AddTemplateCard(
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
-                    color = Color.White
+                    color = TextPrimary
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Create a custom workout template",
                     style = MaterialTheme.typography.bodySmall,
-                    color = SecondaryText
+                    color = TextSecondary
                 )
             }
 

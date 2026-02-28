@@ -47,18 +47,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.TextPrimary as ThemeTextPrimary
+import com.trackspeed.android.ui.theme.TextSecondary as ThemeTextSecondary
+import com.trackspeed.android.ui.theme.SurfaceDark
+import com.trackspeed.android.ui.theme.BorderSubtle
+import com.trackspeed.android.ui.theme.gradientBackground
+import com.trackspeed.android.ui.theme.gunmetalCard
+import com.trackspeed.android.ui.theme.GunmetalCardBottom
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-private val ScreenBackground = Color(0xFF000000)
-private val CardBackground = Color(0xFF2C2C2E)
-private val ChipUnselected = Color(0xFF1C1C1E)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
-private val AccentBlue = Color(0xFF0A84FF)
+private val TextPrimary = ThemeTextPrimary
+private val TextSecondary = ThemeTextSecondary
+private val AccentBlue = AccentNavy
 private val ChartGreen = Color(0xFF30D158)
-private val TopBarBackground = Color(0xFF1C1C1E)
-private val ChipBorder = Color(0xFF38383A)
+private val ChipUnselected = SurfaceDark
+private val ChipBorder = BorderSubtle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,7 +74,8 @@ fun StatsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        containerColor = ScreenBackground,
+        containerColor = Color.Transparent,
+        modifier = Modifier.gradientBackground(),
         topBar = {
             TopAppBar(
                 title = {
@@ -88,7 +94,7 @@ fun StatsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = TopBarBackground,
+                    containerColor = SurfaceDark,
                     titleContentColor = TextPrimary,
                     navigationIconContentColor = TextPrimary
                 )
@@ -175,9 +181,11 @@ fun StatsScreen(
                     )
                 } else if (state.progressPoints.size == 1) {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = CardBackground)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .gunmetalCard(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
                     ) {
                         Box(
                             modifier = Modifier
@@ -249,9 +257,11 @@ private fun SummaryStatsCard(
     totalSessions: Int
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+        modifier = Modifier
+            .fillMaxWidth()
+            .gunmetalCard(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
         Row(
             modifier = Modifier
@@ -327,9 +337,9 @@ private fun ProgressChart(
     val yMax = maxTime + yPadding
 
     Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+        modifier = modifier.gunmetalCard(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
         Canvas(
             modifier = Modifier
@@ -343,8 +353,14 @@ private fun ProgressChart(
             val chartWidth = chartRight - chartLeft
             val chartHeight = chartBottom - chartTop
 
+            val textPaintColor = android.graphics.Color.argb(
+                (TextSecondary.alpha * 255).toInt(),
+                (TextSecondary.red * 255).toInt(),
+                (TextSecondary.green * 255).toInt(),
+                (TextSecondary.blue * 255).toInt()
+            )
             val textPaint = android.graphics.Paint().apply {
-                color = 0xFF8E8E93.toInt()
+                color = textPaintColor
                 textSize = 28f
                 isAntiAlias = true
             }
@@ -360,7 +376,7 @@ private fun ProgressChart(
 
                 // Grid line
                 drawLine(
-                    color = Color(0xFF38383A),
+                    color = BorderSubtle,
                     start = Offset(chartLeft, y),
                     end = Offset(chartRight, y),
                     strokeWidth = 1f
@@ -378,7 +394,7 @@ private fun ProgressChart(
 
             // Draw X-axis labels
             val xLabelPaint = android.graphics.Paint().apply {
-                color = 0xFF8E8E93.toInt()
+                color = textPaintColor
                 textSize = 26f
                 isAntiAlias = true
                 textAlign = android.graphics.Paint.Align.CENTER
@@ -442,7 +458,7 @@ private fun ProgressChart(
                     )
                     // Inner circle
                     drawCircle(
-                        color = CardBackground,
+                        color = GunmetalCardBottom,
                         radius = 3f,
                         center = point
                     )

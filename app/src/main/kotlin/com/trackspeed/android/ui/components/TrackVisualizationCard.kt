@@ -23,13 +23,16 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.BorderSubtle
+import com.trackspeed.android.ui.theme.SurfaceDark
+import com.trackspeed.android.ui.theme.TextPrimary
+import com.trackspeed.android.ui.theme.TextSecondary
 
-private val CardBackground = Color(0xFF2C2C2E)
-private val TrackColor = Color(0xFF48484A)
+private val TrackColor = BorderSubtle
 private val StartGreen = Color(0xFF30D158)
 private val FinishAmber = Color(0xFFFFAB00)
-private val SplitBlue = Color(0xFF0A84FF)
-private val TextSecondary = Color(0xFF8E8E93)
+private val SplitBlue = AccentNavy
 
 /**
  * Gate marker data for the track visualization.
@@ -64,8 +67,8 @@ fun TrackVisualizationCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Column(
             modifier = Modifier
@@ -219,7 +222,7 @@ fun TrackVisualizationCard(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color.White
+                        color = TextPrimary
                     )
                 }
             }

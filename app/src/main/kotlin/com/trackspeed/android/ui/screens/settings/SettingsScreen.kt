@@ -37,16 +37,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.BuildConfig
 import com.trackspeed.android.R
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 
-private val ScreenBackground = Color(0xFF000000)
-private val CardBackground = Color(0xFF2C2C2E)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
-private val TextTertiary = Color(0xFF636366)
-private val DividerColor = Color(0xFF38383A)
-private val AccentBlue = Color(0xFF0A84FF)
-private val AccentGreen = Color(0xFF00E676)
+private val CardBackground = SurfaceDark
+private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
+private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
+private val TextTertiary = TextMuted
+private val DividerColor = BorderSubtle
+private val AccentBlue = AccentNavy
+private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
 private val DestructiveRed = Color(0xFFFF3B30)
 
 /**
@@ -143,7 +142,7 @@ private fun SettingsScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(ScreenBackground)
+            .gradientBackground()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
     ) {
@@ -829,10 +828,10 @@ private fun SettingsScreenContent(
         // Data Management section
         SectionHeader(stringResource(R.string.settings_section_data))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .gunmetalCard()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -904,7 +903,7 @@ private fun SettingsScreenContent(
                     Text(stringResource(R.string.common_cancel), color = AccentBlue)
                 }
             },
-            containerColor = CardBackground,
+            containerColor = SurfaceDark,
             titleContentColor = TextPrimary,
             textContentColor = TextSecondary
         )

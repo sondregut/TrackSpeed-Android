@@ -28,8 +28,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val AccentGreen = Color(0xFF00E676)
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.SurfaceDark
+import com.trackspeed.android.ui.theme.TextPrimary
+import com.trackspeed.android.ui.theme.TextSecondary
 
 /**
  * A reusable dialog shown when a user tries to access a Pro-only feature.
@@ -48,12 +50,12 @@ fun ProFeatureGateDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF2C2C2E),
+        containerColor = SurfaceDark,
         icon = {
             Icon(
                 imageVector = Icons.Default.Lock,
                 contentDescription = null,
-                tint = AccentGreen,
+                tint = AccentNavy,
                 modifier = Modifier.size(32.dp)
             )
         },
@@ -65,7 +67,7 @@ fun ProFeatureGateDialog(
                 ) {
                     Text(
                         text = featureName,
-                        color = Color.White,
+                        color = TextPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
@@ -77,10 +79,10 @@ fun ProFeatureGateDialog(
                             fontSize = 9.sp,
                             letterSpacing = 0.5.sp
                         ),
-                        color = Color.Black,
+                        color = Color.White,
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(AccentGreen)
+                            .background(AccentNavy)
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
@@ -89,7 +91,7 @@ fun ProFeatureGateDialog(
         text = {
             Text(
                 text = featureDescription,
-                color = Color(0xFF8E8E93),
+                color = TextSecondary,
                 style = MaterialTheme.typography.bodyMedium
             )
         },
@@ -97,8 +99,8 @@ fun ProFeatureGateDialog(
             Button(
                 onClick = onUpgrade,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentGreen,
-                    contentColor = Color.Black
+                    containerColor = AccentNavy,
+                    contentColor = Color.White
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -112,7 +114,7 @@ fun ProFeatureGateDialog(
             TextButton(onClick = onDismiss) {
                 Text(
                     text = "Cancel",
-                    color = Color(0xFF8E8E93)
+                    color = TextSecondary
                 )
             }
         }

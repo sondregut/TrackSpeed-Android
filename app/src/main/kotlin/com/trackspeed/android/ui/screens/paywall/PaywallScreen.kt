@@ -61,13 +61,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.R
 import com.trackspeed.android.billing.ProFeature
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
 
-private val AccentGreen = Color(0xFF00E676)
-private val CardBackground = Color(0xFF2C2C2E)
-private val TextSecondary = Color(0xFF8E8E93)
-private val TextMuted = Color(0xFF636366)
+private val PrimaryAccent = AccentNavy
+private val CardBackground = SurfaceDark
+private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
+private val TextMuted = com.trackspeed.android.ui.theme.TextMuted
 private val SuccessGreen = Color(0xFF30D158)
 private val ErrorRed = Color(0xFFFF5252)
 
@@ -145,7 +145,7 @@ private fun PaywallContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .gradientBackground()
     ) {
         // Scrollable content
         Column(
@@ -176,8 +176,8 @@ private fun PaywallContent(
                                 colors = listOf(
                                     Color.Transparent,
                                     Color.Transparent,
-                                    Color.Black.copy(alpha = 0.8f),
-                                    Color.Black
+                                    BackgroundGradientTop.copy(alpha = 0.8f),
+                                    BackgroundGradientTop
                                 )
                             )
                         )
@@ -196,7 +196,7 @@ private fun PaywallContent(
                         modifier = Modifier
                             .size(28.dp)
                             .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.4f))
+                            .background(BackgroundDark.copy(alpha = 0.4f))
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -265,7 +265,7 @@ private fun PaywallContent(
                     .height(32.dp)
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black)
+                            colors = listOf(Color.Transparent, BackgroundGradientBottom)
                         )
                     )
             )
@@ -273,7 +273,7 @@ private fun PaywallContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.Black)
+                    .background(BackgroundGradientBottom)
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -307,7 +307,7 @@ private fun PaywallContent(
                     Text(
                         text = "No commitment, cancel anytime",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White
+                        color = TextPrimary
                     )
                 }
 
@@ -323,16 +323,16 @@ private fun PaywallContent(
                         .fillMaxWidth()
                         .height(56.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AccentGreen,
-                        contentColor = Color.Black,
-                        disabledContainerColor = AccentGreen.copy(alpha = 0.4f)
+                        containerColor = PrimaryAccent,
+                        contentColor = Color.White,
+                        disabledContainerColor = PrimaryAccent.copy(alpha = 0.4f)
                     ),
                     shape = RoundedCornerShape(28.dp),
                     enabled = purchaseState !is PurchaseState.Loading && !isLoadingOfferings
                 ) {
                     if (purchaseState is PurchaseState.Loading) {
                         CircularProgressIndicator(
-                            color = Color.Black,
+                            color = Color.White,
                             modifier = Modifier.size(24.dp),
                             strokeWidth = 2.5.dp
                         )
@@ -463,7 +463,7 @@ private fun FeatureRow(
         Icon(
             imageVector = Icons.Default.CheckCircle,
             contentDescription = null,
-            tint = AccentGreen,
+            tint = PrimaryAccent,
             modifier = Modifier.size(28.dp)
         )
 
@@ -475,7 +475,7 @@ private fun FeatureRow(
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
-                color = Color.White
+                color = TextPrimary
             )
             Text(
                 text = description,
@@ -506,7 +506,7 @@ private fun AllPlansSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF1C1C1E),
+        containerColor = SurfaceDark,
         dragHandle = {
             Box(
                 modifier = Modifier
@@ -514,7 +514,7 @@ private fun AllPlansSheet(
                     .width(36.dp)
                     .height(4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(Color(0xFF48484A))
+                    .background(TextMuted)
             )
         }
     ) {
@@ -533,7 +533,7 @@ private fun AllPlansSheet(
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                color = Color.White
+                color = TextPrimary
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -597,16 +597,16 @@ private fun AllPlansSheet(
                     .fillMaxWidth()
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentGreen,
-                    contentColor = Color.Black,
-                    disabledContainerColor = AccentGreen.copy(alpha = 0.4f)
+                    containerColor = PrimaryAccent,
+                    contentColor = Color.White,
+                    disabledContainerColor = PrimaryAccent.copy(alpha = 0.4f)
                 ),
                 shape = RoundedCornerShape(28.dp),
                 enabled = purchaseState !is PurchaseState.Loading
             ) {
                 if (purchaseState is PurchaseState.Loading) {
                     CircularProgressIndicator(
-                        color = Color.Black,
+                        color = Color.White,
                         modifier = Modifier.size(24.dp),
                         strokeWidth = 2.5.dp
                     )
@@ -679,13 +679,13 @@ private fun AllPlansPlanCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(CardBackground)
             .then(
                 if (isSelected) {
                     Modifier.border(
-                        border = BorderStroke(2.dp, AccentGreen),
-                        shape = RoundedCornerShape(16.dp)
+                        border = BorderStroke(2.dp, PrimaryAccent),
+                        shape = RoundedCornerShape(20.dp)
                     )
                 } else Modifier
             )
@@ -694,13 +694,20 @@ private fun AllPlansPlanCard(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Selection indicator
-        Icon(
-            imageVector = if (isSelected) Icons.Default.CheckCircle
-            else Icons.Default.CheckCircle,
-            contentDescription = if (isSelected) "Selected" else "Not selected",
-            tint = if (isSelected) AccentGreen else TextMuted,
-            modifier = Modifier.size(24.dp)
-        )
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = "Selected",
+                tint = PrimaryAccent,
+                modifier = Modifier.size(24.dp)
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .border(1.5.dp, TextMuted, CircleShape)
+            )
+        }
 
         Spacer(modifier = Modifier.width(14.dp))
 
@@ -711,7 +718,7 @@ private fun AllPlansPlanCard(
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
-                color = Color.White
+                color = TextPrimary
             )
             if (subtitle != null) {
                 Text(
@@ -729,7 +736,7 @@ private fun AllPlansPlanCard(
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                color = Color.White
+                color = TextPrimary
             )
             Text(
                 text = trailingLabel,
@@ -760,7 +767,7 @@ private fun PaywallScreenPreview() {
                 type = PlanType.YEARLY,
                 priceDisplay = "$49.99",
                 periodDisplay = "year",
-                monthlyEquivalent = "$4.17/mo",
+                monthlyEquivalent = "$4.17",
                 savingsPercent = 54
             ),
             onClose = {},

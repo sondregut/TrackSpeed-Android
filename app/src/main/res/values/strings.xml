@@ -469,23 +469,23 @@
     <string name="onboarding_welcome_join_session">Join Session</string>
 
     <!-- Onboarding: How It Works Step -->
-    <string name="onboarding_howitworks_title">How It Works</string>
+    <string name="onboarding_howitworks_title">Get started in under a minute</string>
     <string name="onboarding_howitworks_step1_label">Step 1</string>
-    <string name="onboarding_howitworks_step1_title">Connect</string>
-    <string name="onboarding_howitworks_step1_description">Set up one or two phones at the track</string>
+    <string name="onboarding_howitworks_step1_title">Connect phones</string>
+    <string name="onboarding_howitworks_step1_description">Pair phones, auto sync over Bluetooth</string>
     <string name="onboarding_howitworks_step2_label">Step 2</string>
-    <string name="onboarding_howitworks_step2_title">Start</string>
-    <string name="onboarding_howitworks_step2_description">Begin timing with a tap or voice command</string>
+    <string name="onboarding_howitworks_step2_title">Start your session</string>
+    <string name="onboarding_howitworks_step2_description">Five start methods: flying start, touch release, countdown</string>
     <string name="onboarding_howitworks_step3_label">Step 3</string>
-    <string name="onboarding_howitworks_step3_title">Position</string>
-    <string name="onboarding_howitworks_step3_description">Camera detects the runner crossing the line</string>
+    <string name="onboarding_howitworks_step3_title">Position your phone</string>
+    <string name="onboarding_howitworks_step3_description">Place at finish line, no calibration needed</string>
     <string name="onboarding_howitworks_step4_label">Step 4</string>
-    <string name="onboarding_howitworks_step4_title">Get Time</string>
-    <string name="onboarding_howitworks_step4_description">Instant photo-finish accurate results</string>
+    <string name="onboarding_howitworks_step4_title">Get your time</string>
+    <string name="onboarding_howitworks_step4_description">Instant millisecond-accurate results</string>
 
     <!-- Onboarding: Value Proposition Step -->
-    <string name="onboarding_value_title">Photo Finish Precision</string>
-    <string name="onboarding_value_description">Get millisecond-accurate sprint times using your phone\'s camera — no expensive equipment needed.</string>
+    <string name="onboarding_value_subtitle">Turn your phone into a</string>
+    <string name="onboarding_value_title">professional sprint timer</string>
     <string name="onboarding_value_image_description">Photo Finish</string>
 
     <!-- Onboarding: Competitor Comparison Step -->
@@ -532,29 +532,30 @@
     <string name="onboarding_athlete_event_placeholder">Select your event</string>
 
     <!-- Onboarding: Flying Time Step -->
-    <string name="onboarding_flying_title">Flying Sprint</string>
-    <string name="onboarding_flying_subtitle">What\'s your flying time?</string>
-    <string name="onboarding_flying_time_label">Time (seconds)</string>
+    <string name="onboarding_flying_title">What\'s your flying time?</string>
+    <string name="onboarding_flying_subtitle">Enter your best time for a flying sprint</string>
+    <string name="onboarding_flying_distance_label">Distance</string>
+    <string name="onboarding_flying_time_label">Your best time</string>
     <string name="onboarding_flying_speed_format">That\'s %1$.1f m/s (%2$.1f km/h)</string>
 
     <!-- Onboarding: Goal Time Step -->
-    <string name="onboarding_goal_title">Set Your Goal</string>
-    <string name="onboarding_goal_subtitle_event">Your %s times</string>
-    <string name="onboarding_goal_subtitle_default">Enter your times</string>
+    <string name="onboarding_goal_title">What\'s your goal?</string>
+    <string name="onboarding_goal_subtitle_event">Set a target time for your %s flying sprint</string>
+    <string name="onboarding_goal_subtitle_default">Set a target time for your flying sprint</string>
     <string name="onboarding_goal_pr_label">Current Personal Record (s)</string>
-    <string name="onboarding_goal_time_label">Goal Time (s)</string>
+    <string name="onboarding_goal_time_label">Goal time</string>
 
     <!-- Onboarding: Goal Motivation Step -->
-    <string name="onboarding_motivation_title">Your Journey</string>
-    <string name="onboarding_motivation_subtitle">TrackSpeed will help you get there</string>
+    <string name="onboarding_motivation_title">Great goal!</string>
+    <string name="onboarding_motivation_subtitle">Track your progress over time</string>
     <string name="onboarding_motivation_current">Current: %ss</string>
     <string name="onboarding_motivation_goal">Goal: %ss</string>
     <string name="onboarding_motivation_improvement">Improvement: %ss</string>
     <string name="onboarding_motivation_empty">Set your PR and goal time\nto see your journey</string>
 
     <!-- Onboarding: Start Types Step -->
-    <string name="onboarding_starttypes_title">Start Types</string>
-    <string name="onboarding_starttypes_subtitle">Multiple ways to start your sprint</string>
+    <string name="onboarding_starttypes_title">Five ways to start</string>
+    <string name="onboarding_starttypes_subtitle">Choose the method that fits your training</string>
     <string name="onboarding_starttypes_touch_name">Touch Release</string>
     <string name="onboarding_starttypes_touch_desc">Hands on ground \u2014 timer starts when you lift off</string>
     <string name="onboarding_starttypes_countdown_name">Countdown</string>
@@ -567,10 +568,17 @@
     <string name="onboarding_starttypes_auto_desc">Camera detects motion to start timing</string>
 
     <!-- Onboarding: Multi-Device Step -->
-    <string name="onboarding_multidevice_title">Multi-Device Timing</string>
-    <string name="onboarding_multidevice_description">Use two phones for separate start and finish gates \u2014 wirelessly synced for precision timing.</string>
-    <string name="onboarding_multidevice_wireless">Wireless</string>
-    <string name="onboarding_multidevice_clock_synced">Clock Synced</string>
+    <string name="onboarding_multidevice_title">Connect multiple phones</string>
+    <string name="onboarding_multidevice_subtitle">Measure splits at any distance</string>
+    <string name="onboarding_multidevice_bluetooth">Bluetooth</string>
+    <string name="onboarding_multidevice_bluetooth_subtitle">No internet needed</string>
+    <string name="onboarding_multidevice_synced">Synced</string>
+    <string name="onboarding_multidevice_synced_subtitle">\u00b13\u20135ms accuracy</string>
+    <string name="onboarding_multidevice_track_layout">TRACK LAYOUT</string>
+    <string name="onboarding_multidevice_phones_badge">3 phones</string>
+    <string name="onboarding_multidevice_start">START</string>
+    <string name="onboarding_multidevice_lap">LAP</string>
+    <string name="onboarding_multidevice_finish">FINISH</string>
 
     <!-- Onboarding: Track Progress Step -->
     <string name="onboarding_progress_title">Long-Term Results</string>
@@ -614,13 +622,15 @@
     <string name="onboarding_referral_share_chooser">Share Invite Link</string>
 
     <!-- Onboarding: Auth Step -->
-    <string name="onboarding_auth_title">Create Account</string>
-    <string name="onboarding_auth_description">Sign in to sync your data across devices and unlock cloud features.</string>
-    <string name="onboarding_auth_google">Continue with Google</string>
-    <string name="onboarding_auth_email">Continue with Email</string>
+    <string name="onboarding_auth_title">Save your progress</string>
+    <string name="onboarding_auth_google">Sign up with Google</string>
+    <string name="onboarding_auth_email">Sign up with email</string>
+    <string name="onboarding_auth_other_options">Other sign in options</string>
+    <string name="onboarding_auth_creating">Creating account\u2026</string>
+    <string name="onboarding_auth_signing_in">Signing in\u2026</string>
 
     <!-- Onboarding: Attribution Step -->
-    <string name="onboarding_attribution_title">How did you hear\nabout us?</string>
+    <string name="onboarding_attribution_title">Where did you hear\nabout us?</string>
     <string name="onboarding_attribution_instagram">Instagram</string>
     <string name="onboarding_attribution_tiktok">TikTok</string>
     <string name="onboarding_attribution_youtube">YouTube</string>
@@ -632,7 +642,9 @@
     <string name="onboarding_attribution_promo_label">Promo code (optional)</string>
 
     <!-- Onboarding: Rating Step -->
-    <string name="onboarding_rating_title">Loved by Athletes</string>
+    <string name="onboarding_rating_title">Give us a rating</string>
+    <string name="onboarding_rating_score">5.0</string>
+    <string name="onboarding_rating_made_for_you">Made for athletes like you</string>
     <string name="onboarding_rating_quote1">\&quot;Finally an affordable timing system!\&quot;</string>
     <string name="onboarding_rating_author1">Track Coach, California</string>
     <string name="onboarding_rating_quote2">\&quot;Accurate results that match our Freelap\&quot;</string>
@@ -642,9 +654,9 @@
     <string name="onboarding_rating_author_format">\u2014 %s</string>
 
     <!-- Onboarding: Notification Step -->
-    <string name="onboarding_notification_title">Stay Updated</string>
-    <string name="onboarding_notification_description">Get notified about trial expiry, new features, and timing results.</string>
-    <string name="onboarding_notification_enable">Enable Notifications</string>
+    <string name="onboarding_notification_title">Never miss a session</string>
+    <string name="onboarding_notification_description">Get timely updates to keep your training on track.</string>
+    <string name="onboarding_notification_enable">Allow Notifications</string>
 
     <!-- Onboarding: Trial Intro Step -->
     <string name="onboarding_trial_logo_description">TrackSpeed</string>
@@ -657,8 +669,8 @@
     <string name="onboarding_trial_benefit3_desc">One tap in settings and you\'re done</string>
 
     <!-- Onboarding: Trial Reminder Step -->
-    <string name="onboarding_reminder_title">2 days before\nyour trial ends</string>
-    <string name="onboarding_reminder_description">We\'ll send you a reminder so you\'re never caught off guard. Your #1 concern, addressed.</string>
+    <string name="onboarding_reminder_title">You\'ll get a reminder 2 days before your trial ends</string>
+    <string name="onboarding_reminder_description">We\'ll send you a notification so you\'re never caught off guard.</string>
 
     <!-- Onboarding: Paywall Step -->
     <string name="onboarding_paywall_image_description">Photo Finish</string>
@@ -690,16 +702,18 @@
 
     <!-- Onboarding: Completion Step -->
     <string name="onboarding_completion_logo_description">TrackSpeed</string>
-    <string name="onboarding_completion_title">You\'re All Set!</string>
+    <string name="onboarding_completion_title">Try Solo Mode</string>
+    <string name="onboarding_completion_subtitle">Test detection with one phone \u2014 no subscription needed</string>
+    <string name="onboarding_completion_test_detection">Test Detection</string>
+    <string name="onboarding_completion_test_detection_desc">See how the camera tracks movement</string>
     <string name="onboarding_completion_solo_timing">Solo Timing</string>
-    <string name="onboarding_completion_photo_finish">Photo Finish</string>
-    <string name="onboarding_completion_multi_phone">Multi-Phone Sync</string>
-    <string name="onboarding_completion_unlimited_history">Unlimited History</string>
-    <string name="onboarding_completion_athlete_profiles">Athlete Profiles</string>
-    <string name="onboarding_completion_video_export">Video Export</string>
-    <string name="onboarding_completion_tier_free">Free</string>
-    <string name="onboarding_completion_tier_pro">Pro</string>
+    <string name="onboarding_completion_solo_timing_desc">Time yourself with a single phone</string>
+    <string name="onboarding_completion_two_phone">Two-Phone Precision</string>
+    <string name="onboarding_completion_two_phone_desc">Unlock start + finish gates</string>
+    <string name="onboarding_completion_tier_free">FREE</string>
+    <string name="onboarding_completion_tier_pro">PRO</string>
     <string name="onboarding_completion_try_solo">Try Solo Mode</string>
+    <string name="onboarding_completion_subscribe">Subscribe to unlock everything</string>
 
     <!-- Voice Start Overlay -->
     <string name="voice_overlay_title">VOICE START</string>

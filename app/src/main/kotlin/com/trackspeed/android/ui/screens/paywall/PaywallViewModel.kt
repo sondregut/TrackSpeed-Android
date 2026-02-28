@@ -10,6 +10,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.text.NumberFormat
+import java.util.Currency
 import javax.inject.Inject
 
 sealed interface PurchaseState {
@@ -91,13 +93,20 @@ class PaywallViewModel @Inject constructor(
 
     fun getYearlyPlan(): PlanInfo {
         val rcPackage = _offerings.value?.current?.annual
+        val monthlyEquiv = rcPackage?.product?.price?.let { price ->
+            val monthly = price.amountMicros / 12.0 / 1_000_000.0
+            val formatter = NumberFormat.getCurrencyInstance().apply {
+                currency = Currency.getInstance(price.currencyCode)
+            }
+            formatter.format(monthly)
+        } ?: BillingConfig.YEARLY_MONTHLY_EQUIVALENT
         return PlanInfo(
             type = PlanType.YEARLY,
             rcPackage = rcPackage,
             priceDisplay = rcPackage?.product?.price?.formatted
                 ?: BillingConfig.YEARLY_PRICE_DISPLAY,
             periodDisplay = "year",
-            monthlyEquivalent = BillingConfig.YEARLY_MONTHLY_EQUIVALENT,
+            monthlyEquivalent = monthlyEquiv,
             savingsPercent = BillingConfig.YEARLY_SAVINGS_PERCENT
         )
     }

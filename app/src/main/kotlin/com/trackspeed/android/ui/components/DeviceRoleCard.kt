@@ -20,8 +20,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val CardBackground = Color(0xFF2C2C2E)
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.TextSecondary
+import com.trackspeed.android.ui.theme.TextPrimary
+import com.trackspeed.android.ui.theme.SurfaceDark
 
 /**
  * Role assigned to a device in a multi-device timing session.
@@ -44,7 +46,7 @@ enum class DeviceRole(
     SPLIT(
         displayName = "Split",
         icon = Icons.Outlined.Timer,
-        color = Color(0xFF0A84FF) // blue
+        color = AccentNavy
     )
 }
 
@@ -77,7 +79,7 @@ fun DeviceRoleCard(
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val roleColor = role?.color ?: Color(0xFF8E8E93)
+    val roleColor = role?.color ?: TextSecondary
     val connectionHealth = when (connectionState) {
         DeviceConnectionState.CONNECTED -> ConnectionHealth.CONNECTED
         DeviceConnectionState.CONNECTING -> ConnectionHealth.WEAK
@@ -87,8 +89,8 @@ fun DeviceRoleCard(
     Card(
         onClick = { onClick?.invoke() },
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         border = if (isHost) {
             androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFAB00).copy(alpha = 0.5f))
         } else if (role != null) {
@@ -112,7 +114,7 @@ fun DeviceRoleCard(
                         if (role != null && connectionState == DeviceConnectionState.CONNECTED) {
                             roleColor
                         } else {
-                            Color(0xFF8E8E93).copy(alpha = 0.2f)
+                            TextSecondary.copy(alpha = 0.2f)
                         }
                     ),
                 contentAlignment = Alignment.Center
@@ -123,7 +125,7 @@ fun DeviceRoleCard(
                     tint = if (role != null && connectionState == DeviceConnectionState.CONNECTED) {
                         Color.White
                     } else {
-                        Color(0xFF8E8E93)
+                        TextSecondary
                     },
                     modifier = Modifier.size(24.dp)
                 )
@@ -147,7 +149,7 @@ fun DeviceRoleCard(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.Medium
                         ),
-                        color = Color.White
+                        color = TextPrimary
                     )
                 }
                 Spacer(modifier = Modifier.height(2.dp))
@@ -159,7 +161,7 @@ fun DeviceRoleCard(
                         else -> "Disconnected"
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (role != null) roleColor else Color(0xFF8E8E93)
+                    color = if (role != null) roleColor else TextSecondary
                 )
             }
 
@@ -168,7 +170,7 @@ fun DeviceRoleCard(
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
-                    color = Color(0xFF8E8E93)
+                    color = TextSecondary
                 )
             } else {
                 ConnectionHealthIndicator(

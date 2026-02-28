@@ -54,12 +54,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.data.local.entities.AthleteEntity
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 
-private val PureBlack = Color(0xFF000000)
-private val CardBg = Color(0xFF2C2C2E)
-private val TextSecondary = Color(0xFF8E8E93)
-private val AccentBlue = Color(0xFF0A84FF)
+private val CardBg = SurfaceDark
+private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
+private val AccentBlue = AccentNavy
 private val DeleteRed = Color(0xFFFF453A)
 
 @Composable
@@ -87,8 +86,9 @@ private fun AthleteListContent(
     onAddClick: () -> Unit,
     onDeleteAthlete: (AthleteEntity) -> Unit
 ) {
+    Box(modifier = Modifier.fillMaxSize().gradientBackground()) {
     Scaffold(
-        containerColor = PureBlack,
+        containerColor = Color.Transparent,
         floatingActionButton = {
             if (uiState.athletes.isNotEmpty() || uiState.searchQuery.isNotEmpty()) {
                 FloatingActionButton(
@@ -118,7 +118,7 @@ private fun AthleteListContent(
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                color = Color.White
+                color = TextPrimary
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -157,6 +157,7 @@ private fun AthleteListContent(
             }
         }
     }
+    } // close Box
 }
 
 @Composable
@@ -183,8 +184,8 @@ private fun SearchBar(
         colors = TextFieldDefaults.colors(
             focusedContainerColor = CardBg,
             unfocusedContainerColor = CardBg,
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary,
             cursorColor = AccentBlue,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent
@@ -232,7 +233,7 @@ private fun AthleteList(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(20.dp))
                             .background(color)
                             .padding(horizontal = 20.dp),
                         contentAlignment = Alignment.CenterEnd
@@ -266,7 +267,7 @@ private fun AthleteRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = CardBg)
     ) {
         Row(
@@ -288,7 +289,7 @@ private fun AthleteRow(
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    color = Color.White
+                    color = TextPrimary
                 )
             }
 
@@ -300,7 +301,7 @@ private fun AthleteRow(
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Medium
                     ),
-                    color = Color.White,
+                    color = TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -347,7 +348,7 @@ private fun EmptyState(onAddClick: () -> Unit) {
             style = MaterialTheme.typography.titleLarge.copy(
                 fontWeight = FontWeight.Bold
             ),
-            color = Color.White
+            color = TextPrimary
         )
 
         Spacer(modifier = Modifier.height(8.dp))

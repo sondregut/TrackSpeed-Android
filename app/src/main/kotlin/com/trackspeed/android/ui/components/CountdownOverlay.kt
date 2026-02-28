@@ -60,14 +60,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.AccentNavy
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
-// App accent colors as specified
-private val AccentBlue = Color(0xFF0A84FF)
+// App accent colors - use theme values
 private val AccentGreen = Color(0xFF30D158)
 private val OverlayBackground = Color(0xF2000000)  // ~95% opacity black
-private val CountdownBlue = Color(0xB30A84FF)       // Blue at 70%
+private val CountdownBlue = AccentNavy.copy(alpha = 0.70f)
 private val CountdownAmber = Color(0xD9FF9500)       // Amber at 85%
 private val CountdownGo = Color(0xFF30D158)          // Solid green
 
@@ -323,7 +323,7 @@ private fun IdleContent(onStart: () -> Unit) {
         Button(
             onClick = onStart,
             colors = ButtonDefaults.buttonColors(
-                containerColor = AccentBlue.copy(alpha = 0.3f),
+                containerColor = AccentNavy.copy(alpha = 0.3f),
                 contentColor = Color.White
             ),
             modifier = Modifier.padding(horizontal = 32.dp)

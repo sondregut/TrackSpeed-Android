@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.TextMuted
+import com.trackspeed.android.ui.theme.TextSecondary
 import com.trackspeed.android.ui.theme.TrackSpeedTheme
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -35,8 +38,6 @@ import kotlin.math.sqrt
 private val AccentGreen = Color(0xFF30D158)
 private val AccentRed = Color(0xFFFF453A)
 private val AccentOrange = Color(0xFFFF9F0A)
-private val TextSecondary = Color(0xFF8E8E93)
-private val TextMuted = Color(0xFF636366)
 
 /**
  * Confidence level for the bubble level, matching iOS SetupConfidence enum.
@@ -150,7 +151,7 @@ fun BubbleLevelContent(
     val bubbleColor = when (confidence) {
         LevelConfidence.PASS -> AccentGreen
         LevelConfidence.ACCEPTABLE -> AccentOrange
-        LevelConfidence.NOT_READY -> Color(0xFF0A84FF)
+        LevelConfidence.NOT_READY -> AccentNavy
     }
 
     // Animated bubble position

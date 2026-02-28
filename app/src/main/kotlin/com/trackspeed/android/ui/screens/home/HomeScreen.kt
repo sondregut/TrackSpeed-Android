@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -44,7 +45,7 @@ import com.trackspeed.android.ui.components.BillingIssueBanner
 import com.trackspeed.android.ui.screens.history.SessionHistoryScreen
 import com.trackspeed.android.ui.screens.profile.ProfileScreen
 import com.trackspeed.android.ui.screens.templates.TemplatesScreen
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 import androidx.annotation.StringRes
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -60,10 +61,7 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
-private val CardBackground = Color(0xFF2C2C2E)
-private val NavBarBackground = Color(0xFF1C1C1E)
-private val AccentGreen = Color(0xFF00E676)
-private val AccentBlue = Color(0xFF0A84FF)
+// Theme colors are imported from com.trackspeed.android.ui.theme.*
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -143,37 +141,55 @@ fun HomeScreen(
     var selectedTab by remember { mutableStateOf(HomeTab.HOME) }
 
     Scaffold(
-        containerColor = Color.Black,
+        containerColor = Color.Transparent,
         bottomBar = {
-            NavigationBar(
-                containerColor = NavBarBackground,
-                contentColor = Color.White,
-                tonalElevation = 0.dp
-            ) {
-                HomeTab.entries.forEach { tab ->
-                    NavigationBarItem(
-                        selected = selectedTab == tab,
-                        onClick = { selectedTab = tab },
-                        icon = {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = stringResource(tab.labelRes)
+            Column {
+                // Top border line
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(0.5.dp)
+                        .background(BorderSubtle)
+                )
+                NavigationBar(
+                    containerColor = Color.Transparent,
+                    contentColor = Color.White,
+                    tonalElevation = 0.dp,
+                    modifier = Modifier
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    BackgroundGradientBottom.copy(alpha = 0.85f),
+                                    BackgroundGradientBottom
+                                )
                             )
-                        },
-                        label = {
-                            Text(
-                                text = stringResource(tab.labelRes),
-                                fontSize = 10.sp
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = AccentBlue,
-                            selectedTextColor = AccentBlue,
-                            unselectedIconColor = Color(0xFF8E8E93),
-                            unselectedTextColor = Color(0xFF8E8E93),
-                            indicatorColor = Color.Transparent
                         )
-                    )
+                ) {
+                    HomeTab.entries.forEach { tab ->
+                        NavigationBarItem(
+                            selected = selectedTab == tab,
+                            onClick = { selectedTab = tab },
+                            icon = {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = stringResource(tab.labelRes)
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = stringResource(tab.labelRes),
+                                    fontSize = 10.sp
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = AccentNavy,
+                                selectedTextColor = AccentNavy,
+                                unselectedIconColor = TextSecondary,
+                                unselectedTextColor = TextSecondary,
+                                indicatorColor = Color.Transparent
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -181,8 +197,8 @@ fun HomeScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .gradientBackground()
                 .padding(paddingValues)
-                .background(Color.Black)
         ) {
             when (selectedTab) {
                 HomeTab.HOME -> HomeContent(
@@ -268,7 +284,7 @@ private fun HomeContent(
                 fontWeight = FontWeight.Bold,
                 fontSize = 28.sp
             ),
-            color = Color.White,
+            color = TextPrimary,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -282,7 +298,7 @@ private fun HomeContent(
                 pluralStringResource(R.plurals.home_sprints_recorded, totalRunCount, totalRunCount)
             },
             style = MaterialTheme.typography.bodyLarge,
-            color = Color(0xFF8E8E93),
+            color = TextSecondary,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -304,7 +320,7 @@ private fun HomeContent(
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.5.sp
             ),
-            color = Color(0xFF8E8E93),
+            color = TextSecondary,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)
@@ -325,7 +341,7 @@ private fun HomeContent(
             ModeCard(
                 title = stringResource(R.string.home_10m_acceleration),
                 icon = Icons.Outlined.LocalFireDepartment,
-                iconBackgroundColor = AccentBlue,
+                iconBackgroundColor = AccentNavy,
                 onClick = onAccelerationClick,
                 modifier = Modifier.weight(1f)
             )
@@ -340,7 +356,7 @@ private fun HomeContent(
             ModeCard(
                 title = stringResource(R.string.home_60m_sprint),
                 icon = Icons.AutoMirrored.Outlined.DirectionsRun,
-                iconBackgroundColor = Color(0xFF8E8E93),
+                iconBackgroundColor = TextSecondary,
                 onClick = onSprintClick,
                 modifier = Modifier.weight(1f)
             )
@@ -387,12 +403,12 @@ private fun HomeContent(
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
-                color = Color.White
+                color = TextPrimary
             )
             Text(
                 text = stringResource(R.string.home_see_all),
                 style = MaterialTheme.typography.bodyMedium,
-                color = AccentBlue,
+                color = AccentNavy,
                 modifier = Modifier.clickable { onSeeAllClick() }
             )
         }
@@ -400,10 +416,10 @@ private fun HomeContent(
         Spacer(modifier = Modifier.height(12.dp))
 
         if (recentSessions.isEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBackground)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .gunmetalCard()
             ) {
                 Box(
                     modifier = Modifier
@@ -414,7 +430,7 @@ private fun HomeContent(
                     Text(
                         text = stringResource(R.string.home_no_recent_sessions),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF8E8E93)
+                        color = TextSecondary
                     )
                 }
             }
@@ -441,11 +457,11 @@ private fun ModeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.aspectRatio(1f),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .featureCard()
+            .clickable(onClick = onClick)
     ) {
         Column(
             modifier = Modifier
@@ -476,7 +492,7 @@ private fun ModeCard(
                 style = MaterialTheme.typography.titleSmall.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
-                color = Color.White,
+                color = TextPrimary,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
@@ -494,11 +510,11 @@ private fun FullWidthActionCard(
     modifier: Modifier = Modifier,
     showProBadge: Boolean = false
 ) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .gunmetalCard()
+            .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
@@ -509,7 +525,7 @@ private fun FullWidthActionCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color.White,
+                tint = TextPrimary,
                 modifier = Modifier.size(24.dp)
             )
 
@@ -525,7 +541,7 @@ private fun FullWidthActionCard(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color.White
+                        color = TextPrimary
                     )
                     if (showProBadge) {
                         Text(
@@ -535,10 +551,10 @@ private fun FullWidthActionCard(
                                 fontSize = 9.sp,
                                 letterSpacing = 0.5.sp
                             ),
-                            color = Color.Black,
+                            color = Color.White,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(AccentGreen)
+                                .background(AccentNavy)
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
@@ -547,14 +563,14 @@ private fun FullWidthActionCard(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF8E8E93)
+                    color = TextSecondary
                 )
             }
 
             Icon(
                 imageVector = Icons.Outlined.ChevronRight,
                 contentDescription = null,
-                tint = Color(0xFF48484A),
+                tint = TextMuted,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -572,11 +588,11 @@ private fun RecentSessionCard(
         else -> "${session.distance}m"
     }
 
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .gunmetalCard()
+            .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
@@ -590,7 +606,7 @@ private fun RecentSessionCard(
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
-                    color = Color.White,
+                    color = TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -598,13 +614,13 @@ private fun RecentSessionCard(
                 Text(
                     text = "${dateFormat.format(Date(session.date))} - $distanceLabel",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF8E8E93)
+                    color = TextSecondary
                 )
             }
             Icon(
                 imageVector = Icons.Outlined.ChevronRight,
                 contentDescription = null,
-                tint = Color(0xFF48484A),
+                tint = TextMuted,
                 modifier = Modifier.size(20.dp)
             )
         }

@@ -63,14 +63,14 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.data.local.entities.AthleteEntity
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 
-private val CardBackground = Color(0xFF2C2C2E)
-private val SecondaryText = Color(0xFF8E8E93)
-private val AccentGreen = Color(0xFF30D158)
-private val AccentBlue = Color(0xFF0A84FF)
-private val StepGray = Color(0xFF48484A)
-private val SurfaceDark = Color(0xFF1C1C1E)
+private val CardBackground = com.trackspeed.android.ui.theme.SurfaceDark
+private val SecondaryText = TextSecondary
+private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
+private val AccentBlue = AccentNavy
+private val StepGray = TextMuted
+private val SurfaceDarkLocal = com.trackspeed.android.ui.theme.SurfaceDark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,8 +81,9 @@ fun SessionSetupScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    Box(modifier = Modifier.fillMaxSize().gradientBackground()) {
     Scaffold(
-        containerColor = Color.Black,
+        containerColor = Color.Transparent,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -91,7 +92,7 @@ fun SessionSetupScreen(
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color.White
+                        color = TextPrimary
                     )
                 },
                 navigationIcon = {
@@ -99,12 +100,12 @@ fun SessionSetupScreen(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Cancel",
-                            tint = Color.White
+                            tint = TextPrimary
                         )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Black
+                    containerColor = Color.Transparent
                 )
             )
         },
@@ -171,6 +172,7 @@ fun SessionSetupScreen(
             }
         }
     }
+    } // close Box
 }
 
 // -- Step Indicator --
@@ -209,7 +211,7 @@ private fun StepIndicator(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = TextPrimary,
                         modifier = Modifier.size(14.dp)
                     )
                 } else {
@@ -218,7 +220,7 @@ private fun StepIndicator(
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold
                         ),
-                        color = Color.White
+                        color = TextPrimary
                     )
                 }
             }
@@ -252,7 +254,7 @@ private fun AthleteSelectionStep(
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
-            color = Color.White,
+            color = TextPrimary,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
@@ -326,10 +328,10 @@ private fun AthleteRow(
                 if (isSelected) Modifier.border(
                     width = 2.dp,
                     color = AccentGreen,
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(20.dp)
                 ) else Modifier
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         onClick = onClick
     ) {
@@ -351,7 +353,7 @@ private fun AthleteRow(
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    color = Color.White
+                    color = TextPrimary
                 )
             }
 
@@ -363,7 +365,7 @@ private fun AthleteRow(
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
-                    color = Color.White
+                    color = TextPrimary
                 )
                 athlete.nickname?.let { nickname ->
                     Text(
@@ -400,7 +402,7 @@ private fun DistanceSelectionStep(
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
-            color = Color.White,
+            color = TextPrimary,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
@@ -441,19 +443,19 @@ private fun DistanceSelectionStep(
                 value = customText,
                 onValueChange = onCustomTextChange,
                 placeholder = {
-                    Text("Distance", color = StepGray)
+                    Text("Distance", color = TextMuted)
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.width(140.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
                     cursorColor = AccentBlue,
                     focusedBorderColor = AccentBlue,
                     unfocusedBorderColor = StepGray,
-                    focusedContainerColor = SurfaceDark,
-                    unfocusedContainerColor = SurfaceDark
+                    focusedContainerColor = SurfaceDarkLocal,
+                    unfocusedContainerColor = SurfaceDarkLocal
                 ),
                 shape = RoundedCornerShape(12.dp)
             )
@@ -490,7 +492,7 @@ private fun DistanceChip(
             style = MaterialTheme.typography.titleSmall.copy(
                 fontWeight = FontWeight.SemiBold
             ),
-            color = if (isSelected) Color.Black else Color.White,
+            color = if (isSelected) Color.Black else TextPrimary,
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp)
         )
     }
@@ -509,7 +511,7 @@ private fun StartTypeSelectionStep(
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
-            color = Color.White,
+            color = TextPrimary,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
@@ -555,10 +557,10 @@ private fun StartTypeCard(
                 if (isSelected) Modifier.border(
                     width = 2.dp,
                     color = AccentGreen,
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(20.dp)
                 ) else Modifier
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = CardBackground)
     ) {
         Row(
@@ -582,7 +584,7 @@ private fun StartTypeCard(
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
-                    color = Color.White
+                    color = TextPrimary
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -627,7 +629,7 @@ private fun BottomBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.Black)
+            .background(BackgroundGradientBottom)
             .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -648,7 +650,7 @@ private fun BottomBar(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = TextPrimary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -657,7 +659,7 @@ private fun BottomBar(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color.White
+                        color = TextPrimary
                     )
                 }
             }
@@ -683,7 +685,7 @@ private fun BottomBar(
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    color = if (isLastStep) Color.Black else Color.White
+                    color = if (isLastStep) Color.Black else TextPrimary
                 )
             }
         }
@@ -700,7 +702,7 @@ private fun ConnectPhonesStep() {
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
-            color = Color.White,
+            color = TextPrimary,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
@@ -831,7 +833,7 @@ private fun SessionSetupPreview() {
     TrackSpeedTheme(darkTheme = true) {
         // Simplified preview without Hilt
         Scaffold(
-            containerColor = Color.Black,
+            containerColor = BackgroundDark,
             bottomBar = {
                 BottomBar(
                     currentStep = SetupStep.DISTANCE,
@@ -873,7 +875,7 @@ private fun SessionSetupPreview() {
 private fun StartTypeStepPreview() {
     TrackSpeedTheme(darkTheme = true) {
         Scaffold(
-            containerColor = Color.Black,
+            containerColor = BackgroundDark,
             bottomBar = {
                 BottomBar(
                     currentStep = SetupStep.START_TYPE,

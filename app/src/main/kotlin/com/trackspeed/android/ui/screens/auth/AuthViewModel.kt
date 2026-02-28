@@ -46,6 +46,10 @@ class AuthViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isSignUp = !_uiState.value.isSignUp, error = null)
     }
 
+    fun setSignInMode() {
+        _uiState.value = _uiState.value.copy(isSignUp = false, error = null)
+    }
+
     fun updateEmail(email: String) {
         _uiState.value = _uiState.value.copy(email = email, error = null)
     }

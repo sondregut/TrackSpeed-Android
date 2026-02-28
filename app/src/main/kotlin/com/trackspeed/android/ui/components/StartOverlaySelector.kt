@@ -35,12 +35,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.SurfaceDark
+import com.trackspeed.android.ui.theme.TextPrimary
+import com.trackspeed.android.ui.theme.TextSecondary
 
-// Accent colors
-private val AccentBlue = Color(0xFF0A84FF)
-private val AccentGreen = Color(0xFF30D158)
-private val SurfaceDark = Color(0xFF1C1C1E)
-private val CardDark = Color(0xFF2C2C2E)
+// Accent colors - use theme values
+private val AccentBlue = AccentNavy
+private val CardDark = SurfaceDark
 
 /**
  * Start mode options matching the iOS start type selection.
@@ -131,7 +133,7 @@ fun StartOverlaySelector(
             // Title
             Text(
                 text = "Start Mode",
-                color = Color.White,
+                color = TextPrimary,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
@@ -167,8 +169,8 @@ private fun StartModeOption(
     onClick: () -> Unit
 ) {
     val selectedColor = AccentBlue
-    val iconTint = if (isSelected) selectedColor else Color.White.copy(alpha = 0.7f)
-    val titleColor = if (isSelected) selectedColor else Color.White
+    val iconTint = if (isSelected) selectedColor else TextSecondary
+    val titleColor = if (isSelected) selectedColor else TextPrimary
     val bgColor = if (isSelected) selectedColor.copy(alpha = 0.1f) else Color.Transparent
 
     Row(
@@ -212,7 +214,7 @@ private fun StartModeOption(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = mode.description,
-                color = Color.White.copy(alpha = 0.5f),
+                color = TextSecondary,
                 fontSize = 13.sp,
                 lineHeight = 18.sp
             )

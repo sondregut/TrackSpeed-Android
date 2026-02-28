@@ -8,7 +8,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -16,10 +15,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
 
-private val AccentYellow = Color(0xFFFFD60A)
-private val AccentBlue = Color(0xFF0A84FF)
+private val AccentYellow = AccentGold
+private val AccentBlue = AccentNavy
 
 @Composable
 fun TrialReminderStep(onContinue: () -> Unit) {
@@ -70,7 +70,7 @@ fun TrialReminderStep(onContinue: () -> Unit) {
             stringResource(R.string.onboarding_reminder_title),
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = TextPrimary,
             textAlign = TextAlign.Center,
             lineHeight = 36.sp
         )
@@ -80,7 +80,7 @@ fun TrialReminderStep(onContinue: () -> Unit) {
         Text(
             stringResource(R.string.onboarding_reminder_description),
             fontSize = 17.sp,
-            color = Color(0xFFAEAEB2),
+            color = TextSecondary,
             textAlign = TextAlign.Center,
             lineHeight = 24.sp
         )

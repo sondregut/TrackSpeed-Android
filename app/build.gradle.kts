@@ -119,6 +119,10 @@ dependencies {
     implementation(libs.revenuecat.purchases)
     implementation(libs.revenuecat.purchases.ui)
 
+    // Google Play In-App Review
+    implementation("com.google.android.play:review:2.0.2")
+    implementation("com.google.android.play:review-ktx:2.0.2")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

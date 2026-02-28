@@ -24,15 +24,14 @@ import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 
-private val ScreenBackground = Color(0xFF000000)
-private val CardBackground = Color(0xFF1C1C1E)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
-private val DividerColor = Color(0xFF38383A)
-private val AccentBlue = Color(0xFF0A84FF)
-private val AccentGreen = Color(0xFF30D158)
+private val CardBackground = SurfaceDark
+private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
+private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
+private val DividerColor = BorderSubtle
+private val AccentBlue = AccentNavy
+private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
 private val AccentRed = Color(0xFFFF453A)
 private val AccentOrange = Color(0xFFFF9F0A)
 
@@ -44,6 +43,7 @@ fun WindAdjustmentScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    Box(modifier = Modifier.fillMaxSize().gradientBackground()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -58,11 +58,11 @@ fun WindAdjustmentScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = ScreenBackground
+                    containerColor = Color.Transparent
                 )
             )
         },
-        containerColor = ScreenBackground
+        containerColor = Color.Transparent
     ) { padding ->
         WindAdjustmentContent(
             state = state,
@@ -72,6 +72,7 @@ fun WindAdjustmentScreen(
             modifier = Modifier.padding(padding)
         )
     }
+    } // close Box
 }
 
 @Composable

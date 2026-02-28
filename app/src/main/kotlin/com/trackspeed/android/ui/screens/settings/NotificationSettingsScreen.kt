@@ -35,17 +35,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.R
 import com.trackspeed.android.notifications.NotificationTiming
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 
-// Colors matching the app's dark theme (from SettingsScreen.kt)
-private val ScreenBackground = Color(0xFF000000)
-private val CardBackground = Color(0xFF1C1C1E)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
-private val TextTertiary = Color(0xFF636366)
-private val DividerColor = Color(0xFF38383A)
-private val AccentBlue = Color(0xFF0A84FF)
-private val AccentGreen = Color(0xFF00E676)
+// Colors using the new LaserSpeed theme
+private val CardBackground = SurfaceDark
+private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
+private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
+private val TextTertiary = TextMuted
+private val DividerColor = BorderSubtle
+private val AccentBlue = AccentNavy
+private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
 private val AccentOrange = Color(0xFFFF9F0A)
 private val WarningYellow = Color(0xFFFFD60A)
 
@@ -124,6 +123,7 @@ private fun NotificationSettingsContent(
     onTestNotification: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
+    Box(modifier = Modifier.fillMaxSize().gradientBackground()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -144,11 +144,11 @@ private fun NotificationSettingsContent(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = ScreenBackground
+                    containerColor = Color.Transparent
                 )
             )
         },
-        containerColor = ScreenBackground
+        containerColor = Color.Transparent
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -168,7 +168,7 @@ private fun NotificationSettingsContent(
             Spacer(modifier = Modifier.height(8.dp))
 
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(20.dp),
                 color = CardBackground,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -222,7 +222,7 @@ private fun NotificationSettingsContent(
             Spacer(modifier = Modifier.height(8.dp))
 
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(20.dp),
                 color = CardBackground,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -260,7 +260,7 @@ private fun NotificationSettingsContent(
             Spacer(modifier = Modifier.height(8.dp))
 
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(20.dp),
                 color = CardBackground,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -304,6 +304,7 @@ private fun NotificationSettingsContent(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+    } // close Box
 }
 
 @Composable

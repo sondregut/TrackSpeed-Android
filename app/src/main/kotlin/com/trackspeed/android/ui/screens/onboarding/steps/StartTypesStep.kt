@@ -10,7 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -18,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 
 private data class StartTypeInfo(val nameRes: Int, val descriptionRes: Int, val icon: ImageVector)
 
@@ -36,24 +36,24 @@ fun StartTypesStep(onContinue: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(32.dp))
-        Text(stringResource(R.string.onboarding_starttypes_title), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.onboarding_starttypes_title), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextPrimary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.onboarding_starttypes_subtitle), fontSize = 17.sp, color = Color(0xFFAEAEB2), textAlign = TextAlign.Center)
+        Text(stringResource(R.string.onboarding_starttypes_subtitle), fontSize = 17.sp, color = TextSecondary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
 
         LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(startTypes) { type ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                    shape = RoundedCornerShape(20.dp)
                 ) {
                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(type.icon, contentDescription = null, modifier = Modifier.size(32.dp), tint = Color(0xFF0A84FF))
+                        Icon(type.icon, contentDescription = null, modifier = Modifier.size(32.dp), tint = AccentNavy)
                         Spacer(Modifier.width(16.dp))
                         Column {
-                            Text(stringResource(type.nameRes), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                            Text(stringResource(type.descriptionRes), fontSize = 13.sp, color = Color(0xFF8E8E93))
+                            Text(stringResource(type.nameRes), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                            Text(stringResource(type.descriptionRes), fontSize = 13.sp, color = TextSecondary)
                         }
                     }
                 }
@@ -63,7 +63,7 @@ fun StartTypesStep(onContinue: () -> Unit) {
         Button(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A84FF))
+            colors = ButtonDefaults.buttonColors(containerColor = AccentNavy)
         ) {
             Text(stringResource(R.string.common_continue), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         }

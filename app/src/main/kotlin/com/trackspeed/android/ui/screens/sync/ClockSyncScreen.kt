@@ -20,6 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.res.stringResource
 import com.trackspeed.android.R
 import com.trackspeed.android.sync.SyncQuality
+import com.trackspeed.android.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,12 +66,17 @@ fun ClockSyncScreen(
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize().gradientBackground()) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.sync_title)) }
+                title = { Text(stringResource(R.string.sync_title), color = TextPrimary) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
             )
-        }
+        },
+        containerColor = Color.Transparent
     ) { padding ->
         Column(
             modifier = Modifier
@@ -91,7 +97,8 @@ fun ClockSyncScreen(
                     Text(
                         stringResource(R.string.sync_instruction_auto),
                         textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyLarge
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextPrimary
                     )
 
                     Spacer(modifier = Modifier.height(32.dp))
@@ -107,7 +114,7 @@ fun ClockSyncScreen(
                     if (!hasBluetoothPermission) {
                         Text(
                             stringResource(R.string.sync_bluetooth_required),
-                            color = MaterialTheme.colorScheme.error,
+                            color = Color(0xFFFF453A),
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -116,12 +123,14 @@ fun ClockSyncScreen(
                 SyncStatus.WAITING_FOR_PEER -> {
                     Text(
                         stringResource(R.string.sync_searching),
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        color = TextPrimary
                     )
                     Text(
                         stringResource(R.string.sync_searching_hint),
                         style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        color = TextSecondary
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -136,7 +145,7 @@ fun ClockSyncScreen(
                 }
 
                 SyncStatus.CONNECTING -> {
-                    Text(stringResource(R.string.sync_connecting))
+                    Text(stringResource(R.string.sync_connecting), color = TextPrimary)
                     CircularProgressIndicator()
 
                     TextButton(onClick = { viewModel.stop() }) {
@@ -147,7 +156,8 @@ fun ClockSyncScreen(
                 SyncStatus.SYNCING -> {
                     Text(
                         stringResource(R.string.sync_syncing),
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -159,7 +169,8 @@ fun ClockSyncScreen(
 
                     Text(
                         stringResource(R.string.sync_progress_percent, (uiState.progress * 100).toInt()),
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
                     )
 
                     TextButton(onClick = { viewModel.stop() }) {
@@ -180,7 +191,7 @@ fun ClockSyncScreen(
                 SyncStatus.ERROR -> {
                     Text(
                         uiState.errorMessage ?: stringResource(R.string.sync_status_error),
-                        color = MaterialTheme.colorScheme.error,
+                        color = Color(0xFFFF453A),
                         textAlign = TextAlign.Center
                     )
 
@@ -193,6 +204,7 @@ fun ClockSyncScreen(
             }
         }
     }
+    } // close Box
 }
 
 @Composable
@@ -201,9 +213,9 @@ private fun SyncStatusCard(uiState: ClockSyncUiState) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = when (uiState.status) {
-                SyncStatus.SYNCED -> MaterialTheme.colorScheme.primaryContainer
-                SyncStatus.ERROR -> MaterialTheme.colorScheme.errorContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
+                SyncStatus.SYNCED -> AccentGreen.copy(alpha = 0.15f)
+                SyncStatus.ERROR -> Color(0xFFFF453A).copy(alpha = 0.15f)
+                else -> SurfaceDark
             }
         )
     ) {
@@ -219,7 +231,7 @@ private fun SyncStatusCard(uiState: ClockSyncUiState) {
                     Icon(
                         Icons.Default.Check,
                         contentDescription = stringResource(R.string.sync_synced_cd),
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = AccentGreen,
                         modifier = Modifier.size(48.dp)
                     )
                 }
@@ -227,7 +239,7 @@ private fun SyncStatusCard(uiState: ClockSyncUiState) {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = stringResource(R.string.sync_error_cd),
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = Color(0xFFFF453A),
                         modifier = Modifier.size(48.dp)
                     )
                 }
@@ -248,13 +260,15 @@ private fun SyncStatusCard(uiState: ClockSyncUiState) {
                     SyncStatus.ERROR -> stringResource(R.string.sync_status_error)
                 },
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
             )
 
             if (uiState.isServer && uiState.status != SyncStatus.NOT_SYNCED) {
                 Text(
                     stringResource(R.string.sync_reference_clock_label),
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
                 )
             }
         }
@@ -264,7 +278,8 @@ private fun SyncStatusCard(uiState: ClockSyncUiState) {
 @Composable
 private fun SyncSuccessDetails(uiState: ClockSyncUiState) {
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Column(
             modifier = Modifier
@@ -274,7 +289,8 @@ private fun SyncSuccessDetails(uiState: ClockSyncUiState) {
             Text(
                 stringResource(R.string.sync_details_title),
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -290,13 +306,13 @@ private fun SyncSuccessDetails(uiState: ClockSyncUiState) {
 private fun DetailRow(
     label: String,
     value: String,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface
+    valueColor: Color = TextPrimary
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
         Text(
             value,
             style = MaterialTheme.typography.bodyMedium,

@@ -1,6 +1,7 @@
 package com.trackspeed.android.cloud
 
 import android.util.Log
+import com.trackspeed.android.cloud.dto.CrossingDto
 import com.trackspeed.android.cloud.dto.PairingRequestDto
 import com.trackspeed.android.cloud.dto.RaceEventDto
 import io.github.jan.supabase.SupabaseClient
@@ -30,6 +31,7 @@ class RaceEventService @Inject constructor(
     companion object {
         private const val TAG = "RaceEventService"
         private const val TABLE_RACE_EVENTS = "race_events"
+        private const val TABLE_CROSSINGS = "crossings"
         private const val TABLE_PAIRING_REQUESTS = "pairing_requests"
     }
 
@@ -78,6 +80,53 @@ class RaceEventService @Inject constructor(
         } finally {
             supabase.realtime.removeChannel(channel)
             Log.d(TAG, "Unsubscribed from race events for session: $sessionId")
+        }
+    }
+
+    /**
+     * Insert a crossing record into the crossings table.
+     */
+    suspend fun insertCrossing(crossing: CrossingDto) {
+        try {
+            supabase.from(TABLE_CROSSINGS).insert(crossing)
+            Log.d(TAG, "Inserted crossing: gate=${crossing.gateRole}, session=${crossing.sessionId}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to insert crossing", e)
+            throw e
+        }
+    }
+
+    /**
+     * Subscribe to real-time crossing events for a specific session.
+     * Returns a Flow that emits CrossingDto whenever a new crossing is inserted.
+     */
+    fun subscribeToCrossings(sessionId: String): Flow<CrossingDto> = flow {
+        val channel = supabase.channel("crossings_$sessionId")
+
+        val changeFlow = channel.postgresChangeFlow<PostgresAction.Insert>(
+            schema = "public"
+        ) {
+            table = TABLE_CROSSINGS
+            filter("session_id", FilterOperator.EQ, sessionId)
+        }
+
+        channel.subscribe()
+        Log.d(TAG, "Subscribed to crossings for session: $sessionId")
+
+        try {
+            emitAll(
+                changeFlow.mapNotNull { insertAction ->
+                    try {
+                        insertAction.decodeRecord<CrossingDto>()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to decode crossing from realtime", e)
+                        null
+                    }
+                }
+            )
+        } finally {
+            supabase.realtime.removeChannel(channel)
+            Log.d(TAG, "Unsubscribed from crossings for session: $sessionId")
         }
     }
 

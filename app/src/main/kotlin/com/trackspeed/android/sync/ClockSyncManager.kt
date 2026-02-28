@@ -10,6 +10,7 @@ import com.trackspeed.android.protocol.TimingSessionConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -56,11 +57,31 @@ class ClockSyncManager @Inject constructor(
     private val _isServer = MutableStateFlow(false)
     val isServer: StateFlow<Boolean> = _isServer.asStateFlow()
 
+    private val _connectedGateCount = MutableStateFlow(0)
+    val connectedGateCount: StateFlow<Int> = _connectedGateCount.asStateFlow()
+
+    // Per-client handshake state tracking (server mode only)
+    data class ClientState(
+        val deviceAddress: String,
+        val senderId: String? = null,
+        val gateIndex: Int,
+        val handshakeComplete: Boolean = false,
+        val syncComplete: Boolean = false
+    )
+    private val connectedClients = mutableMapOf<String, ClientState>()
+    private var nextGateIndex = 1  // Gate 0 = server (START), clients start at 1
+    // Per-client timeout jobs for sending SessionConfig
+    private val clientReadyTimeoutJobs = mutableMapOf<String, Job>()
+
     // Drift tracker for long sessions
     private val driftTracker = DriftTracker()
 
     // Sync age tracking
     private var syncTimestampNanos: Long = 0L
+
+    // Supabase session ID for cross-platform thumbnail/crossing sync
+    private val _supabaseSessionId = MutableStateFlow<String?>(null)
+    val supabaseSessionId: StateFlow<String?> = _supabaseSessionId.asStateFlow()
 
     // Mini-sync refresh job
     private var miniSyncJob: Job? = null
@@ -105,8 +126,6 @@ class ClockSyncManager @Inject constructor(
         hostRole = TimingRole.START_LINE
     )
 
-    // Safety timeout job: force-sends SessionConfig if ClientReady never arrives
-    private var clientReadyTimeoutJob: Job? = null
     private val CLIENT_READY_TIMEOUT_MS = 5000L
 
     init {
@@ -128,17 +147,20 @@ class ClockSyncManager @Inject constructor(
                         _syncState.value = SyncState.Connecting
                     }
                     BleClockSyncService.State.Connected -> {
-                        _protocolState.value = ProtocolState.CONNECTED
                         _syncState.value = SyncState.Connecting
                         // Resolve role from dual-mode if needed
                         bleClockSyncService.getResolvedRole()?.let { resolvedRole ->
                             _isServer.value = resolvedRole is BleClockSyncService.Role.Server
                         }
-                        onBleConnected()
+                        // For client mode, drive protocol from state (single server)
+                        if (!_isServer.value) {
+                            _protocolState.value = ProtocolState.CONNECTED
+                            onBleConnectedAsClient()
+                        }
+                        // Server mode: per-client handling via connectionEvents below
                     }
                     BleClockSyncService.State.ClientReady -> {
-                        // Client has enabled notifications — safe to send SessionConfig now
-                        onClientReady()
+                        // Handled per-device via clientReadyDevices flow below
                     }
                     is BleClockSyncService.State.Syncing -> {
                         _protocolState.value = ProtocolState.SYNCING
@@ -178,68 +200,96 @@ class ClockSyncManager @Inject constructor(
         bleClockSyncService.incomingMessages
             .onEach { message -> handleIncomingMessage(message) }
             .launchIn(scope)
-    }
 
-    /**
-     * Called when BLE connection is established. Drives the protocol handshake.
-     *
-     * Host: waits for ClientReady (CCC descriptor write) before sending SessionConfig.
-     *       A safety timeout force-sends after 5s if ClientReady never arrives.
-     * Joiner: waits for SessionConfig from host.
-     */
-    private fun onBleConnected() {
-        if (_isServer.value) {
-            // Host: defer SessionConfig until client enables notifications (ClientReady)
-            // This fixes the race condition where the host sends SessionConfig before
-            // the client has subscribed to notifications, causing the message to be lost.
-            Log.i(TAG, "Host: Connected, waiting for client to enable notifications (ClientReady)...")
-
-            // Safety timeout: force-send SessionConfig if ClientReady never arrives
-            // (some BLE stacks don't reliably deliver onDescriptorWriteRequest)
-            clientReadyTimeoutJob?.cancel()
-            clientReadyTimeoutJob = scope.launch {
-                delay(CLIENT_READY_TIMEOUT_MS)
-                if (_protocolState.value == ProtocolState.CONNECTED) {
-                    Log.w(TAG, "Host: ClientReady timeout (${CLIENT_READY_TIMEOUT_MS}ms) — force-sending SessionConfig")
-                    sendSessionConfig()
+        // Server mode: track per-client connections
+        bleClockSyncService.connectionEvents
+            .onEach { event ->
+                if (!_isServer.value) return@onEach
+                if (event.connected) {
+                    onClientConnected(event.device.address)
+                } else {
+                    onClientDisconnected(event.device.address)
                 }
             }
-        } else {
-            // Joiner: wait for SessionConfig before sending anything
-            Log.i(TAG, "Joiner: Waiting for SessionConfig from host...")
-            _protocolState.value = ProtocolState.AWAITING_CONFIG
-        }
+            .launchIn(scope)
+
+        // Server mode: track per-client notification readiness
+        bleClockSyncService.clientReadyDevices
+            .onEach { deviceAddress ->
+                if (!_isServer.value) return@onEach
+                onClientReady(deviceAddress)
+            }
+            .launchIn(scope)
     }
 
     /**
-     * Called when the client has enabled notifications (CCC descriptor written).
-     * Now it's safe to send SessionConfig — the client will receive the notification.
+     * Called when this device connects as a client (joiner).
      */
-    private fun onClientReady() {
-        if (!_isServer.value) return  // Only relevant for host/server
-
-        clientReadyTimeoutJob?.cancel()
-        clientReadyTimeoutJob = null
-
-        if (_protocolState.value == ProtocolState.CONNECTED) {
-            Log.i(TAG, "Host: ClientReady received — sending SessionConfig now")
-            sendSessionConfig()
-        } else {
-            Log.d(TAG, "Host: ClientReady received but protocol already past CONNECTED (state=${_protocolState.value})")
-        }
+    private fun onBleConnectedAsClient() {
+        Log.i(TAG, "Joiner: Waiting for SessionConfig from host...")
+        _protocolState.value = ProtocolState.AWAITING_CONFIG
     }
 
     /**
-     * Send SessionConfig to the connected client. Called either from onClientReady()
-     * or from the safety timeout.
+     * Server mode: called when a new client connects via BLE.
+     * Registers the client and starts a timeout to send SessionConfig.
      */
-    private fun sendSessionConfig() {
-        Log.i(TAG, "Host: Sending SessionConfig (distance=${sessionConfig.distance}, " +
-            "startType=${sessionConfig.startType}, gates=${sessionConfig.numberOfGates})")
-        bleClockSyncService.sendCriticalMessage(
-            TimingPayload.SessionConfig(config = sessionConfig)
+    private fun onClientConnected(deviceAddress: String) {
+        val gateIndex = nextGateIndex++
+        connectedClients[deviceAddress] = ClientState(
+            deviceAddress = deviceAddress,
+            gateIndex = gateIndex
         )
-        _protocolState.value = ProtocolState.AWAITING_ROLE
+        _connectedGateCount.value = connectedClients.size + 1  // +1 for server itself
+        Log.i(TAG, "Host: Client $deviceAddress registered as gate $gateIndex " +
+            "(${connectedClients.size} client(s), ${_connectedGateCount.value} total gates)")
+
+        // Safety timeout: force-send SessionConfig if ClientReady never arrives
+        clientReadyTimeoutJobs[deviceAddress]?.cancel()
+        clientReadyTimeoutJobs[deviceAddress] = scope.launch {
+            delay(CLIENT_READY_TIMEOUT_MS)
+            if (connectedClients[deviceAddress]?.handshakeComplete == false) {
+                Log.w(TAG, "Host: ClientReady timeout for $deviceAddress — force-sending SessionConfig")
+                sendSessionConfigToDevice(deviceAddress)
+            }
+        }
+    }
+
+    /**
+     * Server mode: called when a client disconnects.
+     */
+    private fun onClientDisconnected(deviceAddress: String) {
+        connectedClients.remove(deviceAddress)
+        clientReadyTimeoutJobs.remove(deviceAddress)?.cancel()
+        _connectedGateCount.value = connectedClients.size + 1
+        Log.i(TAG, "Host: Client $deviceAddress disconnected (${connectedClients.size} client(s) remaining)")
+    }
+
+    /**
+     * Server mode: called when a specific client enables notifications (CCC written).
+     * Now it's safe to send SessionConfig to that client.
+     */
+    private fun onClientReady(deviceAddress: String) {
+        clientReadyTimeoutJobs.remove(deviceAddress)?.cancel()
+
+        if (connectedClients[deviceAddress]?.handshakeComplete == false) {
+            Log.i(TAG, "Host: Client $deviceAddress ready — sending SessionConfig")
+            sendSessionConfigToDevice(deviceAddress)
+        } else {
+            Log.d(TAG, "Host: Client $deviceAddress ready but handshake already complete")
+        }
+    }
+
+    /**
+     * Send SessionConfig to a specific client device.
+     */
+    private fun sendSessionConfigToDevice(deviceAddress: String) {
+        Log.i(TAG, "Host: Sending SessionConfig to $deviceAddress (distance=${sessionConfig.distance}, " +
+            "startType=${sessionConfig.startType}, gates=${sessionConfig.numberOfGates})")
+        bleClockSyncService.sendCriticalMessageToDevice(
+            TimingPayload.SessionConfig(config = sessionConfig),
+            deviceAddress
+        )
     }
 
     /**
@@ -276,33 +326,88 @@ class ClockSyncManager @Inject constructor(
                 Log.i(TAG, "Host: Received RoleRequest from ${payload.deviceId}" +
                     (payload.preferredRole?.let { ", preferred=$it" } ?: ""))
 
-                val assignedRole = payload.preferredRole ?: TimingRole.FINISH_LINE
+                // Look up the BLE device address for this sender to route per-client
+                val senderAddress = bleClockSyncService.getDeviceAddress(message.senderId)
+                val clientState = senderAddress?.let { connectedClients[it] }
+                val gateIndex = clientState?.gateIndex ?: 1
 
-                // Send GateAssigned (critical)
-                bleClockSyncService.sendCriticalMessage(
-                    TimingPayload.GateAssigned(
-                        assignment = GateAssignment(
+                // Update client state with senderId mapping
+                if (senderAddress != null && clientState != null) {
+                    connectedClients[senderAddress] = clientState.copy(senderId = message.senderId)
+                }
+
+                val assignedRole = TimingRole.FINISH_LINE  // All clients are FINISH/intermediate gates
+
+                if (senderAddress != null) {
+                    // Send GateAssigned to specific device (critical)
+                    bleClockSyncService.sendCriticalMessageToDevice(
+                        TimingPayload.GateAssigned(
+                            assignment = GateAssignment(
+                                role = assignedRole,
+                                gateIndex = gateIndex,
+                                distanceFromStart = sessionConfig.distance,
+                                targetDeviceId = payload.deviceId
+                            )
+                        ),
+                        senderAddress
+                    )
+                    Log.i(TAG, "Host: Sent GateAssigned to $senderAddress (gate=$gateIndex)")
+
+                    // Send RoleAssigned to specific device (critical)
+                    bleClockSyncService.sendCriticalMessageToDevice(
+                        TimingPayload.RoleAssigned(
                             role = assignedRole,
-                            gateIndex = if (assignedRole == TimingRole.START_LINE) 0 else 1,
-                            distanceFromStart = if (assignedRole == TimingRole.FINISH_LINE) sessionConfig.distance else 0.0,
+                            targetDeviceId = payload.deviceId
+                        ),
+                        senderAddress
+                    )
+                    Log.i(TAG, "Host: Sent RoleAssigned to $senderAddress")
+
+                    // Mark this client's handshake complete
+                    connectedClients[senderAddress] = connectedClients[senderAddress]!!.copy(
+                        handshakeComplete = true
+                    )
+
+                    // Generate and send Supabase session ID (once, shared across all clients)
+                    if (_supabaseSessionId.value == null) {
+                        val supabaseId = UUID.randomUUID().toString()
+                        _supabaseSessionId.value = supabaseId
+                    }
+                    bleClockSyncService.sendCriticalMessageToDevice(
+                        TimingPayload.SupabaseSession(sessionId = _supabaseSessionId.value!!),
+                        senderAddress
+                    )
+                    Log.i(TAG, "Host: Sent SupabaseSession to $senderAddress")
+                } else {
+                    // Fallback: broadcast (legacy single-client path)
+                    bleClockSyncService.sendCriticalMessage(
+                        TimingPayload.GateAssigned(
+                            assignment = GateAssignment(
+                                role = assignedRole,
+                                gateIndex = gateIndex,
+                                distanceFromStart = sessionConfig.distance,
+                                targetDeviceId = payload.deviceId
+                            )
+                        )
+                    )
+                    bleClockSyncService.sendCriticalMessage(
+                        TimingPayload.RoleAssigned(
+                            role = assignedRole,
                             targetDeviceId = payload.deviceId
                         )
                     )
-                )
-                Log.i(TAG, "Host: Sent GateAssigned (role=${assignedRole.displayName})")
-
-                // Send RoleAssigned (critical)
-                bleClockSyncService.sendCriticalMessage(
-                    TimingPayload.RoleAssigned(
-                        role = assignedRole,
-                        targetDeviceId = payload.deviceId
+                    if (_supabaseSessionId.value == null) {
+                        _supabaseSessionId.value = UUID.randomUUID().toString()
+                    }
+                    bleClockSyncService.sendCriticalMessage(
+                        TimingPayload.SupabaseSession(sessionId = _supabaseSessionId.value!!)
                     )
-                )
-                Log.i(TAG, "Host: Sent RoleAssigned (role=$assignedRole to ${payload.deviceId})")
+                    Log.i(TAG, "Host: Sent handshake via broadcast (no sender address)")
+                }
 
                 _protocolState.value = ProtocolState.HANDSHAKE_COMPLETE
                 _syncState.value = SyncState.Syncing(0f)
-                Log.i(TAG, "Host: Handshake complete, waiting for joiner to start clock sync")
+                Log.i(TAG, "Host: Handshake complete for gate $gateIndex, waiting for sync")
             }
 
             // ── Joiner receives GateAssigned from host ──
@@ -338,8 +443,18 @@ class ClockSyncManager @Inject constructor(
 
             // ── Host receives SyncComplete from joiner ──
             is TimingPayload.SyncComplete -> {
-                Log.i(TAG, "Host: Received SyncComplete from peer: " +
+                val senderAddress = bleClockSyncService.getDeviceAddress(message.senderId)
+                Log.i(TAG, "Host: Received SyncComplete from ${senderAddress ?: "unknown"}: " +
                     "offset=${payload.offsetNanos}ns, uncertainty=${payload.uncertaintyMs}ms")
+
+                // Mark this client as sync-complete
+                if (senderAddress != null) {
+                    connectedClients[senderAddress]?.let {
+                        connectedClients[senderAddress] = it.copy(syncComplete = true)
+                    }
+                    val syncedCount = connectedClients.values.count { it.syncComplete }
+                    Log.i(TAG, "Host: $syncedCount/${connectedClients.size} clients synced")
+                }
 
                 val now = SystemClock.elapsedRealtimeNanos()
                 syncTimestampNanos = now
@@ -382,6 +497,12 @@ class ClockSyncManager @Inject constructor(
 
             is TimingPayload.GateAssignedAck -> {
                 Log.i(TAG, "Received GateAssignedAck: gateIndex=${payload.gateIndex}")
+            }
+
+            // ── Supabase session ID for cross-platform sync ──
+            is TimingPayload.SupabaseSession -> {
+                Log.i(TAG, "Received Supabase session ID: ${payload.sessionId}")
+                _supabaseSessionId.value = payload.sessionId
             }
 
             else -> {
@@ -470,6 +591,9 @@ class ClockSyncManager @Inject constructor(
         sessionConfig = config
         _isServer.value = false  // Will be resolved on connection
         _protocolState.value = ProtocolState.IDLE
+        connectedClients.clear()
+        nextGateIndex = 1
+        _connectedGateCount.value = 0
         driftTracker.reset()
         bleClockSyncService.startDual()
     }
@@ -528,13 +652,17 @@ class ClockSyncManager @Inject constructor(
      */
     fun stop() {
         Log.i(TAG, "Stopping clock sync")
-        clientReadyTimeoutJob?.cancel()
-        clientReadyTimeoutJob = null
+        clientReadyTimeoutJobs.values.forEach { it.cancel() }
+        clientReadyTimeoutJobs.clear()
+        connectedClients.clear()
+        nextGateIndex = 1
+        _connectedGateCount.value = 0
         stopPeriodicRefresh()
         stopHeartbeat()
         bleClockSyncService.stop()
         _protocolState.value = ProtocolState.IDLE
         _syncState.value = SyncState.NotSynced
+        _supabaseSessionId.value = null
     }
 
     /**

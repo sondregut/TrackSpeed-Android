@@ -22,14 +22,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 
-private val ScreenBackground = Color(0xFF000000)
-private val CardBackground = Color(0xFF1C1C1E)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
-private val TextTertiary = Color(0xFF636366)
-private val AccentBlue = Color(0xFF0A84FF)
+private val CardBackground = SurfaceDark
+private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
+private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
+private val TextTertiary = TextMuted
+private val AccentBlue = AccentNavy
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +37,7 @@ fun ToolsScreen(
     onWindAdjustmentClick: () -> Unit,
     onDistanceConverterClick: () -> Unit
 ) {
+    Box(modifier = Modifier.fillMaxSize().gradientBackground()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -52,11 +52,11 @@ fun ToolsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = ScreenBackground
+                    containerColor = Color.Transparent
                 )
             )
         },
-        containerColor = ScreenBackground
+        containerColor = Color.Transparent
     ) { padding ->
         Column(
             modifier = Modifier
@@ -89,7 +89,7 @@ fun ToolsScreen(
                     )
 
                     HorizontalDivider(
-                        color = Color(0xFF38383A),
+                        color = BorderSubtle,
                         modifier = Modifier.padding(start = 56.dp)
                     )
 
@@ -105,6 +105,7 @@ fun ToolsScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+    } // close Box
 }
 
 @Composable

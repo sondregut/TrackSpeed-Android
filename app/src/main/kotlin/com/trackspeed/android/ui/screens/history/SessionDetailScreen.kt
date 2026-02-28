@@ -49,6 +49,11 @@ import com.trackspeed.android.data.local.entities.RunEntity
 import kotlinx.coroutines.launch
 import com.trackspeed.android.ui.components.ExpandedThumbnail
 import com.trackspeed.android.ui.components.ThumbnailViewerDialog
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.TextPrimary as ThemeTextPrimary
+import com.trackspeed.android.ui.theme.TextSecondary as ThemeTextSecondary
+import com.trackspeed.android.ui.theme.SurfaceDark
+import com.trackspeed.android.ui.theme.gradientBackground
 import com.trackspeed.android.ui.util.formatTime
 import com.trackspeed.android.ui.util.formatSpeed
 import com.trackspeed.android.ui.util.parseAthleteColor
@@ -59,16 +64,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val ScreenBackground = Color(0xFF000000)
-private val CardBackground = Color(0xFF2C2C2E)
-private val TopBarBackground = Color(0xFF1C1C1E)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
+private val TextPrimary = ThemeTextPrimary
+private val TextSecondary = ThemeTextSecondary
 private val BestGreen = Color(0xFF4CAF50)
 private val SeasonGold = Color(0xFFFFD600)
-private val AccentBlue = Color(0xFF0A84FF)
-private val ChipUnselected = Color(0xFF1C1C1E)
-private val TableHeaderBg = Color(0xFF1C1C1E)
+private val AccentBlue = AccentNavy
+private val ChipUnselected = SurfaceDark
+private val TableHeaderBg = SurfaceDark
 private val BestRowBg = Color(0xFF1A3A1A)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,7 +93,7 @@ fun SessionDetailScreen(
     )
 
     Scaffold(
-        containerColor = ScreenBackground,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
@@ -126,17 +128,17 @@ fun SessionDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = TopBarBackground,
+                    containerColor = SurfaceDark,
                     titleContentColor = TextPrimary,
                     navigationIconContentColor = TextPrimary
                 )
             )
-        }
+        },
+        modifier = Modifier.gradientBackground()
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(ScreenBackground)
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -395,7 +397,7 @@ private fun CompactRunRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val bgColor = if (isBest) BestRowBg else CardBackground
+    val bgColor = if (isBest) BestRowBg else SurfaceDark
     val timeColor = if (isBest) BestGreen else TextPrimary
 
     Row(
@@ -523,7 +525,7 @@ private fun ExpandedThumbnailRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(CardBackground.copy(alpha = 0.7f))
+            .background(SurfaceDark.copy(alpha = 0.7f))
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically

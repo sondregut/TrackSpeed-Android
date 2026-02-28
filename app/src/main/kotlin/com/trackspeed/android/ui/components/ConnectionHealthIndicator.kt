@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.trackspeed.android.ui.theme.TextSecondary
 
 /**
  * Connection health status levels, matching iOS ConnectionStatus enum.
@@ -142,7 +143,7 @@ fun ConnectionHealthIndicator(
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontSize = 10.sp
                 ),
-                color = Color(0xFF8E8E93)
+                color = TextSecondary
             )
         }
     }

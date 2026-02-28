@@ -19,10 +19,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = Color(0xFF0A84FF)
-private val SuccessGreen = Color(0xFF30D158)
-private val SurfaceColor = Color(0xFF1C1C1E)
+private val AccentBlue = AccentNavy
+private val SuccessGreen = AccentGreen
+private val SurfaceColor = SurfaceDark
 
 @Composable
 fun PromoCodeStep(
@@ -59,7 +60,7 @@ fun PromoCodeStep(
                 text = stringResource(R.string.onboarding_promo_title),
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = TextPrimary
             )
 
             Spacer(Modifier.height(8.dp))
@@ -67,7 +68,7 @@ fun PromoCodeStep(
             Text(
                 text = stringResource(R.string.onboarding_promo_subtitle),
                 fontSize = 17.sp,
-                color = Color(0xFFAEAEB2)
+                color = TextSecondary
             )
         }
 
@@ -84,22 +85,22 @@ fun PromoCodeStep(
                 Text(
                     text = stringResource(R.string.onboarding_promo_field_label),
                     fontSize = 12.sp,
-                    color = Color(0xFF8E8E93),
+                    color = TextSecondary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
                 OutlinedTextField(
                     value = promoCode,
                     onValueChange = { onPromoCodeChanged(it.uppercase()) },
-                    placeholder = { Text(stringResource(R.string.onboarding_promo_field_placeholder), color = Color(0xFF48484A)) },
+                    placeholder = { Text(stringResource(R.string.onboarding_promo_field_placeholder), color = TextMuted) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .onFocusChanged { isFocused = it.isFocused },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = if (isFocused) AccentBlue else Color(0xFF3A3A3C),
-                        unfocusedBorderColor = Color(0xFF3A3A3C),
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = if (isFocused) AccentBlue else BorderSubtle,
+                        unfocusedBorderColor = BorderSubtle,
                         focusedContainerColor = SurfaceColor,
                         unfocusedContainerColor = SurfaceColor,
                         cursorColor = AccentBlue
@@ -107,7 +108,7 @@ fun PromoCodeStep(
                     textStyle = TextStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 20.sp,
-                        color = Color.White
+                        color = TextPrimary
                     ),
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true

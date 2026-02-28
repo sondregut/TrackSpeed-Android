@@ -29,11 +29,12 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
 
-private val AccentBlue = Color(0xFF0A84FF)
-private val SuccessGreen = Color(0xFF30D158)
-private val WarningOrange = Color(0xFFFF9F0A)
+private val AccentBlue = AccentNavy
+private val SuccessGreen = AccentGreen
+private val WarningOrange = AccentGold
 
 private enum class CameraPermissionState {
     NOT_DETERMINED,
@@ -135,7 +136,7 @@ fun CameraPermissionStep(
             text = headline,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = TextPrimary,
             textAlign = TextAlign.Center
         )
 
@@ -144,7 +145,7 @@ fun CameraPermissionStep(
         Text(
             text = description,
             fontSize = 17.sp,
-            color = Color(0xFFAEAEB2),
+            color = TextSecondary,
             textAlign = TextAlign.Center,
             lineHeight = 24.sp
         )
@@ -210,7 +211,7 @@ fun CameraPermissionStep(
 
         if (permissionState != CameraPermissionState.GRANTED) {
             TextButton(onClick = onSkip) {
-                Text(stringResource(R.string.common_skip_for_now), color = Color(0xFF8E8E93))
+                Text(stringResource(R.string.common_skip_for_now), color = TextSecondary)
             }
         }
 

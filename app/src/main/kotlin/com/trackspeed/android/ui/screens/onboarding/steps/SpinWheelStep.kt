@@ -22,12 +22,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
 
-private val AccentBlue = Color(0xFF0A84FF)
-private val AccentGreen = Color(0xFF30D158)
+private val AccentBlue = AccentNavy
+private val SpinGreen = AccentGreen
 
 private data class WheelSegment(val labelRes: Int?, val emoji: String?, val color: Color, val isTarget: Boolean = false)
 
@@ -44,14 +45,14 @@ fun SpinWheelStep(onContinue: () -> Unit) {
 
     val segments = remember(segment20Off, segmentNoLuck) {
         listOf(
-            WheelSegment(null, segment20Off, Color(0xFF0A84FF), isTarget = true),
-            WheelSegment(null, "\uD83C\uDF81", Color(0xFF2C2C2E)),
-            WheelSegment(null, segmentNoLuck, Color(0xFF1C1C1E)),
-            WheelSegment(null, "\uD83C\uDF81", Color(0xFF2C2C2E)),
-            WheelSegment(null, segmentNoLuck, Color(0xFF1C1C1E)),
-            WheelSegment(null, "\uD83C\uDF81", Color(0xFF2C2C2E)),
-            WheelSegment(null, segmentNoLuck, Color(0xFF1C1C1E)),
-            WheelSegment(null, "\uD83C\uDF81", Color(0xFF2C2C2E)),
+            WheelSegment(null, segment20Off, AccentBlue, isTarget = true),
+            WheelSegment(null, "\uD83C\uDF81", SurfaceDark),
+            WheelSegment(null, segmentNoLuck, SurfaceDark.copy(alpha = 0.8f)),
+            WheelSegment(null, "\uD83C\uDF81", SurfaceDark),
+            WheelSegment(null, segmentNoLuck, SurfaceDark.copy(alpha = 0.8f)),
+            WheelSegment(null, "\uD83C\uDF81", SurfaceDark),
+            WheelSegment(null, segmentNoLuck, SurfaceDark.copy(alpha = 0.8f)),
+            WheelSegment(null, "\uD83C\uDF81", SurfaceDark),
         )
     }
 
@@ -88,14 +89,14 @@ fun SpinWheelStep(onContinue: () -> Unit) {
             stringResource(R.string.onboarding_spin_title),
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = TextPrimary,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
         Text(
             stringResource(R.string.onboarding_spin_subtitle),
             fontSize = 17.sp,
-            color = Color(0xFFAEAEB2)
+            color = TextSecondary
         )
 
         Spacer(Modifier.height(24.dp))
@@ -134,7 +135,7 @@ fun SpinWheelStep(onContinue: () -> Unit) {
                     lineTo(size.width, 0f)
                     close()
                 }
-                drawPath(path, Color.White)
+                drawPath(path, TextPrimary)
             }
         }
 
@@ -154,7 +155,7 @@ fun SpinWheelStep(onContinue: () -> Unit) {
                 // Pricing with strikethrough
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark.copy(alpha = 0.8f)),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(
@@ -165,7 +166,7 @@ fun SpinWheelStep(onContinue: () -> Unit) {
                             Text(
                                 stringResource(R.string.onboarding_spin_original_price),
                                 fontSize = 16.sp,
-                                color = Color(0xFF8E8E93),
+                                color = TextSecondary,
                                 style = LocalTextStyle.current.copy(
                                     textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
                                 )
@@ -182,7 +183,7 @@ fun SpinWheelStep(onContinue: () -> Unit) {
                         Text(
                             stringResource(R.string.onboarding_spin_monthly_price),
                             fontSize = 14.sp,
-                            color = Color(0xFF8E8E93)
+                            color = TextSecondary
                         )
                     }
                 }
@@ -216,14 +217,14 @@ fun SpinWheelStep(onContinue: () -> Unit) {
                 },
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = if (spinState == SpinState.LANDED) Color.Black else Color.White
+                color = if (spinState == SpinState.LANDED) Color.Black else TextPrimary
             )
         }
 
         if (canSkip && spinState != SpinState.LANDED) {
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = onContinue) {
-                Text(stringResource(R.string.common_skip), color = Color(0xFF8E8E93), fontSize = 14.sp)
+                Text(stringResource(R.string.common_skip), color = TextSecondary, fontSize = 14.sp)
             }
         }
 

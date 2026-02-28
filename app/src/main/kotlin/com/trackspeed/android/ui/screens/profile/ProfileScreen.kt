@@ -80,14 +80,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.R
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 
-// Design tokens
-private val PureBlack = Color(0xFF000000)
-private val CardBg = Color(0xFF2C2C2E)
-private val TextSecondary = Color(0xFF8E8E93)
-private val AccentGreen = Color(0xFF30D158)
-private val AccentBlue = Color(0xFF0A84FF)
+// Design tokens (theme colors imported from ui.theme)
 private val ProGreen = Color(0xFF00E676)
 private val DangerRed = Color(0xFFFF453A)
 
@@ -151,15 +146,15 @@ fun ProfileScreen(
     if (showPhotoSourceDialog) {
         AlertDialog(
             onDismissRequest = { showPhotoSourceDialog = false },
-            title = { Text(stringResource(R.string.profile_photo_title), color = Color.White) },
+            title = { Text(stringResource(R.string.profile_photo_title), color = TextPrimary) },
             text = { Text(stringResource(R.string.profile_photo_choose_option), color = TextSecondary) },
-            containerColor = CardBg,
+            containerColor = SurfaceDark,
             confirmButton = {
                 TextButton(onClick = {
                     showPhotoSourceDialog = false
                     galleryLauncher.launch("image/*")
                 }) {
-                    Text(stringResource(R.string.profile_photo_choose_new), color = AccentBlue)
+                    Text(stringResource(R.string.profile_photo_choose_new), color = AccentNavy)
                 }
             },
             dismissButton = {
@@ -170,7 +165,7 @@ fun ProfileScreen(
                         captureUri = uri
                         cameraLauncher.launch(uri)
                     }) {
-                        Text(stringResource(R.string.profile_photo_take), color = AccentBlue)
+                        Text(stringResource(R.string.profile_photo_take), color = AccentNavy)
                     }
                     TextButton(onClick = {
                         showPhotoSourceDialog = false
@@ -207,7 +202,7 @@ private fun ProfileScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(PureBlack)
+            .gradientBackground()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
     ) {
@@ -222,7 +217,7 @@ private fun ProfileScreenContent(
                 Icon(
                     imageVector = Icons.Outlined.Settings,
                     contentDescription = stringResource(R.string.common_settings),
-                    tint = Color.White,
+                    tint = TextPrimary,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -267,7 +262,7 @@ private fun ProfileScreenContent(
                         modifier = Modifier
                             .size(80.dp)
                             .clip(CircleShape)
-                            .background(AccentBlue.copy(alpha = 0.2f)),
+                            .background(AccentNavy.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (uiState.userName.isNotEmpty()) {
@@ -276,14 +271,14 @@ private fun ProfileScreenContent(
                                 style = MaterialTheme.typography.headlineMedium.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = AccentBlue
+                                color = AccentNavy
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Outlined.Person,
                                 contentDescription = stringResource(R.string.profile_avatar_cd),
                                 modifier = Modifier.size(40.dp),
-                                tint = AccentBlue
+                                tint = AccentNavy
                             )
                         }
                     }
@@ -296,14 +291,14 @@ private fun ProfileScreenContent(
                         .offset(x = 2.dp, y = 2.dp)
                         .size(24.dp)
                         .clip(CircleShape)
-                        .background(CardBg),
+                        .background(SurfaceDark),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.CameraAlt,
                         contentDescription = stringResource(R.string.profile_change_photo_cd),
                         modifier = Modifier.size(14.dp),
-                        tint = Color.White
+                        tint = TextPrimary
                     )
                 }
             }
@@ -322,13 +317,13 @@ private fun ProfileScreenContent(
                     onNameChanged(newName)
                 },
                 textStyle = TextStyle(
-                    color = Color.White,
+                    color = TextPrimary,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 ),
                 singleLine = true,
-                cursorBrush = SolidColor(AccentBlue),
+                cursorBrush = SolidColor(AccentNavy),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
                     onDone = { focusManager.clearFocus() }
@@ -376,7 +371,7 @@ private fun ProfileScreenContent(
         if (uiState.isProUser) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = ProGreen.copy(alpha = 0.12f))
             ) {
                 Row(
@@ -405,7 +400,7 @@ private fun ProfileScreenContent(
             Card(
                 onClick = onPaywallClick,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = ProGreen)
             ) {
                 Row(
@@ -451,8 +446,8 @@ private fun ProfileScreenContent(
         Card(
             onClick = onReferralClick,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBg)
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark)
         ) {
             Row(
                 modifier = Modifier
@@ -464,14 +459,14 @@ private fun ProfileScreenContent(
                     imageVector = Icons.Outlined.PersonAdd,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
-                    tint = AccentBlue
+                    tint = AccentNavy
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.profile_invite_friends),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White
+                        color = TextPrimary
                     )
                     Text(
                         text = stringResource(R.string.profile_invite_friends_subtitle),
@@ -482,7 +477,7 @@ private fun ProfileScreenContent(
                 Icon(
                     imageVector = Icons.Outlined.ChevronRight,
                     contentDescription = null,
-                    tint = Color(0xFF48484A),
+                    tint = TextMuted,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -522,8 +517,8 @@ private fun ProfileScreenContent(
         if (uiState.personalBests.isEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBg)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark)
             ) {
                 Box(
                     modifier = Modifier
@@ -556,8 +551,8 @@ private fun ProfileScreenContent(
         } else {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBg)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark)
             ) {
                 Column(modifier = Modifier.padding(vertical = 4.dp)) {
                     uiState.personalBests.forEachIndexed { index, pb ->
@@ -568,7 +563,7 @@ private fun ProfileScreenContent(
                         if (index < uiState.personalBests.lastIndex) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 16.dp),
-                                color = Color(0xFF3A3A3C)
+                                color = BorderSubtle
                             )
                         }
                     }
@@ -586,8 +581,8 @@ private fun ProfileScreenContent(
         Card(
             onClick = onAthletesClick,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBg)
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark)
         ) {
             Row(
                 modifier = Modifier
@@ -606,7 +601,7 @@ private fun ProfileScreenContent(
                     Text(
                         text = stringResource(R.string.profile_manage_athletes),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White
+                        color = TextPrimary
                     )
                     if (uiState.athleteCount > 0) {
                         Text(
@@ -622,7 +617,7 @@ private fun ProfileScreenContent(
                 Icon(
                     imageVector = Icons.Outlined.ChevronRight,
                     contentDescription = null,
-                    tint = Color(0xFF48484A),
+                    tint = TextMuted,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -637,8 +632,8 @@ private fun ProfileScreenContent(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBg)
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark)
         ) {
             Column {
                 // Wind Adjustment
@@ -660,7 +655,7 @@ private fun ProfileScreenContent(
                         Text(
                             text = stringResource(R.string.profile_wind_adjustment),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White
+                            color = TextPrimary
                         )
                         Text(
                             text = stringResource(R.string.profile_wind_adjustment_subtitle),
@@ -671,7 +666,7 @@ private fun ProfileScreenContent(
                     Icon(
                         imageVector = Icons.Outlined.ChevronRight,
                         contentDescription = null,
-                        tint = Color(0xFF48484A),
+                        tint = TextMuted,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -697,7 +692,7 @@ private fun ProfileScreenContent(
                         Text(
                             text = stringResource(R.string.profile_distance_converter),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White
+                            color = TextPrimary
                         )
                         Text(
                             text = stringResource(R.string.profile_distance_converter_subtitle),
@@ -708,7 +703,7 @@ private fun ProfileScreenContent(
                     Icon(
                         imageVector = Icons.Outlined.ChevronRight,
                         contentDescription = null,
-                        tint = Color(0xFF48484A),
+                        tint = TextMuted,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -724,8 +719,8 @@ private fun ProfileScreenContent(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBg)
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark)
         ) {
             Column {
                 if (uiState.isSignedIn) {
@@ -733,7 +728,7 @@ private fun ProfileScreenContent(
                     AccountRow(
                         icon = Icons.Outlined.Logout,
                         label = stringResource(R.string.profile_sign_out),
-                        labelColor = Color.White,
+                        labelColor = TextPrimary,
                         iconTint = TextSecondary,
                         onClick = onSignOutClick
                     )
@@ -767,7 +762,7 @@ private fun ProfileScreenContent(
                             Text(
                                 text = stringResource(R.string.profile_guest_account),
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = Color.White
+                                color = TextPrimary
                             )
                             Text(
                                 text = stringResource(R.string.profile_guest_sign_in_hint),
@@ -789,8 +784,8 @@ private fun ProfileScreenContent(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBg)
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark)
         ) {
             Column {
                 AboutRow(
@@ -827,14 +822,14 @@ private fun ProfileScreenContent(
     if (uiState.showSignOutConfirmation) {
         AlertDialog(
             onDismissRequest = onDismissSignOut,
-            title = { Text(stringResource(R.string.profile_sign_out_title), color = Color.White) },
+            title = { Text(stringResource(R.string.profile_sign_out_title), color = TextPrimary) },
             text = {
                 Text(
                     stringResource(R.string.profile_sign_out_message),
                     color = TextSecondary
                 )
             },
-            containerColor = CardBg,
+            containerColor = SurfaceDark,
             confirmButton = {
                 TextButton(onClick = onConfirmSignOut) {
                     Text(stringResource(R.string.profile_sign_out), color = DangerRed)
@@ -842,7 +837,7 @@ private fun ProfileScreenContent(
             },
             dismissButton = {
                 TextButton(onClick = onDismissSignOut) {
-                    Text(stringResource(R.string.common_cancel), color = AccentBlue)
+                    Text(stringResource(R.string.common_cancel), color = AccentNavy)
                 }
             }
         )
@@ -851,14 +846,14 @@ private fun ProfileScreenContent(
     if (uiState.showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = onDismissDeleteAccount,
-            title = { Text(stringResource(R.string.profile_delete_account_title), color = Color.White) },
+            title = { Text(stringResource(R.string.profile_delete_account_title), color = TextPrimary) },
             text = {
                 Text(
                     stringResource(R.string.profile_delete_account_message),
                     color = TextSecondary
                 )
             },
-            containerColor = CardBg,
+            containerColor = SurfaceDark,
             confirmButton = {
                 TextButton(onClick = onConfirmDeleteAccount) {
                     Text(stringResource(R.string.profile_delete_account), color = DangerRed)
@@ -866,7 +861,7 @@ private fun ProfileScreenContent(
             },
             dismissButton = {
                 TextButton(onClick = onDismissDeleteAccount) {
-                    Text(stringResource(R.string.common_cancel), color = AccentBlue)
+                    Text(stringResource(R.string.common_cancel), color = AccentNavy)
                 }
             }
         )
@@ -881,10 +876,8 @@ private fun StatCard(
     value: String,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBg)
+    Box(
+        modifier = modifier.gunmetalCard()
     ) {
         Column(
             modifier = Modifier
@@ -898,7 +891,7 @@ private fun StatCard(
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
                 ),
-                color = Color.White
+                color = TextPrimary
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -927,7 +920,7 @@ private fun PersonalBestRow(
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontWeight = FontWeight.Medium
             ),
-            color = Color.White
+            color = TextPrimary
         )
         Text(
             text = formatTime(timeSeconds),
@@ -998,7 +991,7 @@ private fun AboutRow(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.White
+                color = TextPrimary
             )
         }
         Text(
@@ -1013,7 +1006,7 @@ private fun AboutRow(
 private fun SettingsDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 16.dp),
-        color = Color(0xFF3A3A3C)
+        color = BorderSubtle
     )
 }
 

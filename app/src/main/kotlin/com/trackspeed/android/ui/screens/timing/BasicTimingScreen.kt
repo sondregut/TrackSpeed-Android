@@ -57,20 +57,21 @@ import com.trackspeed.android.ui.components.TouchStartOverlay
 import com.trackspeed.android.ui.components.VoiceStartOverlay
 import com.trackspeed.android.ui.util.formatDistance
 import com.trackspeed.android.ui.util.formatTime
+import com.trackspeed.android.ui.theme.*
 
-// Color constants matching iOS TrackSpeed design
-private val ScreenBackground = Color(0xFF000000)
-private val CardBackground = Color(0xFF2C2C2E)
-private val TimerBlue = Color(0xFF5B9BD5)
-private val PracticeGreen = Color(0xFF34C759)
-private val StatusRed = Color(0xFFFF3B30)
-private val StatusGreen = Color(0xFF30D158)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
-private val TextTertiary = Color(0xFF636366)
-private val DarkGray = Color(0xFF3A3A3C)
-private val TabSelectedColor = Color.White
-private val TabUnselectedColor = Color(0xFF8E8E93)
+// Color constants - keep camera area dark for contrast, update accent/text colors
+private val ScreenBackground = Color(0xFF000000) // Keep dark for camera contrast
+private val CardBackground = SurfaceDark
+private val TimerBlue = AccentNavy
+private val PracticeGreen = com.trackspeed.android.ui.theme.AccentGreen
+private val StatusRed = com.trackspeed.android.ui.theme.StatusRed
+private val StatusGreen = com.trackspeed.android.ui.theme.StatusGreen
+private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
+private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
+private val TextTertiary = TextMuted
+private val DarkGray = BorderSubtle
+private val TabSelectedColor = com.trackspeed.android.ui.theme.TextPrimary
+private val TabUnselectedColor = com.trackspeed.android.ui.theme.TextSecondary
 
 @Composable
 fun BasicTimingScreen(
@@ -640,7 +641,7 @@ private fun getStatusBannerInfo(uiState: BasicTimingUiState): BannerInfo? {
             BannerInfo(stringResource(R.string.timing_banner_ready), Icons.Default.FiberManualRecord, StatusGreen)
 
         !uiState.isRunning && uiState.laps.isNotEmpty() ->
-            BannerInfo(stringResource(R.string.timing_banner_stopped), Icons.Default.Pause, Color(0xFF636366))
+            BannerInfo(stringResource(R.string.timing_banner_stopped), Icons.Default.Pause, TextMuted)
 
         else -> null
     }

@@ -2,7 +2,6 @@ package com.trackspeed.android.ui.screens.race
 
 import android.Manifest
 import android.os.Build
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -26,20 +24,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,16 +39,16 @@ import com.trackspeed.android.detection.PhotoFinishDetector
 import com.trackspeed.android.sync.SyncQuality
 import com.trackspeed.android.ui.components.CameraPreview
 import com.trackspeed.android.ui.components.CameraPreviewPlaceholder
+import com.trackspeed.android.ui.theme.*
 
-// Dark theme color constants matching the rest of the app
-private val ScreenBackground = Color(0xFF000000)
-private val CardBackground = Color(0xFF2C2C2E)
-private val DarkGray = Color(0xFF3A3A3C)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
-private val TextTertiary = Color(0xFF636366)
-private val AccentBlue = Color(0xFF0A84FF)
-private val AccentGreen = Color(0xFF30D158)
+// Dark theme color constants using new LaserSpeed theme
+private val CardBackground = SurfaceDark
+private val DarkGray = BorderSubtle
+private val TextPrimary = com.trackspeed.android.ui.theme.TextPrimary
+private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
+private val TextTertiary = TextMuted
+private val AccentBlue = AccentNavy
+private val AccentGreen = com.trackspeed.android.ui.theme.AccentGreen
 private val AccentRed = Color(0xFFFF453A)
 private val AccentOrange = Color(0xFFFF9F0A)
 
@@ -117,46 +105,39 @@ fun RaceModeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ScreenBackground)
+            .gradientBackground()
             .systemBarsPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top bar
             RaceTopBar(
                 phase = uiState.phase,
+                connectedDeviceCount = uiState.connectedDeviceCount,
                 onBack = {
-                    if (uiState.phase == RacePhase.ROLE_SELECTION) {
+                    if (uiState.phase == RacePhase.PAIRING) {
+                        viewModel.resetToStart()
                         onNavigateBack()
                     } else {
-                        viewModel.resetToRoleSelection()
+                        viewModel.resetToStart()
                     }
                 }
             )
 
             // Phase content
             when (uiState.phase) {
-                RacePhase.ROLE_SELECTION -> RoleSelectionContent(
-                    hasBluetoothPermission = hasBluetoothPermission,
-                    onRoleSelected = viewModel::selectRole
-                )
-                RacePhase.SESSION_CODE -> SessionCodeContent(
-                    isHosting = uiState.isHostingSession,
-                    sessionCode = uiState.sessionCode,
-                    pairingError = uiState.pairingError,
-                    onJoinSession = viewModel::joinSession,
-                    onClearError = viewModel::clearPairingError,
-                    onCancel = viewModel::resetToRoleSelection
-                )
                 RacePhase.PAIRING -> PairingContent(
-                    role = uiState.role,
                     pairingStatus = uiState.pairingStatus,
-                    remoteDeviceName = uiState.remoteDeviceName,
-                    onCancel = viewModel::resetToRoleSelection
+                    connectedDeviceCount = uiState.connectedDeviceCount,
+                    onConfirm = { viewModel.confirmPairing() },
+                    onCancel = {
+                        viewModel.resetToStart()
+                        onNavigateBack()
+                    }
                 )
                 RacePhase.SYNCING -> SyncingContent(
                     progress = uiState.syncProgress,
                     quality = uiState.syncQuality,
-                    onCancel = viewModel::resetToRoleSelection
+                    onCancel = viewModel::resetToStart
                 )
                 RacePhase.RACE_READY -> RaceReadyContent(
                     uiState = uiState,
@@ -202,6 +183,7 @@ fun RaceModeScreen(
 @Composable
 private fun RaceTopBar(
     phase: RacePhase,
+    connectedDeviceCount: Int = 0,
     onBack: () -> Unit
 ) {
     Row(
@@ -228,8 +210,6 @@ private fun RaceTopBar(
 
         Text(
             text = when (phase) {
-                RacePhase.ROLE_SELECTION -> stringResource(R.string.race_phase_multi_device)
-                RacePhase.SESSION_CODE -> stringResource(R.string.race_phase_session_code)
                 RacePhase.PAIRING -> stringResource(R.string.race_phase_pairing)
                 RacePhase.SYNCING -> stringResource(R.string.race_phase_clock_sync)
                 RacePhase.RACE_READY -> stringResource(R.string.race_phase_race_ready)
@@ -244,10 +224,26 @@ private fun RaceTopBar(
 
         Spacer(modifier = Modifier.weight(1f))
 
+        // Connected device count badge (during pairing)
+        if (phase == RacePhase.PAIRING && connectedDeviceCount > 0) {
+            Box(
+                modifier = Modifier
+                    .background(AccentGreen.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "$connectedDeviceCount connected",
+                    color = AccentGreen,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+
         // Phase indicator pill
         val phaseLabel = when (phase) {
-            RacePhase.ROLE_SELECTION -> stringResource(R.string.race_pill_setup)
-            RacePhase.SESSION_CODE -> stringResource(R.string.race_pill_code)
             RacePhase.PAIRING -> stringResource(R.string.race_pill_pairing)
             RacePhase.SYNCING -> stringResource(R.string.race_pill_syncing)
             RacePhase.RACE_READY -> stringResource(R.string.race_pill_ready)
@@ -257,7 +253,6 @@ private fun RaceTopBar(
         val phaseColor = when (phase) {
             RacePhase.ACTIVE_RACE -> AccentRed
             RacePhase.RACE_READY -> AccentGreen
-            RacePhase.SESSION_CODE -> AccentOrange
             RacePhase.RESULT -> AccentBlue
             else -> TextSecondary
         }
@@ -279,552 +274,14 @@ private fun RaceTopBar(
 }
 
 // =============================================================================
-// Phase 1: Role Selection
-// =============================================================================
-
-@Composable
-private fun RoleSelectionContent(
-    hasBluetoothPermission: Boolean,
-    onRoleSelected: (DeviceRole) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Header
-        Icon(
-            imageVector = Icons.Outlined.Devices,
-            contentDescription = null,
-            tint = AccentBlue,
-            modifier = Modifier.size(56.dp)
-        )
-
-        Text(
-            text = stringResource(R.string.race_choose_role),
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            color = TextPrimary
-        )
-
-        Text(
-            text = stringResource(R.string.race_choose_role_desc),
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Start Phone card
-        RoleCard(
-            role = DeviceRole.START,
-            icon = Icons.Filled.PlayArrow,
-            iconColor = AccentGreen,
-            subtitle = stringResource(R.string.race_start_subtitle),
-            enabled = hasBluetoothPermission,
-            onClick = { onRoleSelected(DeviceRole.START) }
-        )
-
-        // Finish Phone card
-        RoleCard(
-            role = DeviceRole.FINISH,
-            icon = Icons.Filled.Flag,
-            iconColor = AccentRed,
-            subtitle = stringResource(R.string.race_finish_subtitle),
-            enabled = hasBluetoothPermission,
-            onClick = { onRoleSelected(DeviceRole.FINISH) }
-        )
-
-        if (!hasBluetoothPermission) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Warning,
-                    contentDescription = null,
-                    tint = AccentOrange,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = stringResource(R.string.race_bluetooth_required),
-                    color = AccentOrange,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // How it works section
-        HowItWorksSection()
-    }
-}
-
-@Composable
-private fun RoleCard(
-    role: DeviceRole,
-    icon: ImageVector,
-    iconColor: Color,
-    subtitle: String,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        enabled = enabled
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(iconColor.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconColor,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = when (role) {
-                        DeviceRole.START -> stringResource(R.string.race_role_start)
-                        DeviceRole.FINISH -> stringResource(R.string.race_role_finish)
-                    },
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = if (enabled) TextPrimary else TextTertiary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (enabled) TextSecondary else TextTertiary
-                )
-            }
-
-            Icon(
-                imageVector = Icons.Outlined.ChevronRight,
-                contentDescription = null,
-                tint = TextTertiary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun HowItWorksSection() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(CardBackground, RoundedCornerShape(16.dp))
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.race_how_it_works),
-            style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            color = TextPrimary
-        )
-
-        HowItWorksStep(
-            number = "1",
-            text = stringResource(R.string.race_step_1)
-        )
-        HowItWorksStep(
-            number = "2",
-            text = stringResource(R.string.race_step_2)
-        )
-        HowItWorksStep(
-            number = "3",
-            text = stringResource(R.string.race_step_3)
-        )
-        HowItWorksStep(
-            number = "4",
-            text = stringResource(R.string.race_step_4)
-        )
-    }
-}
-
-@Composable
-private fun HowItWorksStep(number: String, text: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .background(AccentBlue.copy(alpha = 0.15f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = number,
-                color = AccentBlue,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Bold
-                )
-            )
-        }
-
-        Text(
-            text = text,
-            color = TextSecondary,
-            style = MaterialTheme.typography.bodySmall
-        )
-    }
-}
-
-// =============================================================================
-// Phase 1.5: Session Code
-// =============================================================================
-
-@Composable
-private fun SessionCodeContent(
-    isHosting: Boolean,
-    sessionCode: String,
-    pairingError: String?,
-    onJoinSession: (String) -> Unit,
-    onClearError: () -> Unit,
-    onCancel: () -> Unit
-) {
-    if (isHosting) {
-        HostSessionCodeContent(
-            sessionCode = sessionCode,
-            onCancel = onCancel
-        )
-    } else {
-        JoinSessionCodeContent(
-            pairingError = pairingError,
-            onJoinSession = onJoinSession,
-            onClearError = onClearError,
-            onCancel = onCancel
-        )
-    }
-}
-
-@Composable
-private fun HostSessionCodeContent(
-    sessionCode: String,
-    onCancel: () -> Unit
-) {
-    val clipboardManager: ClipboardManager = LocalClipboardManager.current
-    val context = LocalContext.current
-
-    // Pulsing animation for waiting indicator
-    val infiniteTransition = rememberInfiniteTransition(label = "waiting")
-    val dotAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = EaseInOut),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dots"
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Icon
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .background(AccentBlue.copy(alpha = 0.15f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Share,
-                contentDescription = null,
-                tint = AccentBlue,
-                modifier = Modifier.size(32.dp)
-            )
-        }
-
-        Text(
-            text = stringResource(R.string.race_your_session_code),
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            color = TextPrimary
-        )
-
-        Text(
-            text = stringResource(R.string.race_share_this_code),
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            textAlign = TextAlign.Center
-        )
-
-        // Large code display
-        if (sessionCode.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(CardBackground, RoundedCornerShape(16.dp))
-                    .padding(vertical = 24.dp, horizontal = 16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    sessionCode.forEach { digit ->
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(DarkGray, RoundedCornerShape(12.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = digit.toString(),
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                ),
-                                color = TextPrimary
-                            )
-                        }
-                    }
-                }
-            }
-        } else {
-            // Loading state
-            CircularProgressIndicator(
-                color = AccentBlue,
-                modifier = Modifier.size(32.dp)
-            )
-            Text(
-                text = stringResource(R.string.race_generating_code),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
-        }
-
-        // Waiting indicator
-        Text(
-            text = stringResource(R.string.race_waiting_for_partner),
-            style = MaterialTheme.typography.bodyMedium,
-            color = AccentBlue.copy(alpha = dotAlpha)
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Share Code button
-        if (sessionCode.isNotEmpty()) {
-            PillButton(
-                text = stringResource(R.string.race_share_code),
-                backgroundColor = AccentBlue,
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(sessionCode))
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.race_code_copied),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            )
-        }
-
-        // Cancel button
-        PillButton(
-            text = stringResource(R.string.race_cancel),
-            backgroundColor = DarkGray,
-            onClick = onCancel
-        )
-    }
-}
-
-@Composable
-private fun JoinSessionCodeContent(
-    pairingError: String?,
-    onJoinSession: (String) -> Unit,
-    onClearError: () -> Unit,
-    onCancel: () -> Unit
-) {
-    var codeDigits by remember { mutableStateOf(List(6) { "" }) }
-    val focusRequesters = remember { List(6) { FocusRequester() } }
-
-    // Auto-focus first field
-    LaunchedEffect(Unit) {
-        focusRequesters[0].requestFocus()
-    }
-
-    val fullCode = codeDigits.joinToString("")
-    val isCodeComplete = fullCode.length == 6
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Icon
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .background(AccentOrange.copy(alpha = 0.15f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Dialpad,
-                contentDescription = null,
-                tint = AccentOrange,
-                modifier = Modifier.size(32.dp)
-            )
-        }
-
-        Text(
-            text = stringResource(R.string.race_enter_session_code),
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            color = TextPrimary
-        )
-
-        Text(
-            text = stringResource(R.string.race_enter_code_desc),
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            textAlign = TextAlign.Center
-        )
-
-        // OTP-style 6-digit input
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        ) {
-            for (i in 0 until 6) {
-                OutlinedTextField(
-                    value = codeDigits[i],
-                    onValueChange = { value ->
-                        // Clear error on input
-                        if (pairingError != null) onClearError()
-
-                        // Only accept single digit
-                        val filtered = value.filter { it.isDigit() }.take(1)
-                        val newDigits = codeDigits.toMutableList()
-                        newDigits[i] = filtered
-                        codeDigits = newDigits
-
-                        // Auto-advance to next field
-                        if (filtered.isNotEmpty() && i < 5) {
-                            focusRequesters[i + 1].requestFocus()
-                        }
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusRequester(focusRequesters[i])
-                        .onKeyEvent { event ->
-                            // Handle backspace to go to previous field
-                            if (event.key == Key.Backspace && codeDigits[i].isEmpty() && i > 0) {
-                                val newDigits = codeDigits.toMutableList()
-                                newDigits[i - 1] = ""
-                                codeDigits = newDigits
-                                focusRequesters[i - 1].requestFocus()
-                                true
-                            } else {
-                                false
-                            }
-                        },
-                    textStyle = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        fontFamily = FontFamily.Monospace
-                    ),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = AccentBlue,
-                        unfocusedBorderColor = DarkGray,
-                        focusedContainerColor = CardBackground,
-                        unfocusedContainerColor = CardBackground,
-                        errorBorderColor = AccentRed
-                    ),
-                    isError = pairingError != null,
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-        }
-
-        // Error display
-        if (pairingError != null) {
-            Text(
-                text = pairingError,
-                color = AccentRed,
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Join Session button
-        PillButton(
-            text = stringResource(R.string.race_join_session),
-            backgroundColor = if (isCodeComplete) AccentGreen else DarkGray,
-            onClick = {
-                if (isCodeComplete) {
-                    onJoinSession(fullCode)
-                }
-            }
-        )
-
-        // Cancel button
-        PillButton(
-            text = stringResource(R.string.race_cancel),
-            backgroundColor = DarkGray,
-            onClick = onCancel
-        )
-    }
-}
-
-// =============================================================================
-// Phase 2: Pairing
+// Phase 1: Auto BLE Pairing
 // =============================================================================
 
 @Composable
 private fun PairingContent(
-    role: DeviceRole?,
     pairingStatus: String,
-    remoteDeviceName: String? = null,
+    connectedDeviceCount: Int,
+    onConfirm: () -> Unit,
     onCancel: () -> Unit
 ) {
     Column(
@@ -840,7 +297,11 @@ private fun PairingContent(
         ScanningAnimation()
 
         Text(
-            text = if (role == DeviceRole.START) stringResource(R.string.race_pairing_waiting) else stringResource(R.string.race_pairing_searching),
+            text = if (connectedDeviceCount >= 2) {
+                "Ready to time"
+            } else {
+                stringResource(R.string.race_pairing_searching)
+            },
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
@@ -849,25 +310,46 @@ private fun PairingContent(
         )
 
         Text(
-            text = if (pairingStatus.isEmpty()) {
-                if (role == DeviceRole.START) {
-                    stringResource(R.string.race_pairing_start_desc)
-                } else {
-                    stringResource(R.string.race_pairing_finish_desc)
-                }
+            text = if (connectedDeviceCount >= 2) {
+                "$connectedDeviceCount phones connected — tap Start Timing when ready"
+            } else if (connectedDeviceCount > 0) {
+                "$connectedDeviceCount device connected, waiting for more..."
             } else {
-                pairingStatus
+                "Open race mode on all phones — they will auto-discover via Bluetooth"
             },
             style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
+            color = if (connectedDeviceCount > 0) AccentGreen else TextSecondary,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
-        // Role badge
-        RoleBadge(role = role)
+        // Status pill
+        if (pairingStatus.isNotEmpty() && connectedDeviceCount == 0) {
+            Box(
+                modifier = Modifier
+                    .background(TextSecondary.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = pairingStatus,
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.weight(1f))
+
+        // Start timing button (appears when 2+ phones connected)
+        if (connectedDeviceCount >= 2) {
+            PillButton(
+                text = "Start Timing",
+                backgroundColor = AccentGreen,
+                onClick = onConfirm
+            )
+        }
 
         // Cancel button
         PillButton(
@@ -1083,33 +565,6 @@ private fun RaceReadyContent(
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Cloud-only warning
-        if (uiState.isCloudOnlyMode) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = AccentOrange.copy(alpha = 0.15f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Warning,
-                        contentDescription = null,
-                        tint = AccentOrange,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = stringResource(R.string.race_cloud_only_warning),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AccentOrange
-                    )
-                }
-            }
-        }
-
         // Sync quality card
         SyncStatusCard(
             quality = uiState.syncQuality,
@@ -1131,8 +586,8 @@ private fun RaceReadyContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(200.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .border(2.dp, DarkGray, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .border(2.dp, DarkGray, RoundedCornerShape(20.dp))
         ) {
             if (uiState.hasPermission && uiState.cameraState !is CameraManager.CameraState.Error) {
                 CameraPreview(
@@ -1189,7 +644,7 @@ private fun SyncStatusCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = CardBackground)
     ) {
         Column(
@@ -1355,11 +810,11 @@ private fun ActiveRaceContent(
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
                 .border(
                     width = 3.dp,
                     color = getDetectionBorderColor(uiState.detectionState),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(20.dp)
                 )
         ) {
             if (uiState.hasPermission && uiState.cameraState !is CameraManager.CameraState.Error) {
@@ -1557,7 +1012,7 @@ private fun ResultContent(
             // Details card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = CardBackground)
             ) {
                 Column(

@@ -12,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -21,8 +20,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = Color(0xFF0A84FF)
+private val AccentBlue = AccentNavy
 
 @Composable
 fun TrialIntroStep(onContinue: () -> Unit) {
@@ -47,7 +47,7 @@ fun TrialIntroStep(onContinue: () -> Unit) {
             stringResource(R.string.onboarding_trial_title),
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = TextPrimary,
             textAlign = TextAlign.Center,
             lineHeight = 34.sp
         )
@@ -100,9 +100,9 @@ private fun TrialBenefitRow(icon: ImageVector, title: String, description: Strin
         )
         Spacer(Modifier.width(14.dp))
         Column {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
             Spacer(Modifier.height(2.dp))
-            Text(description, fontSize = 14.sp, color = Color(0xFF8E8E93), lineHeight = 20.sp)
+            Text(description, fontSize = 14.sp, color = TextSecondary, lineHeight = 20.sp)
         }
     }
 }

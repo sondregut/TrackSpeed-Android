@@ -45,21 +45,25 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.res.stringResource
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.TextPrimary as ThemeTextPrimary
+import com.trackspeed.android.ui.theme.TextSecondary as ThemeTextSecondary
+import com.trackspeed.android.ui.theme.SurfaceDark
+import com.trackspeed.android.ui.theme.gradientBackground
+import com.trackspeed.android.ui.theme.gunmetalCard
 import com.trackspeed.android.ui.util.formatTime
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val ScreenBackground = Color(0xFF000000)
-private val CardBackground = Color(0xFF2C2C2E)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
-private val AccentBlue = Color(0xFF0A84FF)
-private val ChipUnselectedBackground = Color(0xFF1C1C1E)
+private val TextPrimary = ThemeTextPrimary
+private val TextSecondary = ThemeTextSecondary
+private val AccentBlue = AccentNavy
+private val ChipUnselectedBackground = SurfaceDark
 private val BestGreen = Color(0xFF30D158)
 private val DeleteRed = Color(0xFFFF3B30)
-private val SectionHeaderColor = Color(0xFF8E8E93)
+private val SectionHeaderColor = ThemeTextSecondary
 
 @Composable
 fun SessionHistoryScreen(
@@ -100,14 +104,14 @@ fun SessionHistoryScreen(
                     Text(stringResource(R.string.common_cancel), color = AccentBlue)
                 }
             },
-            containerColor = CardBackground
+            containerColor = SurfaceDark
         )
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(ScreenBackground)
+            .gradientBackground()
             .padding(horizontal = 24.dp)
     ) {
         Spacer(modifier = Modifier.height(24.dp))
@@ -333,7 +337,7 @@ private fun MiniStatChip(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
-        color = CardBackground
+        color = SurfaceDark
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
@@ -484,9 +488,10 @@ private fun SessionCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .gunmetalCard()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
         Row(
             modifier = Modifier

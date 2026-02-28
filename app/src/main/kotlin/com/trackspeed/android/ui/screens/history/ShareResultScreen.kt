@@ -55,15 +55,18 @@ import com.trackspeed.android.R
 import com.trackspeed.android.ui.components.ComposeCapture
 import com.trackspeed.android.ui.components.ShareCardTheme
 import com.trackspeed.android.ui.components.ShareableResultCard
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.TextPrimary as ThemeTextPrimary
+import com.trackspeed.android.ui.theme.TextSecondary as ThemeTextSecondary
+import com.trackspeed.android.ui.theme.SurfaceDark
+import com.trackspeed.android.ui.theme.gradientBackground
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val ScreenBackground = Color(0xFF000000)
-private val TopBarBackground = Color(0xFF1C1C1E)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFF8E8E93)
-private val AccentBlue = Color(0xFF4A90D9)
+private val TextPrimary = ThemeTextPrimary
+private val TextSecondary = ThemeTextSecondary
+private val AccentBlue = AccentNavy
 
 // Card render size in pixels (1080x1920 = 9:16 for Instagram Stories)
 private const val CARD_WIDTH_PX = 1080
@@ -80,7 +83,8 @@ fun ShareResultScreen(
     val scope = rememberCoroutineScope()
 
     Scaffold(
-        containerColor = ScreenBackground,
+        containerColor = Color.Transparent,
+        modifier = Modifier.gradientBackground(),
         topBar = {
             TopAppBar(
                 title = {
@@ -99,7 +103,7 @@ fun ShareResultScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = TopBarBackground,
+                    containerColor = SurfaceDark,
                     titleContentColor = TextPrimary,
                     navigationIconContentColor = TextPrimary
                 )
@@ -110,7 +114,6 @@ fun ShareResultScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(ScreenBackground)
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
@@ -124,7 +127,6 @@ fun ShareResultScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(ScreenBackground)
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
@@ -140,7 +142,6 @@ fun ShareResultScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(ScreenBackground)
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally

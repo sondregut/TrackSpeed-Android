@@ -1,6 +1,5 @@
 package com.trackspeed.android.ui.navigation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -10,7 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import com.trackspeed.android.ui.theme.gradientBackground
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -62,7 +61,9 @@ sealed class Screen(val route: String) {
     data object DevicePairing : Screen("device_pairing")
     data object History : Screen("history")
     data object Settings : Screen("settings")
-    data object Auth : Screen("auth")
+    data object Auth : Screen("auth?signIn={signIn}") {
+        fun createRoute(signInMode: Boolean = false) = "auth?signIn=$signInMode"
+    }
     data object Paywall : Screen("paywall")
     data object Stats : Screen("stats")
 
@@ -119,13 +120,13 @@ fun TrackSpeedNavHost(
         resolvedStart = if (completed) Screen.Home.route else Screen.Onboarding.route
     }
 
-    // Show a black screen while loading the preference (prevents flash of wrong screen).
+    // Show a gradient screen while loading the preference (prevents flash of wrong screen).
     val start = resolvedStart
     if (start == null) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
+                .gradientBackground()
         )
         return
     }
@@ -144,6 +145,9 @@ fun TrackSpeedNavHost(
                 },
                 onGuestJoinSession = {
                     navController.navigate(Screen.GuestJoinSession.route)
+                },
+                onSignIn = {
+                    navController.navigate(Screen.Auth.createRoute(signInMode = true))
                 }
             )
         }
@@ -266,10 +270,25 @@ fun TrackSpeedNavHost(
             )
         }
 
-        composable(Screen.Auth.route) {
+        composable(
+            route = Screen.Auth.route,
+            arguments = listOf(
+                navArgument("signIn") { type = NavType.BoolType; defaultValue = false }
+            )
+        ) { backStackEntry ->
+            val signInMode = backStackEntry.arguments?.getBoolean("signIn") ?: false
+            val fromOnboarding = navController.previousBackStackEntry?.destination?.route == Screen.Onboarding.route
             AuthScreen(
+                startInSignInMode = signInMode,
                 onAuthSuccess = {
-                    navController.popBackStack()
+                    if (fromOnboarding) {
+                        onboardingViewModel.completeOnboarding()
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    } else {
+                        navController.popBackStack()
+                    }
                 },
                 onBack = {
                     navController.popBackStack()

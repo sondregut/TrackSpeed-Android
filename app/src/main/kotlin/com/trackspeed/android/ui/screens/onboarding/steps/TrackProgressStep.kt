@@ -29,9 +29,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = Color(0xFF0A84FF)
-private val SurfaceColor = Color(0xFF1C1C1E)
+private val AccentBlue = AccentNavy
+private val SurfaceColor = SurfaceDark
 
 private data class DataPoint(val month: String, val time: Double)
 
@@ -79,7 +80,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
             text = stringResource(R.string.onboarding_progress_title),
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = TextPrimary,
             textAlign = TextAlign.Center
         )
 
@@ -88,7 +89,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
         Text(
             text = stringResource(R.string.onboarding_progress_subtitle),
             fontSize = 15.sp,
-            color = Color(0xFF8E8E93),
+            color = TextSecondary,
             textAlign = TextAlign.Center
         )
 
@@ -98,7 +99,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
         Text(
             text = chartTitle,
             fontSize = 14.sp,
-            color = Color(0xFFAEAEB2),
+            color = TextSecondary,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 50.dp, bottom = 8.dp)
@@ -123,7 +124,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
 
                 // Grid line
                 drawLine(
-                    color = Color(0xFF2C2C2E),
+                    color = SurfaceDark,
                     start = Offset(chartLeft, y),
                     end = Offset(size.width, y),
                     strokeWidth = 1f
@@ -133,7 +134,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                 val label = textMeasurer.measure(
                     String.format("%.2fs", value),
                     style = TextStyle(
-                        color = Color(0xFF636366),
+                        color = TextMuted,
                         fontSize = 10.sp
                     )
                 )
@@ -150,7 +151,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                 val label = textMeasurer.measure(
                     point.month,
                     style = TextStyle(
-                        color = Color(0xFF636366),
+                        color = TextMuted,
                         fontSize = 10.sp
                     )
                 )
@@ -227,7 +228,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                     )
                     // Inner dot
                     drawCircle(
-                        color = Color(0xFF0A0A0A),
+                        color = BackgroundGradientBottom,
                         radius = 2f,
                         center = point
                     )
@@ -242,7 +243,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(20.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp)
@@ -261,7 +262,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                             text = stringResource(R.string.onboarding_progress_research_label),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF636366),
+                            color = TextMuted,
                             letterSpacing = 0.5.sp
                         )
                     }
@@ -271,7 +272,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                     Text(
                         text = stringResource(R.string.onboarding_progress_research_body),
                         fontSize = 14.sp,
-                        color = Color.White,
+                        color = TextPrimary,
                         lineHeight = 20.sp
                     )
 
@@ -280,7 +281,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
                     Text(
                         text = stringResource(R.string.onboarding_progress_research_detail),
                         fontSize = 12.sp,
-                        color = Color(0xFF636366),
+                        color = TextMuted,
                         lineHeight = 18.sp
                     )
                 }

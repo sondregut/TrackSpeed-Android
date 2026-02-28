@@ -90,7 +90,7 @@ class SettingsRepository @Inject constructor(
         const val CROSSING_FLASH_ENABLED = true
         const val ANNOUNCE_TIMES_ENABLED = false
         const val CONNECTION_METHOD = "auto"
-        const val APPEARANCE_MODE = "system"
+        const val APPEARANCE_MODE = "midnight"
         const val TRY_PRO_REMINDER_ENABLED = true
         const val TRAINING_REMINDER_ENABLED = true
         const val RATING_PROMPT_ENABLED = true

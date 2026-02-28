@@ -21,25 +21,25 @@ enum class OnboardingStep {
     WELCOME,               // 0
     VALUE_PROPOSITION,     // 1
     HOW_IT_WORKS,          // 2
-    TRACK_PREVIEW,         // 3  - NEW: visual track illustration
-    TRACK_PROGRESS,        // 4  - NEW: progress chart preview
-    FLYING_TIME,           // 5
+    NOTIFICATION,          // 3  - moved earlier (after how it works, like iOS)
+    TRACK_PREVIEW,         // 4  - visual track illustration
+    FLYING_TIME,           // 5  - moved before track progress
     GOAL_TIME,             // 6
     GOAL_MOTIVATION,       // 7
-    START_TYPES,           // 8
-    MULTI_DEVICE,          // 9
-    ATTRIBUTION,           // 10
-    RATING,                // 11
-    COMPETITOR_COMPARISON, // 12
-    AUTH,                  // 13
-    CAMERA_PERMISSION,     // 14 - NEW: camera permission request
-    PROFILE_SETUP,         // 15 - NEW: name + team entry
-    TRIAL_INTRO,           // 16
-    TRIAL_REMINDER,        // 17
-    NOTIFICATION,          // 18
+    TRACK_PROGRESS,        // 8  - progress chart preview
+    START_TYPES,           // 9
+    MULTI_DEVICE,          // 10
+    ATTRIBUTION,           // 11
+    RATING,                // 12
+    COMPETITOR_COMPARISON, // 13
+    AUTH,                  // 14
+    CAMERA_PERMISSION,     // 15
+    PROFILE_SETUP,         // 16
+    TRIAL_INTRO,           // 17
+    TRIAL_REMINDER,        // 18
     PAYWALL,               // 19
-    PROMO_CODE,            // 20 - NEW: referral/promo code entry
-    REFERRAL,              // 21 - NEW: invite friends for free months
+    PROMO_CODE,            // 20
+    REFERRAL,              // 21
     SPIN_WHEEL,            // 22
     COMPLETION;            // 23
 

@@ -25,10 +25,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
 
-private val AccentBlue = Color(0xFF0A84FF)
-private val SurfaceColor = Color(0xFF1C1C1E)
+private val AccentBlue = AccentNavy
+private val SurfaceColor = SurfaceDark
 
 @Composable
 fun PaywallStep(
@@ -63,8 +64,7 @@ fun PaywallStep(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 300.dp)
-                    .shadow(elevation = 20.dp, shape = RoundedCornerShape(16.dp))
-                    .clip(RoundedCornerShape(16.dp)),
+                    .clip(RoundedCornerShape(20.dp)),
                 contentScale = ContentScale.Fit
             )
 
@@ -101,7 +101,7 @@ fun PaywallStep(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(20.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(24.dp),
@@ -122,12 +122,12 @@ fun PaywallStep(
                             stringResource(R.string.onboarding_paywall_price),
                             fontSize = 36.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = TextPrimary
                         )
                         Text(
                             stringResource(R.string.onboarding_paywall_price_period),
                             fontSize = 16.sp,
-                            color = Color(0xFF8E8E93),
+                            color = TextSecondary,
                             modifier = Modifier.padding(bottom = 5.dp)
                         )
                     }
@@ -135,7 +135,7 @@ fun PaywallStep(
                     Text(
                         stringResource(R.string.onboarding_paywall_billed),
                         fontSize = 14.sp,
-                        color = Color(0xFF8E8E93)
+                        color = TextSecondary
                     )
                 }
             }
@@ -152,10 +152,10 @@ fun PaywallStep(
                         Icons.Default.Check,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
-                        tint = Color(0xFF30D158)
+                        tint = AccentBlue
                     )
                     Spacer(Modifier.width(12.dp))
-                    Text(stringResource(featureRes), fontSize = 16.sp, color = Color.White)
+                    Text(stringResource(featureRes), fontSize = 16.sp, color = TextPrimary)
                 }
             }
 
@@ -173,14 +173,14 @@ fun PaywallStep(
                     .height(40.dp)
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color(0x000A0A0A), Color(0xFF0A0A0A))
+                            colors = listOf(BackgroundGradientBottom.copy(alpha = 0f), BackgroundGradientBottom)
                         )
                     )
             )
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF0A0A0A))
+                    .background(BackgroundGradientBottom)
                     .padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -194,7 +194,7 @@ fun PaywallStep(
                 Spacer(Modifier.height(8.dp))
                 if (canSkip) {
                     TextButton(onClick = onSkip) {
-                        Text(stringResource(R.string.onboarding_paywall_limited_access), color = Color(0xFF8E8E93), fontSize = 14.sp)
+                        Text(stringResource(R.string.onboarding_paywall_limited_access), color = TextSecondary, fontSize = 14.sp)
                     }
                 } else {
                     Spacer(Modifier.height(40.dp))

@@ -21,12 +21,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val CardBackground = Color(0xFF2C2C2E)
-private val TextSecondary = Color(0xFF8E8E93)
-private val AccentBlue = Color(0xFF0A84FF)
-private val SurfaceColor = Color(0xFF3A3A3C)
-private val BorderColor = Color(0xFF48484A)
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.BorderSubtle
+import com.trackspeed.android.ui.theme.SurfaceDark
+import com.trackspeed.android.ui.theme.TextSecondary
 
 /**
  * Data class representing an athlete for chip display.
@@ -92,13 +90,13 @@ fun AthleteChipSelector(
                     Icon(
                         imageVector = Icons.Outlined.Add,
                         contentDescription = "Add athlete",
-                        tint = AccentBlue,
+                        tint = AccentNavy,
                         modifier = Modifier.size(12.dp)
                     )
                     Text(
                         text = "Add",
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = AccentBlue
+                        color = AccentNavy
                     )
                 }
             }
@@ -117,7 +115,7 @@ fun AthleteChipSelector(
             AthleteChip(
                 name = "No Athlete",
                 initial = "?",
-                chipColor = Color(0xFF8E8E93),
+                chipColor = TextSecondary,
                 isSelected = selectedIds.isEmpty(),
                 runCount = null,
                 onClick = {
@@ -165,8 +163,8 @@ private fun AthleteChip(
                         .border(2.dp, chipColor, RoundedCornerShape(50))
                 } else {
                     Modifier
-                        .background(SurfaceColor)
-                        .border(1.dp, BorderColor, RoundedCornerShape(50))
+                        .background(SurfaceDark)
+                        .border(1.dp, BorderSubtle, RoundedCornerShape(50))
                 }
             )
             .clickable { onClick() }
@@ -219,7 +217,7 @@ private fun AthleteChip(
 private fun AthleteChipSelectorPreview() {
     AthleteChipSelector(
         athletes = listOf(
-            AthleteChipData("1", "Usain Bolt", Color(0xFF0A84FF), runCount = 12),
+            AthleteChipData("1", "Usain Bolt", AccentNavy, runCount = 12),
             AthleteChipData("2", "Elaine Thompson", Color(0xFFBF5AF2), runCount = 8),
             AthleteChipData("3", "Noah Lyles", Color(0xFF30D158), runCount = 3)
         ),

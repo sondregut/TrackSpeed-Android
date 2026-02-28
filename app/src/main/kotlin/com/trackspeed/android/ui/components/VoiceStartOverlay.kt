@@ -59,15 +59,15 @@ import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.audio.VoiceStartPhase
 import com.trackspeed.android.audio.VoiceStartService
+import com.trackspeed.android.ui.theme.AccentNavy
 import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
 
 // Accent colors
-private val AccentBlue = Color(0xFF0A84FF)
 private val AccentGreen = Color(0xFF30D158)
 private val OverlayBackground = Color(0xF2000000)
-private val PhaseBlue = Color(0xD90A84FF)
+private val PhaseBlue = AccentNavy.copy(alpha = 0.85f)
 private val PhaseAmber = Color(0xE5FF9500)
 private val PhaseGo = Color(0xFF30D158)
 
@@ -240,7 +240,7 @@ private fun VoiceIdleContent(pulseScale: Float, onBegin: () -> Unit) {
         Button(
             onClick = onBegin,
             colors = ButtonDefaults.buttonColors(
-                containerColor = AccentBlue.copy(alpha = 0.3f),
+                containerColor = AccentNavy.copy(alpha = 0.3f),
                 contentColor = Color.White
             ),
             modifier = Modifier.padding(horizontal = 32.dp)

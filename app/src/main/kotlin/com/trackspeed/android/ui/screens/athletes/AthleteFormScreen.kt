@@ -54,12 +54,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.trackspeed.android.ui.theme.TrackSpeedTheme
+import com.trackspeed.android.ui.theme.*
 
-private val PureBlack = Color(0xFF000000)
-private val CardBg = Color(0xFF2C2C2E)
-private val TextSecondary = Color(0xFF8E8E93)
-private val AccentBlue = Color(0xFF0A84FF)
+private val CardBg = SurfaceDark
+private val TextSecondary = com.trackspeed.android.ui.theme.TextSecondary
+private val AccentBlue = AccentNavy
 private val DeleteRed = Color(0xFFFF453A)
 
 private val presetColors = listOf(
@@ -107,7 +106,7 @@ private fun AthleteFormContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(PureBlack)
+            .gradientBackground()
     ) {
         // Top bar
         TopAppBar(
@@ -134,8 +133,8 @@ private fun AthleteFormContent(
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = PureBlack,
-                titleContentColor = Color.White
+                containerColor = Color.Transparent,
+                titleContentColor = TextPrimary
             )
         )
 
@@ -190,7 +189,7 @@ private fun AthleteFormContent(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = CardBg)
             ) {
                 Column {
@@ -208,7 +207,7 @@ private fun AthleteFormContent(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
                             .height(1.dp)
-                            .background(Color(0xFF3A3A3C))
+                            .background(BorderSubtle)
                     )
 
                     TextField(
@@ -231,7 +230,7 @@ private fun AthleteFormContent(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = CardBg)
             ) {
                 FlowRow(
@@ -278,7 +277,7 @@ private fun AthleteFormContent(
                 Button(
                     onClick = { showDeleteDialog = true },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = DeleteRed.copy(alpha = 0.15f),
                         contentColor = DeleteRed
@@ -332,7 +331,7 @@ private fun AthleteFormContent(
                 }
             },
             containerColor = CardBg,
-            titleContentColor = Color.White,
+            titleContentColor = TextPrimary,
             textContentColor = TextSecondary
         )
     }
@@ -355,8 +354,8 @@ private fun SectionLabel(text: String) {
 private fun textFieldColors() = TextFieldDefaults.colors(
     focusedContainerColor = Color.Transparent,
     unfocusedContainerColor = Color.Transparent,
-    focusedTextColor = Color.White,
-    unfocusedTextColor = Color.White,
+    focusedTextColor = TextPrimary,
+    unfocusedTextColor = TextPrimary,
     cursorColor = AccentBlue,
     focusedIndicatorColor = Color.Transparent,
     unfocusedIndicatorColor = Color.Transparent

@@ -22,8 +22,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.*
 
-private val AccentBlue = Color(0xFF0A84FF)
+private val AccentBlue = AccentNavy
 
 @Composable
 fun CompetitorComparisonStep(onContinue: () -> Unit) {
@@ -42,7 +43,7 @@ fun CompetitorComparisonStep(onContinue: () -> Unit) {
                 stringResource(R.string.onboarding_comparison_title_top),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = TextPrimary,
                 textAlign = TextAlign.Center
             )
             Text(
@@ -58,8 +59,8 @@ fun CompetitorComparisonStep(onContinue: () -> Unit) {
             // TrackSpeed card with accent border
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                shape = RoundedCornerShape(20.dp),
                 border = BorderStroke(2.dp, AccentBlue)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -81,7 +82,7 @@ fun CompetitorComparisonStep(onContinue: () -> Unit) {
                                 stringResource(R.string.onboarding_comparison_trackspeed_name),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = TextPrimary
                             )
                             Text(
                                 stringResource(R.string.onboarding_comparison_price),
@@ -99,7 +100,7 @@ fun CompetitorComparisonStep(onContinue: () -> Unit) {
                                 stringResource(R.string.onboarding_comparison_save_badge),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                                color = TextPrimary,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
@@ -138,14 +139,14 @@ fun CompetitorComparisonStep(onContinue: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF3A3A3C))
+                HorizontalDivider(modifier = Modifier.weight(1f), color = BorderSubtle)
                 Text(
                     "  ${stringResource(R.string.onboarding_comparison_vs_divider)}  ",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFF8E8E93)
+                    color = TextSecondary
                 )
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF3A3A3C))
+                HorizontalDivider(modifier = Modifier.weight(1f), color = BorderSubtle)
             }
 
             Spacer(Modifier.height(20.dp))
@@ -156,7 +157,7 @@ fun CompetitorComparisonStep(onContinue: () -> Unit) {
                 contentDescription = stringResource(R.string.onboarding_comparison_hardware_image_description),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp)),
+                    .clip(RoundedCornerShape(20.dp)),
                 contentScale = ContentScale.Fit
             )
 
@@ -166,12 +167,12 @@ fun CompetitorComparisonStep(onContinue: () -> Unit) {
                 stringResource(R.string.onboarding_comparison_hardware_price),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = TextPrimary
             )
             Text(
                 stringResource(R.string.onboarding_comparison_hardware_subtitle),
                 fontSize = 15.sp,
-                color = Color(0xFF8E8E93)
+                color = TextSecondary
             )
 
             // Bottom padding for button overlay
@@ -188,14 +189,14 @@ fun CompetitorComparisonStep(onContinue: () -> Unit) {
                     .height(40.dp)
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color(0x000A0A0A), Color(0xFF0A0A0A))
+                            colors = listOf(BackgroundGradientBottom.copy(alpha = 0f), BackgroundGradientBottom)
                         )
                     )
             )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF0A0A0A))
+                    .background(BackgroundGradientBottom)
                     .padding(horizontal = 32.dp)
                     .padding(bottom = 32.dp)
             ) {

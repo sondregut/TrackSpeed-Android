@@ -11,11 +11,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val AccentBlue = Color(0xFF0A84FF)
-private val CardBackground = Color(0xFF2C2C2E)
-private val TextSecondary = Color(0xFF8E8E93)
-private val TextTertiary = Color(0xFF636366)
+import com.trackspeed.android.ui.theme.AccentNavy
+import com.trackspeed.android.ui.theme.SurfaceDark
+import com.trackspeed.android.ui.theme.TextMuted
+import com.trackspeed.android.ui.theme.TextSecondary
 
 /**
  * Start type options matching iOS StartType enum.
@@ -62,14 +61,14 @@ fun StartTypeSelectorRow(
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    containerColor = CardBackground,
-                    selectedContainerColor = AccentBlue,
+                    containerColor = SurfaceDark,
+                    selectedContainerColor = AccentNavy,
                     labelColor = TextSecondary,
                     selectedLabelColor = Color.White
                 ),
                 border = FilterChipDefaults.filterChipBorder(
-                    borderColor = TextTertiary,
-                    selectedBorderColor = AccentBlue,
+                    borderColor = TextMuted,
+                    selectedBorderColor = AccentNavy,
                     enabled = true,
                     selected = isSelected
                 )

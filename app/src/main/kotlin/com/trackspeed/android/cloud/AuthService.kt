@@ -28,7 +28,7 @@ sealed interface AuthState {
 class AuthService @Inject constructor(
     private val supabase: SupabaseClient
 ) {
-    private val _authState = MutableStateFlow<AuthState>(AuthState.Loading)
+    private val _authState = MutableStateFlow<AuthState>(AuthState.Unauthenticated)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
     val isAuthenticated: Boolean
@@ -84,7 +84,12 @@ class AuthService @Inject constructor(
                 email = user?.email
             )
         } catch (e: Exception) {
-            _authState.value = AuthState.Error(parseAuthError(e))
+            val msg = e.message ?: ""
+            if ("No credentials available" in msg || "canceled" in msg.lowercase()) {
+                _authState.value = AuthState.Unauthenticated
+            } else {
+                _authState.value = AuthState.Error(parseAuthError(e))
+            }
         }
     }
 

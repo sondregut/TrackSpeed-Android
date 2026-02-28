@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.theme.BackgroundDark
+import com.trackspeed.android.ui.theme.TextPrimary
+import com.trackspeed.android.ui.theme.TextSecondary
 
 private val WarningAmber = Color(0xFFFFAB00)
 private val WarningBackground = Color(0x26FFAB00) // 15% opacity amber
@@ -54,7 +57,7 @@ fun BillingIssueBanner(
     ) {
         Card(
             modifier = modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = WarningBackground),
             border = androidx.compose.foundation.BorderStroke(1.dp, WarningBorder)
         ) {
@@ -81,7 +84,7 @@ fun BillingIssueBanner(
                         modifier = Modifier
                             .size(12.dp)
                             .align(Alignment.BottomEnd)
-                            .background(Color.Black, CircleShape)
+                            .background(BackgroundDark, CircleShape)
                     )
                 }
 
@@ -92,13 +95,13 @@ fun BillingIssueBanner(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color.White
+                        color = TextPrimary
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = message,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF8E8E93)
+                        color = TextSecondary
                     )
                 }
 
@@ -121,7 +124,7 @@ fun BillingIssueBanner(
                     Icon(
                         imageVector = Icons.Outlined.Close,
                         contentDescription = stringResource(R.string.billing_dismiss),
-                        tint = Color(0xFF8E8E93),
+                        tint = TextSecondary,
                         modifier = Modifier
                             .size(20.dp)
                             .clickable {
