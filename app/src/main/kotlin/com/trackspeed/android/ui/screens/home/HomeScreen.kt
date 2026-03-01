@@ -1,6 +1,9 @@
 package com.trackspeed.android.ui.screens.home
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,10 +27,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +46,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.billing.SubscriptionManager
+import com.trackspeed.android.data.local.dao.SessionSummary
 import com.trackspeed.android.data.local.entities.TrainingSessionEntity
 import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.data.repository.SettingsRepository
@@ -56,6 +64,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -73,11 +82,20 @@ class HomeViewModel @Inject constructor(
     val isProUser: StateFlow<Boolean> = subscriptionManager.isProUser
 
     val recentSessions: StateFlow<List<TrainingSessionEntity>> =
-        sessionRepository.getRecentSessions(3)
+        sessionRepository.getRecentSessions(5)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = emptyList()
+            )
+
+    val sessionSummaries: StateFlow<Map<String, SessionSummary>> =
+        sessionRepository.getSessionSummaries()
+            .map { list -> list.associateBy { it.sessionId } }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyMap()
             )
 
     val totalRunCount: StateFlow<Int> =
@@ -134,6 +152,7 @@ fun HomeScreen(
 ) {
     val isProUser by viewModel.isProUser.collectAsStateWithLifecycle()
     val recentSessions by viewModel.recentSessions.collectAsStateWithLifecycle()
+    val sessionSummaries by viewModel.sessionSummaries.collectAsStateWithLifecycle()
     val totalRunCount by viewModel.totalRunCount.collectAsStateWithLifecycle()
     val rawUserName by viewModel.userName.collectAsStateWithLifecycle()
     val defaultName = stringResource(R.string.home_default_user_name)
@@ -203,8 +222,6 @@ fun HomeScreen(
         ) {
             when (selectedTab) {
                 HomeTab.HOME -> HomeContent(
-                    userName = userName,
-                    totalRunCount = totalRunCount,
                     isInBillingGracePeriod = isInBillingGracePeriod,
                     onSoloModeClick = { onTemplateClick(60.0, "standing", 1) },
                     onAccelerationClick = { onTemplateClick(10.0, "standing", 2) },
@@ -216,6 +233,7 @@ fun HomeScreen(
                     onSessionClick = onSessionClick,
                     onPaywallClick = onPaywallClick,
                     recentSessions = recentSessions,
+                    sessionSummaries = sessionSummaries,
                     isProUser = isProUser
                 )
                 HomeTab.TEMPLATES -> TemplatesScreen(
@@ -254,8 +272,6 @@ private fun getGreetingRes(): Int {
 
 @Composable
 private fun HomeContent(
-    userName: String = "",
-    totalRunCount: Int = 0,
     isInBillingGracePeriod: Boolean = false,
     onSoloModeClick: () -> Unit,
     onAccelerationClick: () -> Unit,
@@ -267,26 +283,27 @@ private fun HomeContent(
     onSessionClick: (String) -> Unit = {},
     onPaywallClick: () -> Unit = {},
     recentSessions: List<TrainingSessionEntity> = emptyList(),
+    sessionSummaries: Map<String, SessionSummary> = emptyMap(),
     isProUser: Boolean = false
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // App logo + title (matching iOS DashboardHomeView header)
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            androidx.compose.foundation.Image(
+            Image(
                 painter = painterResource(R.drawable.home_icon),
                 contentDescription = null,
-                modifier = Modifier.size(72.dp)
+                modifier = Modifier.size(80.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -314,15 +331,15 @@ private fun HomeContent(
             text = stringResource(R.string.home_section_quick_start),
             style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.5.sp
+                letterSpacing = 0.5.sp
             ),
-            color = TextSecondary,
+            color = TextMuted,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)
         )
 
-        // 2x2 grid of mode cards
+        // 2x2 grid of mode cards (matching iOS PresetCardButton)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -332,6 +349,9 @@ private fun HomeContent(
                 icon = Icons.Outlined.Sync,
                 iconColor = Color(0xFF30D158),
                 onClick = onSoloModeClick,
+                requiresPro = false,
+                isProUser = isProUser,
+                onPaywallClick = onPaywallClick,
                 modifier = Modifier.weight(1f)
             )
             ModeCard(
@@ -339,6 +359,9 @@ private fun HomeContent(
                 icon = Icons.Outlined.LocalFireDepartment,
                 iconColor = Color(0xFFFF9500),
                 onClick = onAccelerationClick,
+                requiresPro = !isProUser,
+                isProUser = isProUser,
+                onPaywallClick = onPaywallClick,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -354,6 +377,9 @@ private fun HomeContent(
                 icon = Icons.AutoMirrored.Outlined.DirectionsRun,
                 iconColor = AccentNavy,
                 onClick = onSprintClick,
+                requiresPro = !isProUser,
+                isProUser = isProUser,
+                onPaywallClick = onPaywallClick,
                 modifier = Modifier.weight(1f)
             )
             ModeCard(
@@ -361,29 +387,33 @@ private fun HomeContent(
                 icon = Icons.Outlined.RocketLaunch,
                 iconColor = Color(0xFFBF8040),
                 onClick = onTakeOffClick,
+                requiresPro = !isProUser,
+                isProUser = isProUser,
+                onPaywallClick = onPaywallClick,
                 modifier = Modifier.weight(1f)
             )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Custom Session card (full-width)
+        // Custom Session card (full-width) — iOS: primaryAccent colored circle
         FullWidthActionCard(
             title = stringResource(R.string.home_custom_session),
             subtitle = stringResource(R.string.home_custom_session_subtitle),
             icon = Icons.Outlined.Tune,
+            iconColor = AccentNavy,
             onClick = onCustomSessionClick
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Join Session card (full-width) - free for everyone
+        // Join Session card (full-width) — iOS: secondary (green) colored circle
         FullWidthActionCard(
             title = stringResource(R.string.home_join_session),
             subtitle = stringResource(R.string.home_join_session_subtitle),
             icon = Icons.Outlined.Groups,
-            onClick = onJoinSessionClick,
-            showProBadge = false
+            iconColor = AccentGreen,
+            onClick = onJoinSessionClick
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -401,33 +431,66 @@ private fun HomeContent(
                 ),
                 color = TextPrimary
             )
-            Text(
-                text = stringResource(R.string.home_see_all),
-                style = MaterialTheme.typography.bodyMedium,
-                color = AccentNavy,
-                modifier = Modifier.clickable { onSeeAllClick() }
-            )
+            if (recentSessions.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.home_see_all),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AccentNavy,
+                    modifier = Modifier.clickable { onSeeAllClick() }
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
         if (recentSessions.isEmpty()) {
+            // Rich empty state (matching iOS ContentUnavailableView)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .gunmetalCard()
+                    .padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = stringResource(R.string.home_no_recent_sessions),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.DirectionsRun,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(48.dp)
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.home_no_sessions_title),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = stringResource(R.string.home_no_sessions_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = onCustomSessionClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AccentNavy,
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_start_session),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        )
+                    }
                 }
             }
         } else {
@@ -435,6 +498,7 @@ private fun HomeContent(
                 recentSessions.forEach { session ->
                     RecentSessionCard(
                         session = session,
+                        summary = sessionSummaries[session.id],
                         onClick = { onSessionClick(session.id) }
                     )
                 }
@@ -445,29 +509,166 @@ private fun HomeContent(
     }
 }
 
+// ── ModeCard (matching iOS PresetCardButton) ──────────────────────────────────
+
 @Composable
 private fun ModeCard(
     title: String,
     icon: ImageVector,
     iconColor: Color,
     onClick: () -> Unit,
+    requiresPro: Boolean = false,
+    isProUser: Boolean = false,
+    onPaywallClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val cardShape = RoundedCornerShape(20.dp)
+    val colors = LocalAppColors.current
+
+    Box(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 2.dp,
+                    shape = cardShape,
+                    ambientColor = Color.Black.copy(alpha = 0.06f),
+                    spotColor = Color.Black.copy(alpha = 0.06f)
+                )
+                .clip(cardShape)
+                .background(colors.surface)
+                .border(1.dp, colors.border, cardShape)
+                .clickable(onClick = if (requiresPro) onPaywallClick else onClick)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (requiresPro) Modifier.blur(3.dp) else Modifier)
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Gradient circle icon (matching iOS LinearGradient 0.2→0.1 opacity)
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    iconColor.copy(alpha = 0.2f),
+                                    iconColor.copy(alpha = 0.1f)
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // PRO badge overlay (matching iOS ProGateOverlay)
+            if (requiresPro) {
+                Box(
+                    modifier = Modifier.matchParentSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ProBadge()
+                }
+            }
+        }
+    }
+}
+
+// ── Pro Badge (matching iOS ProBadge: crown + "PRO" pill) ──────────────────────
+
+@Composable
+private fun ProBadge() {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        AccentNavy,
+                        AccentNavy.copy(alpha = 0.85f)
+                    )
+                )
+            )
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "\uD83D\uDC51", // crown emoji
+            fontSize = 10.sp
+        )
+        Text(
+            text = "PRO",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                letterSpacing = 0.5.sp
+            ),
+            color = Color.White
+        )
+    }
+}
+
+// ── FullWidthActionCard (matching iOS Custom/Join Session cards) ───────────────
+
+@Composable
+private fun FullWidthActionCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    iconColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cardShape = RoundedCornerShape(16.dp)
+    val colors = LocalAppColors.current
+
     Box(
         modifier = modifier
-            .surfaceCard()
+            .fillMaxWidth()
+            .shadow(
+                elevation = 2.dp,
+                shape = cardShape,
+                ambientColor = Color.Black.copy(alpha = 0.06f),
+                spotColor = Color.Black.copy(alpha = 0.06f)
+            )
+            .clip(cardShape)
+            .background(colors.surface)
+            .border(1.dp, colors.border, cardShape)
             .clickable(onClick = onClick)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Colored circle behind icon (matching iOS 50pt circle)
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(50.dp)
                     .clip(CircleShape)
                     .background(iconColor.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
@@ -476,81 +677,18 @@ private fun ModeCard(
                     imageVector = icon,
                     contentDescription = null,
                     tint = iconColor,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = TextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun FullWidthActionCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    showProBadge: Boolean = false
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .gunmetalCard()
-            .clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = TextPrimary,
-                modifier = Modifier.size(24.dp)
-            )
-
-            Spacer(modifier = Modifier.width(14.dp))
-
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = TextPrimary
-                    )
-                    if (showProBadge) {
-                        Text(
-                            text = stringResource(R.string.common_pro_badge),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 9.sp,
-                                letterSpacing = 0.5.sp
-                            ),
-                            color = Color.White,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(AccentNavy)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = TextPrimary
+                )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
@@ -569,15 +707,41 @@ private fun FullWidthActionCard(
     }
 }
 
+// ── RecentSessionCard (matching iOS RecentSessionRow) ─────────────────────────
+
+private val SuccessGreen = Color(0xFF30D158)
+
 @Composable
 private fun RecentSessionCard(
     session: TrainingSessionEntity,
+    summary: SessionSummary?,
     onClick: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy, h:mm a", Locale.getDefault()) }
     val distanceLabel = when {
         session.distance % 1.0 == 0.0 -> "${session.distance.toInt()}m"
         else -> "${session.distance}m"
+    }
+
+    // Load thumbnail from session's first run (thumbnails stored at thumbnails/{sessionId}/lap_1.jpg)
+    val thumbnail = remember(session.id) {
+        try {
+            // Try session thumbnail first, then fall back to first run's thumbnail
+            val sessionPath = session.thumbnailPath
+            if (sessionPath != null && File(sessionPath).exists()) {
+                BitmapFactory.decodeFile(sessionPath)?.asImageBitmap()
+            } else {
+                // Look for first run thumbnail in the session directory
+                val dir = File(
+                    android.os.Environment.getDataDirectory(),
+                    "data/com.trackspeed.android/files/thumbnails/${session.id}"
+                )
+                val firstLap = dir.listFiles()
+                    ?.filter { it.extension == "jpg" }
+                    ?.minByOrNull { it.name }
+                firstLap?.let { BitmapFactory.decodeFile(it.absolutePath)?.asImageBitmap() }
+            }
+        } catch (_: Exception) { null }
     }
 
     Box(
@@ -589,33 +753,114 @@ private fun RecentSessionCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            // 56x56 thumbnail (matching iOS RecentSessionRow)
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (thumbnail != null) {
+                    Image(
+                        bitmap = thumbnail,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Gradient placeholder with runner icon (matching iOS fallback)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        TextSecondary.copy(alpha = 0.3f),
+                                        TextSecondary.copy(alpha = 0.1f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.DirectionsRun,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+
+            // Details column
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Date line (abbreviated date + shortened time, matching iOS)
                 Text(
-                    text = session.name ?: "$distanceLabel ${session.startType}",
-                    style = MaterialTheme.typography.titleSmall.copy(
+                    text = dateFormat.format(Date(session.date)),
+                    style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
                     color = TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${dateFormat.format(Date(session.date))} - $distanceLabel",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
+
+                // Metadata pills row (matching iOS HStack with distance pill, runs pill, best time)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Distance pill
+                    MetadataPill(text = distanceLabel, icon = "\uD83D\uDCCF") // ruler
+
+                    // Runs pill
+                    if (summary != null) {
+                        MetadataPill(text = "${summary.runCount}", icon = "\u23F1") // stopwatch
+                    }
+
+                    // Best time (green, matching iOS AppColors.success)
+                    if (summary != null && summary.bestTime > 0) {
+                        Text(
+                            text = "%.2fs".format(summary.bestTime),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = SuccessGreen
+                        )
+                    }
+                }
             }
-            Icon(
-                imageVector = Icons.Outlined.ChevronRight,
-                contentDescription = null,
-                tint = TextMuted,
-                modifier = Modifier.size(20.dp)
-            )
         }
+    }
+}
+
+@Composable
+private fun MetadataPill(text: String, icon: String) {
+    val colors = LocalAppColors.current
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(colors.surface.copy(alpha = 0.5f))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = icon,
+            fontSize = 9.sp
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextSecondary
+        )
     }
 }
 

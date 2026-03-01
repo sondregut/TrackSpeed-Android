@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -29,6 +30,11 @@ fun ValuePropositionStep(onContinue: () -> Unit) {
         animationSpec = tween(durationMillis = 600),
         label = "fade_in"
     )
+    val offsetY by animateFloatAsState(
+        targetValue = if (appeared) 0f else 20f,
+        animationSpec = tween(durationMillis = 600),
+        label = "offset_y"
+    )
 
     LaunchedEffect(Unit) { appeared = true }
 
@@ -40,11 +46,14 @@ fun ValuePropositionStep(onContinue: () -> Unit) {
     ) {
         Spacer(Modifier.weight(1f))
 
-        // Split text layout matching iOS
+        // Main value proposition - matching iOS layout
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.alpha(alpha)
+            modifier = Modifier
+                .alpha(alpha)
+                .offset(y = offsetY.dp)
         ) {
+            // iOS: "Turn your phone into a" in title2, textSecondary
             Text(
                 text = stringResource(R.string.onboarding_value_subtitle),
                 fontSize = 22.sp,
@@ -52,6 +61,7 @@ fun ValuePropositionStep(onContinue: () -> Unit) {
                 textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(4.dp))
+            // iOS: "professional sprint timer" in displaySmall, bold, text
             Text(
                 text = stringResource(R.string.onboarding_value_title),
                 fontSize = 28.sp,
@@ -62,13 +72,18 @@ fun ValuePropositionStep(onContinue: () -> Unit) {
 
             Spacer(Modifier.height(24.dp))
 
-            // Photo finish image
+            // Photo finish image with shadow matching iOS
             Image(
                 painter = painterResource(R.drawable.onboarding_photofinish_edit),
                 contentDescription = stringResource(R.string.onboarding_value_image_description),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 400.dp)
+                    .heightIn(max = 480.dp)
+                    .shadow(
+                        elevation = 20.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        spotColor = BackgroundGradientBottom.copy(alpha = 0.15f)
+                    )
                     .clip(RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Fit
             )
@@ -76,6 +91,7 @@ fun ValuePropositionStep(onContinue: () -> Unit) {
 
         Spacer(Modifier.weight(1f))
 
+        // Continue button matching iOS onboardingAccent
         Button(
             onClick = onContinue,
             modifier = Modifier
@@ -83,11 +99,11 @@ fun ValuePropositionStep(onContinue: () -> Unit) {
                 .height(56.dp)
                 .alpha(alpha),
             shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentNavy)
+            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
         ) {
             Text(
                 stringResource(R.string.common_continue),
-                fontSize = 18.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.SemiBold
             )
         }

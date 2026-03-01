@@ -36,6 +36,9 @@
     <string name="home_recent_sessions">Recent Sessions</string>
     <string name="home_see_all">See All</string>
     <string name="home_no_recent_sessions">No recent sessions</string>
+    <string name="home_no_sessions_title">No Sessions Yet</string>
+    <string name="home_no_sessions_description">Start your first timing session to see results here</string>
+    <string name="home_start_session">Start Session</string>
 
     <!-- Timing Screen -->
     <string name="timing_tap_to_close">Tap to close</string>
@@ -265,6 +268,10 @@
     <string name="session_history_sort_oldest">Oldest First</string>
     <string name="session_history_sort_fastest">Fastest First</string>
     <string name="session_history_sort_slowest">Slowest First</string>
+    <string name="session_history_stat_sessions">Sessions</string>
+    <string name="session_history_stat_runs">Runs</string>
+    <string name="session_history_stat_best">Best</string>
+    <string name="session_history_stat_this_week">This Week</string>
 
     <!-- Run Detail Screen -->
     <string name="run_detail_title_format">Run %d</string>
@@ -530,9 +537,13 @@
     <string name="onboarding_preview_two_phones_subtitle">Start + finish gates</string>
 
     <!-- Onboarding: Athlete Details Step -->
+    <string name="onboarding_athlete_title_athlete">Your Sport</string>
+    <string name="onboarding_athlete_title_coach">Primary Discipline</string>
     <string name="onboarding_athlete_title">Tell Us About You</string>
+    <string name="onboarding_athlete_subtitle_athlete">What\'s your main sport or event?</string>
+    <string name="onboarding_athlete_subtitle_coach">Which sport do you coach?</string>
     <string name="onboarding_athlete_role_label">I am a\u2026</string>
-    <string name="onboarding_athlete_event_label">Primary event</string>
+    <string name="onboarding_athlete_event_label">Primary Discipline</string>
     <string name="onboarding_athlete_event_placeholder">Select your event</string>
 
     <!-- Onboarding: Flying Time Step -->
@@ -622,7 +633,7 @@
     <string name="onboarding_referral_step3_title">You earn</string>
     <string name="onboarding_referral_step3_desc">Get 1 free month for each friend who subscribes</string>
     <string name="onboarding_referral_share_button">Share Invite Link</string>
-    <string name="onboarding_referral_share_text">Check out TrackSpeed - turn your phone into a sprint timer! Use my referral link: %s</string>
+    <string name="onboarding_referral_share_text">Join me on TrackSpeed and use my referral link to get started!\n\nDownload for iOS: https://apps.apple.com/app/trackspeed/id6757509163\nDownload for Android: https://play.google.com/store/apps/details?id=com.trackspeed.android\n\n%s</string>
     <string name="onboarding_referral_share_chooser">Share Invite Link</string>
 
     <!-- Onboarding: Auth Step -->

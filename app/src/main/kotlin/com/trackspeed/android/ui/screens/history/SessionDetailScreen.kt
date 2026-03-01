@@ -63,7 +63,6 @@ import java.util.Locale
 
 private val BestGreen = Color(0xFF4CAF50)
 private val SeasonGold = Color(0xFFFFD600)
-private val BestRowBg = Color(0xFF1A3A1A)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -389,8 +388,8 @@ private fun CompactRunRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val bgColor = if (isBest) BestRowBg else SurfaceDark
-    val timeColor = if (isBest) BestGreen else TextPrimary
+    val bgColor = if (isBest) AccentBlue.copy(alpha = 0.08f) else Color.Transparent
+    val timeColor = if (isBest) AccentBlue else TextPrimary
 
     Row(
         modifier = Modifier
@@ -404,8 +403,10 @@ private fun CompactRunRow(
         Text(
             text = "${run.runNumber}",
             modifier = Modifier.weight(0.08f),
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = FontFamily.Monospace
+            ),
+            color = TextMuted
         )
 
         // Time + badges
@@ -438,18 +439,27 @@ private fun CompactRunRow(
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = FontFamily.Monospace
             ),
-            color = TextSecondary,
+            color = TextMuted,
             maxLines = 1
         )
 
-        // Dist
-        Text(
-            text = "${run.distance.toInt()}m",
-            modifier = Modifier.weight(0.17f),
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
-            maxLines = 1
-        )
+        // Dist - accent colored pill like iOS
+        Box(
+            modifier = Modifier.weight(0.17f)
+        ) {
+            Text(
+                text = "${run.distance.toInt()}m",
+                style = MaterialTheme.typography.labelSmall,
+                color = AccentBlue,
+                modifier = Modifier
+                    .background(
+                        AccentBlue.copy(alpha = 0.15f),
+                        RoundedCornerShape(4.dp)
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                maxLines = 1
+            )
+        }
 
         // Type
         Text(
@@ -457,8 +467,8 @@ private fun CompactRunRow(
                 if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
             },
             modifier = Modifier.weight(0.17f),
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMuted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -473,14 +483,14 @@ private fun CompactRunRow(
                 if (run.athleteColor != null) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(10.dp)
                             .background(parseAthleteColor(run.athleteColor), CircleShape)
                     )
                 }
                 Text(
                     text = run.athleteName ?: "",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -490,7 +500,8 @@ private fun CompactRunRow(
 
     // Thin divider between rows
     HorizontalDivider(
-        color = Color.White.copy(alpha = 0.05f),
+        modifier = Modifier.padding(start = 14.dp),
+        color = DividerColor,
         thickness = 0.5.dp
     )
 }

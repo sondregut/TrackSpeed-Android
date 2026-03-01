@@ -5,6 +5,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,51 +36,99 @@ fun AthleteDetailsStep(
 ) {
     var showDisciplinePicker by remember { mutableStateOf(false) }
 
+    val isAthlete = selectedRole == UserRole.ATHLETE
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Header at top (matching iOS)
         Spacer(Modifier.height(32.dp))
-        Text(stringResource(R.string.onboarding_athlete_title), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextPrimary, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(32.dp))
+        Text(
+            if (isAthlete) stringResource(R.string.onboarding_athlete_title_athlete)
+            else stringResource(R.string.onboarding_athlete_title_coach),
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (isAthlete) stringResource(R.string.onboarding_athlete_subtitle_athlete)
+            else stringResource(R.string.onboarding_athlete_subtitle_coach),
+            fontSize = 15.sp,
+            color = TextSecondary,
+            textAlign = TextAlign.Center
+        )
 
-        // Role toggle
-        Text(stringResource(R.string.onboarding_athlete_role_label), fontSize = 17.sp, color = TextSecondary)
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            UserRole.entries.forEach { role ->
+        Spacer(Modifier.weight(1f))
+
+        // Centered content (matching iOS layout)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Trophy/stopwatch icon based on role (matching iOS goldMedal color)
+            Icon(
+                imageVector = if (isAthlete) Icons.Default.EmojiEvents else Icons.Default.Timer,
+                contentDescription = null,
+                tint = AccentGold,
+                modifier = Modifier.size(56.dp)
+            )
+
+            // Discipline picker button (matching iOS style with icon + chevron)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    stringResource(R.string.onboarding_athlete_event_label),
+                    fontSize = 15.sp,
+                    color = TextSecondary
+                )
+
                 OutlinedButton(
-                    onClick = { onRoleSelected(role) },
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    border = BorderStroke(
-                        1.dp,
-                        if (selectedRole == role) AccentNavy else BorderSubtle
-                    ),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = if (selectedRole == role) AccentNavy.copy(alpha = 0.15f) else Color.Transparent
-                    )
+                    onClick = { showDisciplinePicker = true },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, BorderSubtle),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = SurfaceDark)
                 ) {
-                    Text(role.displayName, color = if (selectedRole == role) AccentNavy else TextPrimary)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (selectedDiscipline != null) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    selectedDiscipline.displayName,
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    selectedDiscipline.category.displayName,
+                                    color = TextMuted,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        } else {
+                            Text(
+                                stringResource(R.string.onboarding_athlete_event_placeholder),
+                                color = TextSecondary,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = TextMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
-        }
-
-        Spacer(Modifier.height(32.dp))
-
-        // Discipline picker
-        Text(stringResource(R.string.onboarding_athlete_event_label), fontSize = 17.sp, color = TextSecondary)
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = { showDisciplinePicker = true },
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            border = BorderStroke(1.dp, BorderSubtle)
-        ) {
-            Text(
-                selectedDiscipline?.displayName ?: stringResource(R.string.onboarding_athlete_event_placeholder),
-                color = if (selectedDiscipline != null) TextPrimary else TextSecondary
-            )
         }
 
         Spacer(Modifier.weight(1f))
@@ -84,7 +136,8 @@ fun AthleteDetailsStep(
         Button(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentNavy)
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
         ) {
             Text(stringResource(R.string.common_continue), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         }
@@ -115,11 +168,24 @@ fun AthleteDetailsStep(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                discipline.displayName,
-                                color = if (selectedDiscipline == discipline) AccentNavy else TextPrimary,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    discipline.displayName,
+                                    color = if (selectedDiscipline == discipline) AccentBlue else TextPrimary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (selectedDiscipline == discipline) {
+                                    Icon(
+                                        Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = AccentBlue,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }

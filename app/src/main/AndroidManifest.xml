@@ -68,6 +68,20 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.trackspeed.android" android:host="login-callback" />
             </intent-filter>
+            <!-- Custom scheme deeplinks: trackspeed://invite/CODE, trackspeed://promo, trackspeed://subscribe -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="trackspeed" />
+            </intent-filter>
+            <!-- App Links: https://mytrackspeed.com/invite/CODE -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="mytrackspeed.com" android:pathPrefix="/invite/" />
+            </intent-filter>
         </activity>
 
         <provider

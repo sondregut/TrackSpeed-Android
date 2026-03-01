@@ -1,8 +1,10 @@
 package com.trackspeed.android.ui.screens.onboarding
 
+import android.app.Application
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.MainActivity
 import com.trackspeed.android.billing.PromoCodeError
 import com.trackspeed.android.billing.PromoRedemptionResult
 import com.trackspeed.android.billing.SubscriptionManager
@@ -69,6 +71,7 @@ data class OnboardingUiState(
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
+    private val application: Application,
     private val settingsRepository: SettingsRepository,
     private val subscriptionManager: SubscriptionManager,
     private val referralService: ReferralService
@@ -150,6 +153,32 @@ class OnboardingViewModel @Inject constructor(
                     Log.w(TAG, "Failed to track referral signup: ${e.message}")
                 }
             }
+
+            // Process pending referral code from deeplink (trackspeed://invite/CODE)
+            processPendingReferralCode()
+        }
+    }
+
+    private suspend fun processPendingReferralCode() {
+        val pendingCode = MainActivity.getPendingReferralCode(application) ?: return
+        Log.d(TAG, "Processing pending referral code from deeplink: $pendingCode")
+        MainActivity.clearPendingReferralCode(application)
+
+        // First try as promo code
+        try {
+            subscriptionManager.redeemPromoCode(pendingCode, "deeplink")
+            Log.d(TAG, "Pending referral code redeemed as promo code: $pendingCode")
+            return
+        } catch (e: Exception) {
+            Log.d(TAG, "Not a promo code, trying as referral: ${e.message}")
+        }
+
+        // Fall back to tracking as referral
+        try {
+            referralService.trackReferralSignup(pendingCode)
+            Log.d(TAG, "Pending referral code tracked as referral: $pendingCode")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to process pending referral code: ${e.message}")
         }
     }
 

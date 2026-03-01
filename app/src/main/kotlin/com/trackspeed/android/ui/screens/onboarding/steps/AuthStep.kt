@@ -98,7 +98,7 @@ fun AuthStep(
                             unfocusedBorderColor = BorderSubtle,
                             focusedContainerColor = SurfaceDark,
                             unfocusedContainerColor = SurfaceDark,
-                            cursorColor = AccentNavy
+                            cursorColor = AccentBlue
                         ),
                         singleLine = true,
                         enabled = !state.isLoading
@@ -137,7 +137,7 @@ fun AuthStep(
                             unfocusedBorderColor = BorderSubtle,
                             focusedContainerColor = SurfaceDark,
                             unfocusedContainerColor = SurfaceDark,
-                            cursorColor = AccentNavy
+                            cursorColor = AccentBlue
                         ),
                         singleLine = true,
                         enabled = !state.isLoading
@@ -167,7 +167,7 @@ fun AuthStep(
                                 unfocusedBorderColor = BorderSubtle,
                                 focusedContainerColor = SurfaceDark,
                                 unfocusedContainerColor = SurfaceDark,
-                                cursorColor = AccentNavy
+                                cursorColor = AccentBlue
                             ),
                             singleLine = true,
                             enabled = !state.isLoading
@@ -181,7 +181,7 @@ fun AuthStep(
                             .fillMaxWidth()
                             .height(52.dp),
                         shape = RoundedCornerShape(100.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentNavy),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                         enabled = !state.isLoading
                     ) {
                         Text(
@@ -197,7 +197,7 @@ fun AuthStep(
                         Text(
                             if (state.isSignUp) stringResource(R.string.auth_has_account)
                             else stringResource(R.string.auth_no_account),
-                            color = AccentNavy,
+                            color = AccentBlue,
                             fontSize = 14.sp
                         )
                     }
@@ -289,7 +289,7 @@ fun AuthStep(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         CircularProgressIndicator(
-                            color = AccentNavy,
+                            color = AccentBlue,
                             strokeWidth = 3.dp,
                             modifier = Modifier.size(36.dp)
                         )

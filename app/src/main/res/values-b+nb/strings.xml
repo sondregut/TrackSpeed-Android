@@ -516,7 +516,7 @@
     <string name="onboarding_rating_quote2">\&quot;Noyaktige resultater som matcher var Freelap\&quot;</string>
     <string name="onboarding_rating_quote3">\&quot;Utoverne mine elsker a se tider ojeblikkelig\&quot;</string>
     <string name="onboarding_rating_title">Elsket av utovere</string>
-    <string name="onboarding_referral_share_text">Sjekk ut TrackSpeed \u2013 gjor telefonen din til en sprint-tidtaker! Bruk min vervelenke: %s</string>
+    <string name="onboarding_referral_share_text">Sjekk ut TrackSpeed \u2013 gjor telefonen din til en sprint-tidtaker!\n\nDownload for iOS: https://apps.apple.com/app/trackspeed/id6757509163\nDownload for Android: https://play.google.com/store/apps/details?id=com.trackspeed.android\n\n%s</string>
     <string name="onboarding_referral_step1_desc">Send vervelenken din til venner som loper</string>
     <string name="onboarding_referral_step1_title">Del lenken din</string>
     <string name="onboarding_referral_step2_desc">Nar en venn starter et TrackSpeed-abonnement</string>

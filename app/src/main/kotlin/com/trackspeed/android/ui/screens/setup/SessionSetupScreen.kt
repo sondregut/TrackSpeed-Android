@@ -7,12 +7,9 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,19 +19,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.filled.PersonOff
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -71,6 +77,7 @@ import com.trackspeed.android.ui.theme.*
 fun SessionSetupScreen(
     onNavigateBack: () -> Unit,
     onStartSession: (distance: Double, startType: String, athleteIds: List<String>) -> Unit,
+    onAddAthlete: () -> Unit = {},
     viewModel: SessionSetupViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -149,7 +156,8 @@ fun SessionSetupScreen(
                     SetupStep.ATHLETES -> AthleteSelectionStep(
                         athletes = uiState.athletes,
                         selectedIds = uiState.selectedAthleteIds,
-                        onToggle = viewModel::toggleAthlete
+                        onToggle = viewModel::toggleAthlete,
+                        onAddAthlete = onAddAthlete
                     )
                     SetupStep.DISTANCE -> DistanceSelectionStep(
                         selectedDistance = uiState.selectedDistance,
@@ -187,48 +195,51 @@ private fun StepIndicator(
         activeSteps.forEachIndexed { index, step ->
             val isCompleted = index < currentActiveIndex
             val isCurrent = step == currentStep
+            val isReachedOrCurrent = index <= currentActiveIndex
 
-            val circleColor = when {
-                isCompleted -> AccentGreen
-                isCurrent -> AccentBlue
-                else -> TextMuted
-            }
+            val circleColor = if (isReachedOrCurrent) AccentGreen
+                else TextMuted.copy(alpha = 0.3f)
 
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(circleColor),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                if (isCompleted) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = TextPrimary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                } else {
-                    Text(
-                        text = "${index + 1}",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = TextPrimary
-                    )
-                }
-            }
-
-            if (index < activeSteps.size - 1) {
                 Box(
                     modifier = Modifier
-                        .width(40.dp)
-                        .height(2.dp)
-                        .background(
-                            if (index < currentActiveIndex) AccentGreen
-                            else TextMuted
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(circleColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isCompleted) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = TextPrimary,
+                            modifier = Modifier.size(14.dp)
                         )
-                )
+                    } else {
+                        Text(
+                            text = "${index + 1}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = if (isReachedOrCurrent) TextPrimary else TextMuted
+                        )
+                    }
+                }
+
+                if (index < activeSteps.size - 1) {
+                    Box(
+                        modifier = Modifier
+                            .width(32.dp)
+                            .height(2.dp)
+                            .background(
+                                if (index < currentActiveIndex) AccentGreen
+                                else TextMuted.copy(alpha = 0.3f)
+                            )
+                    )
+                }
             }
         }
     }
@@ -240,30 +251,27 @@ private fun StepIndicator(
 private fun AthleteSelectionStep(
     athletes: List<AthleteEntity>,
     selectedIds: Set<String>,
-    onToggle: (String) -> Unit
+    onToggle: (String) -> Unit,
+    onAddAthlete: () -> Unit = {}
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Text(
             text = "Who's training?",
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
             color = TextPrimary,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-        Text(
-            text = if (selectedIds.isEmpty()) "Optional - skip if solo practice"
-            else "${selectedIds.size} selected",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            modifier = Modifier.padding(bottom = 20.dp)
+            modifier = Modifier.padding(top = 8.dp, bottom = 20.dp)
         )
 
         if (athletes.isEmpty()) {
             EmptyAthletesPlaceholder()
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(athletes, key = { it.id }) { athlete ->
                     AthleteRow(
@@ -281,9 +289,9 @@ private fun AthleteSelectionStep(
 private fun EmptyAthletesPlaceholder() {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 60.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Icon(
             imageVector = Icons.Default.Person,
@@ -291,18 +299,19 @@ private fun EmptyAthletesPlaceholder() {
             tint = TextMuted,
             modifier = Modifier.size(64.dp)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         Text(
             text = "No athletes added yet",
             style = MaterialTheme.typography.bodyLarge,
-            color = TextSecondary
+            color = TextMuted
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "You can continue without selecting athletes,\nor add them from the Profile tab.",
+            text = "You can continue without selecting athletes,\nor add them later.",
             style = MaterialTheme.typography.bodySmall,
             color = TextMuted,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 32.dp)
         )
     }
 }
@@ -314,75 +323,55 @@ private fun AthleteRow(
     onClick: () -> Unit
 ) {
     val athleteColor = athleteColorFromString(athlete.color)
+    val shape = RoundedCornerShape(20.dp)
+    val borderColor = if (isSelected) AccentGreen else BorderSubtle
+    val borderWidth = if (isSelected) 2.dp else 0.5.dp
 
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (isSelected) Modifier.border(
-                    width = 2.dp,
-                    color = AccentGreen,
-                    shape = RoundedCornerShape(20.dp)
-                ) else Modifier
-            ),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        onClick = onClick
+            .clip(shape)
+            .background(SurfaceDark)
+            .border(borderWidth, borderColor, shape)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(athleteColor),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(athleteColor),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = athlete.name.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = TextPrimary
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = athlete.name,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = TextPrimary
-                )
-                athlete.nickname?.let { nickname ->
-                    Text(
-                        text = nickname,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-            }
-
-            Icon(
-                imageVector = if (isSelected) Icons.Default.Check else Icons.Default.Person,
-                contentDescription = if (isSelected) "Selected" else "Not selected",
-                tint = if (isSelected) AccentGreen else TextMuted,
-                modifier = Modifier.size(24.dp)
+            Text(
+                text = athlete.name.take(1).uppercase(),
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = TextPrimary
             )
         }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Text(
+            text = athlete.nickname ?: athlete.name,
+            style = MaterialTheme.typography.bodyLarge,
+            color = TextPrimary,
+            modifier = Modifier.weight(1f)
+        )
+
+        Icon(
+            imageVector = if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+            contentDescription = if (isSelected) "Selected" else "Not selected",
+            tint = if (isSelected) AccentGreen else TextMuted,
+            modifier = Modifier.size(26.dp)
+        )
     }
 }
 
 // -- Step 2: Distance Selection --
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DistanceSelectionStep(
     selectedDistance: Double,
@@ -390,28 +379,30 @@ private fun DistanceSelectionStep(
     onSelectPreset: (Double) -> Unit,
     onCustomTextChange: (String) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Text(
             text = "Select Distance",
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
             color = TextPrimary,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-        Text(
-            text = "Choose a preset or enter custom",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
         )
 
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxWidth()
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(((PRESET_DISTANCES.size / 3 + 1) * 60).dp)
         ) {
-            PRESET_DISTANCES.forEach { preset ->
+            items(PRESET_DISTANCES) { preset ->
                 val isSelected = customText.isEmpty() && selectedDistance == preset.meters
                 DistanceChip(
                     label = preset.label,
@@ -424,9 +415,9 @@ private fun DistanceSelectionStep(
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "Or enter custom distance",
+            text = "or enter custom:",
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
+            color = TextMuted,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
@@ -441,7 +432,7 @@ private fun DistanceSelectionStep(
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
-                modifier = Modifier.width(140.dp),
+                modifier = Modifier.width(120.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary,
@@ -457,7 +448,7 @@ private fun DistanceSelectionStep(
             Text(
                 text = "meters",
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
+                color = TextMuted
             )
         }
     }
@@ -469,25 +460,25 @@ private fun DistanceChip(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) AccentGreen else CardBackground
-        ),
-        modifier = if (isSelected) {
-            Modifier.border(2.dp, AccentGreen, RoundedCornerShape(12.dp))
-        } else {
-            Modifier
-        }
+    val shape = RoundedCornerShape(16.dp)
+    val bgColor = if (isSelected) AccentGreen else SurfaceDark
+    val borderMod = if (isSelected) Modifier.border(2.dp, AccentGreen, shape) else Modifier
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(bgColor)
+            .then(borderMod)
+            .padding(vertical = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.titleSmall.copy(
                 fontWeight = FontWeight.SemiBold
             ),
-            color = if (isSelected) Color.Black else TextPrimary,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp)
+            color = if (isSelected) Color.Black else TextPrimary
         )
     }
 }
@@ -499,39 +490,62 @@ private fun StartTypeSelectionStep(
     selectedStartType: String,
     onSelect: (String) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Text(
             text = "How to start?",
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
             color = TextPrimary,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-        Text(
-            text = "Choose the start method",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier.padding(top = 8.dp, bottom = 20.dp)
         )
 
-        StartTypeCard(
-            title = "Standing Start",
-            description = "Timer starts when the athlete leaves the start line. Best for acceleration tests and combine drills.",
-            icon = Icons.Outlined.Flag,
-            isSelected = selectedStartType == "standing",
-            onClick = { onSelect("standing") }
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            StartTypeCard(
+                title = "Flying Start",
+                description = "Gate-triggered start. Timer starts when athlete crosses the gate line.",
+                icon = Icons.AutoMirrored.Filled.DirectionsRun,
+                isSelected = selectedStartType == "flying",
+                onClick = { onSelect("flying") }
+            )
 
-        Spacer(modifier = Modifier.height(12.dp))
+            StartTypeCard(
+                title = "Countdown",
+                description = "3\u2026 2\u2026 1\u2026 BEEP! Visual countdown with automatic start.",
+                icon = Icons.Default.Timer,
+                isSelected = selectedStartType == "countdown",
+                onClick = { onSelect("countdown") }
+            )
 
-        StartTypeCard(
-            title = "Flying Start",
-            description = "Timer starts when the athlete crosses the first gate at speed. Best for max velocity testing.",
-            icon = Icons.Outlined.Speed,
-            isSelected = selectedStartType == "flying",
-            onClick = { onSelect("flying") }
-        )
+            StartTypeCard(
+                title = "Voice Command",
+                description = "\"On your marks\u2026 Set\u2026 GO!\" Spoken commands like a real starter.",
+                icon = Icons.Default.Mic,
+                isSelected = selectedStartType == "voiceCommand",
+                onClick = { onSelect("voiceCommand") }
+            )
+
+            StartTypeCard(
+                title = "Touch Start",
+                description = "Touch screen, hold, then lift finger to start the timer.",
+                icon = Icons.Default.TouchApp,
+                isSelected = selectedStartType == "touch",
+                onClick = { onSelect("touch") }
+            )
+
+            StartTypeCard(
+                title = "In-Frame Start",
+                description = "Stand in front of the camera, step away to start.",
+                icon = Icons.Default.PersonOff,
+                isSelected = selectedStartType == "inFrame",
+                onClick = { onSelect("inFrame") }
+            )
+        }
     }
 }
 
@@ -555,7 +569,7 @@ private fun StartTypeCard(
                 ) else Modifier
             ),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Row(
             modifier = Modifier
@@ -710,7 +724,7 @@ private fun ConnectPhonesStep() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground)
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark)
         ) {
             Row(
                 modifier = Modifier

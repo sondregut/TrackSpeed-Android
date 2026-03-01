@@ -89,7 +89,7 @@ fun GoalTimeStep(
             Icon(
                 imageVector = Icons.Default.GpsFixed,
                 contentDescription = null,
-                tint = AccentNavy,
+                tint = AccentBlue,
                 modifier = Modifier.size(56.dp)
             )
 
@@ -112,7 +112,7 @@ fun GoalTimeStep(
                         .background(SurfaceDark, RoundedCornerShape(12.dp))
                         .border(
                             width = if (isFocused) 2.dp else 1.dp,
-                            color = if (isFocused) AccentNavy else BorderSubtle,
+                            color = if (isFocused) AccentBlue else BorderSubtle,
                             shape = RoundedCornerShape(12.dp)
                         )
                         .padding(16.dp),
@@ -136,7 +136,7 @@ fun GoalTimeStep(
                         ),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
-                        cursorBrush = SolidColor(AccentNavy),
+                        cursorBrush = SolidColor(AccentBlue),
                         decorationBox = { innerTextField ->
                             Box(contentAlignment = Alignment.Center) {
                                 if (goalText.isEmpty()) {
@@ -181,7 +181,7 @@ fun GoalTimeStep(
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentNavy)
+            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
         ) {
             Text(stringResource(R.string.common_continue), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         }

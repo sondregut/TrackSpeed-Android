@@ -158,6 +158,7 @@ fun ProfileSetupStep(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (isFormValid) AccentBlue else AccentBlue.copy(alpha = 0.5f)
             ),

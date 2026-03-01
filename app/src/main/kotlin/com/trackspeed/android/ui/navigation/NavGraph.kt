@@ -4,13 +4,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.trackspeed.android.DeepLinkEvent
 import com.trackspeed.android.ui.theme.gradientBackground
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.flow.StateFlow
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -107,7 +110,9 @@ sealed class Screen(val route: String) {
 
 @Composable
 fun TrackSpeedNavHost(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    deepLinkEvent: StateFlow<DeepLinkEvent?>? = null,
+    onDeepLinkConsumed: (() -> Unit)? = null
 ) {
     val onboardingViewModel: OnboardingViewModel = hiltViewModel()
 
@@ -118,6 +123,30 @@ fun TrackSpeedNavHost(
     LaunchedEffect(Unit) {
         val completed = onboardingViewModel.isOnboardingCompleted()
         resolvedStart = if (completed) Screen.Home.route else Screen.Onboarding.route
+    }
+
+    // Handle deeplink events
+    val currentDeepLink by deepLinkEvent?.collectAsState() ?: mutableStateOf(null)
+    LaunchedEffect(currentDeepLink) {
+        val event = currentDeepLink ?: return@LaunchedEffect
+        // Only navigate if the start destination has been resolved
+        val start = resolvedStart ?: return@LaunchedEffect
+
+        when (event) {
+            is DeepLinkEvent.Invite -> {
+                // Code is already stored in SharedPreferences by MainActivity.
+                // If onboarding is done, navigate to paywall; otherwise let onboarding handle it.
+                if (start == Screen.Home.route) {
+                    navController.navigate(Screen.Paywall.route)
+                }
+            }
+            is DeepLinkEvent.Promo, is DeepLinkEvent.Subscribe -> {
+                if (start == Screen.Home.route) {
+                    navController.navigate(Screen.Paywall.route)
+                }
+            }
+        }
+        onDeepLinkConsumed?.invoke()
     }
 
     // Show a gradient screen while loading the preference (prevents flash of wrong screen).
@@ -366,6 +395,9 @@ fun TrackSpeedNavHost(
                             popUpTo(Screen.SessionSetup.route) { inclusive = true }
                         }
                     }
+                },
+                onAddAthlete = {
+                    navController.navigate(Screen.AthleteForm.createRoute())
                 }
             )
         }

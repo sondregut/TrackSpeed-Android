@@ -109,13 +109,13 @@ fun CameraPermissionStep(
     ) {
         Spacer(Modifier.weight(1f))
 
-        // Camera icon in tinted circle
+        // Camera icon in tinted circle (iOS uses onboardingAccent for circle always)
         Box(
             modifier = Modifier
                 .size(120.dp)
                 .scale(scale)
                 .background(
-                    color = iconTint.copy(alpha = 0.15f),
+                    color = AccentBlue.copy(alpha = 0.15f),
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center

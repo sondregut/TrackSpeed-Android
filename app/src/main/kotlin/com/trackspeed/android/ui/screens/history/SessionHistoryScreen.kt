@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.LocalFireDepartment
@@ -36,6 +38,7 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -54,6 +57,7 @@ import java.util.Date
 import java.util.Locale
 
 private val BestGreen = Color(0xFF30D158)
+private val WarningGold = Color(0xFFFFD600)
 private val DeleteRed = Color(0xFFFF3B30)
 
 @Composable
@@ -261,13 +265,12 @@ fun SessionHistoryScreen(
                             DateGroupKey.EARLIER -> stringResource(R.string.session_history_group_earlier)
                         }
                         Text(
-                            text = groupLabel.uppercase(),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.5.sp
+                            text = groupLabel,
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.SemiBold
                             ),
-                            color = TextSecondary,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 4.dp)
+                            color = TextMuted,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                         )
                     }
 
@@ -294,63 +297,70 @@ private fun HeaderStatsRow(stats: HistoryStats) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        MiniStatChip(
+        StatBox(
             icon = Icons.Outlined.CalendarMonth,
             value = stats.totalSessions.toString(),
+            label = stringResource(R.string.session_history_stat_sessions),
             modifier = Modifier.weight(1f)
         )
-        MiniStatChip(
+        StatBox(
             icon = Icons.Outlined.Timer,
             value = stats.totalRuns.toString(),
+            label = stringResource(R.string.session_history_stat_runs),
             modifier = Modifier.weight(1f)
         )
-        MiniStatChip(
+        StatBox(
             icon = Icons.Outlined.Speed,
             value = stats.bestTime?.let { formatTime(it) } ?: "--",
+            label = stats.bestTime?.let { stringResource(R.string.session_history_stat_best) } ?: stringResource(R.string.session_history_stat_best),
             valueColor = if (stats.bestTime != null) BestGreen else TextSecondary,
             modifier = Modifier.weight(1f)
         )
-        MiniStatChip(
+        StatBox(
             icon = Icons.Outlined.LocalFireDepartment,
             value = stats.weeklySessionCount.toString(),
+            label = stringResource(R.string.session_history_stat_this_week),
+            valueColor = if (stats.weeklySessionCount > 0) WarningGold else TextPrimary,
             modifier = Modifier.weight(1f)
         )
     }
 }
 
 @Composable
-private fun MiniStatChip(
+private fun StatBox(
     icon: ImageVector,
     value: String,
+    label: String,
     modifier: Modifier = Modifier,
     valueColor: Color = TextPrimary
 ) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
-        color = SurfaceDark
+    Column(
+        modifier = modifier
+            .gunmetalCard()
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = TextSecondary
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                ),
-                color = valueColor
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(14.dp),
+            tint = IconMuted
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            ),
+            color = valueColor
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMuted,
+            fontSize = 10.sp
+        )
     }
 }
 
@@ -487,16 +497,20 @@ private fun SessionCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Thumbnail (Task 1)
+            // Thumbnail - iOS uses 72x72 square
             Box(
                 modifier = Modifier
-                    .width(50.dp)
-                    .height(62.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(
+                        width = 0.5.dp,
+                        color = BorderSubtle,
+                        shape = RoundedCornerShape(12.dp)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 val currentBitmap = bitmap
@@ -511,14 +525,21 @@ private fun SessionCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.White.copy(alpha = 0.05f)),
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        IconMuted.copy(alpha = 0.3f),
+                                        IconMuted.copy(alpha = 0.1f)
+                                    )
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.DirectionsRun,
                             contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = TextSecondary.copy(alpha = 0.3f)
+                            modifier = Modifier.size(28.dp),
+                            tint = IconMuted
                         )
                     }
                 }
@@ -526,81 +547,82 @@ private fun SessionCard(
 
             // Session info
             Column(modifier = Modifier.weight(1f)) {
+                // Date as primary line (matching iOS)
                 Text(
-                    text = session.name ?: stringResource(R.string.session_history_session_name_default),
-                    style = MaterialTheme.typography.titleSmall.copy(
+                    text = dateStr,
+                    style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
                     color = TextPrimary,
                     maxLines = 1
                 )
 
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Text(
-                    text = dateStr,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                    fontSize = 11.sp
-                )
-
                 Spacer(modifier = Modifier.height(4.dp))
 
+                // Distance + run count + start type (dot-separated)
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if (session.distance > 0) {
                         Text(
                             text = "${session.distance.toInt()}m",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold
                             ),
-                            color = TextSecondary
+                            color = AccentBlue
+                        )
+                        Text(
+                            text = "\u2022",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted.copy(alpha = 0.6f)
                         )
                     }
                     if (cardData.runCount > 0) {
                         Text(
                             text = if (cardData.runCount == 1)
-                            stringResource(R.string.session_history_run_count_singular, cardData.runCount)
-                        else
-                            stringResource(R.string.session_history_run_count, cardData.runCount),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
+                                stringResource(R.string.session_history_run_count_singular, cardData.runCount)
+                            else
+                                stringResource(R.string.session_history_run_count, cardData.runCount),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted
+                        )
+                        Text(
+                            text = "\u2022",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted.copy(alpha = 0.6f)
                         )
                     }
-                }
-            }
-
-            // Best time + delete
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Best time (Task 1)
-                if (cardData.bestTime != null) {
                     Text(
-                        text = formatTime(cardData.bestTime),
-                        style = MaterialTheme.typography.titleMedium.copy(
+                        text = session.startType.replaceFirstChar {
+                            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextMuted
+                    )
+                }
+
+                // Best time
+                if (cardData.bestTime != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${formatTime(cardData.bestTime)}s",
+                        style = MaterialTheme.typography.titleSmall.copy(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
                         ),
                         color = BestGreen
                     )
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Delete button (Task 12)
-                Icon(
-                    imageVector = Icons.Outlined.Delete,
-                    contentDescription = stringResource(R.string.session_history_delete_session_cd),
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clickable { onDeleteClick() },
-                    tint = TextSecondary.copy(alpha = 0.4f)
-                )
             }
+
+            // Chevron
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = IconMuted.copy(alpha = 0.6f)
+            )
         }
     }
 }

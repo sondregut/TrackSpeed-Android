@@ -2,14 +2,17 @@ package com.trackspeed.android.ui.screens.stats
 
 import com.trackspeed.android.ui.theme.*
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -83,7 +87,7 @@ fun StatsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = SurfaceDark,
+                    containerColor = Color.Transparent,
                     titleContentColor = TextPrimary,
                     navigationIconContentColor = TextPrimary
                 )
@@ -132,6 +136,16 @@ fun StatsScreen(
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Test type header (matches iOS "TEST TYPE" label)
+                Text(
+                    text = "TEST TYPE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.5.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
                 // Test type selector
                 TestTypeSelector(
                     testTypes = state.testTypes,
@@ -154,11 +168,11 @@ fun StatsScreen(
                 // Progress chart
                 if (state.progressPoints.size >= 2) {
                     Text(
-                        text = stringResource(R.string.stats_progress),
+                        text = stringResource(R.string.stats_progress).uppercase(),
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary,
+                        color = TextMuted,
                         fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.5.sp,
+                        letterSpacing = 0.5.sp,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
@@ -252,59 +266,102 @@ private fun SummaryStatsCard(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 20.dp, horizontal = 12.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .padding(20.dp)
         ) {
-            StatCell(
-                value = bestTime?.let { formatTime(it) } ?: "--",
-                label = stringResource(R.string.stats_best),
-                modifier = Modifier.weight(1f)
-            )
-            StatCell(
-                value = averageTime?.let { formatTime(it) } ?: "--",
-                label = stringResource(R.string.stats_average),
-                modifier = Modifier.weight(1f)
-            )
-            StatCell(
-                value = totalRuns.toString(),
-                label = stringResource(R.string.stats_runs),
-                modifier = Modifier.weight(1f)
-            )
-            StatCell(
-                value = totalSessions.toString(),
-                label = stringResource(R.string.stats_sessions),
-                modifier = Modifier.weight(1f)
-            )
+            // Header with icon + title (matches iOS statsCard header)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Timer,
+                    contentDescription = null,
+                    tint = AccentBlue,
+                    modifier = Modifier.size(22.dp)
+                )
+                Text(
+                    text = stringResource(R.string.stats_title),
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = TextPrimary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 2x2 grid of metric tiles (matches iOS LazyVGrid)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                MetricTile(
+                    label = stringResource(R.string.stats_best),
+                    value = bestTime?.let { formatTime(it) } ?: "\u2014",
+                    valueColor = TimerGreen,
+                    modifier = Modifier.weight(1f)
+                )
+                MetricTile(
+                    label = stringResource(R.string.stats_average),
+                    value = averageTime?.let { formatTime(it) } ?: "\u2014",
+                    valueColor = AccentBlue,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                MetricTile(
+                    label = stringResource(R.string.stats_runs),
+                    value = totalRuns.toString(),
+                    valueColor = TextPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+                MetricTile(
+                    label = stringResource(R.string.stats_sessions),
+                    value = totalSessions.toString(),
+                    valueColor = TextPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun StatCell(
-    value: String,
+private fun MetricTile(
     label: String,
+    value: String,
+    valueColor: Color,
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(SurfaceDark.copy(alpha = 0.5f))
+            .padding(12.dp),
+        horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            ),
-            color = TextPrimary
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMuted
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            text = value,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            ),
+            color = valueColor
         )
     }
 }

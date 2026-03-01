@@ -1,6 +1,5 @@
 package com.trackspeed.android.ui.screens.settings
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,6 +10,7 @@ import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Notifications
@@ -18,16 +18,19 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -137,9 +140,9 @@ private fun SettingsScreenContent(
             .fillMaxSize()
             .gradientBackground()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 20.dp)
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Text(
             text = stringResource(R.string.settings_title),
@@ -148,485 +151,312 @@ private fun SettingsScreenContent(
             color = TextPrimary
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // Subscription section
-        SectionHeader(stringResource(R.string.settings_section_subscription))
-
-        if (state.isProUser) {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_trackspeed_pro), color = TextPrimary) },
-                supportingContent = { Text(stringResource(R.string.settings_active), color = AccentGreen) },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.Star,
-                        contentDescription = null,
-                        tint = AccentGreen
-                    )
-                },
-                trailingContent = {
-                    Text(
-                        text = stringResource(R.string.settings_manage),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = AccentBlue,
-                        modifier = Modifier.clickable {
-                            // TODO: Open Google Play subscription management
-                        }
-                    )
-                },
-                colors = ListItemDefaults.colors(
-                    containerColor = Color.Transparent
-                )
-            )
-        } else {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_upgrade_to_pro), color = TextPrimary) },
-                supportingContent = { Text(stringResource(R.string.settings_unlock_all_features), color = TextSecondary) },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.Star,
-                        contentDescription = null,
-                        tint = AccentGreen
-                    )
-                },
-                trailingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = null,
-                        tint = TextTertiary
-                    )
-                },
-                modifier = Modifier.clickable { onPaywallClick() },
-                colors = ListItemDefaults.colors(
-                    containerColor = Color.Transparent
-                )
-            )
-        }
-
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = DividerColor
-        )
-
-        // Timing section
+        // ── PREFERENCES SECTION ──
         SectionHeader(stringResource(R.string.settings_section_timing))
 
-        // Distance
-        Box {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_distance), color = TextPrimary) },
-                supportingContent = {
-                    val distanceDisplayLabel = when (state.defaultDistance) {
-                        36.576 -> stringResource(R.string.settings_distance_40yd)
-                        60.0 -> stringResource(R.string.settings_distance_60m)
-                        100.0 -> stringResource(R.string.settings_distance_100m)
-                        200.0 -> stringResource(R.string.settings_distance_200m)
-                        else -> "${state.defaultDistance.toInt()}m"
-                    }
-                    Text(distanceDisplayLabel, color = TextSecondary)
-                },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.Straighten,
-                        contentDescription = null,
-                        tint = TextSecondary
+        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+            Column {
+                // Distance picker
+                Box {
+                    SettingsRow(
+                        icon = Icons.Outlined.Straighten,
+                        label = stringResource(R.string.settings_distance),
+                        value = when (state.defaultDistance) {
+                            36.576 -> stringResource(R.string.settings_distance_40yd)
+                            60.0 -> stringResource(R.string.settings_distance_60m)
+                            100.0 -> stringResource(R.string.settings_distance_100m)
+                            200.0 -> stringResource(R.string.settings_distance_200m)
+                            else -> "${state.defaultDistance.toInt()}m"
+                        },
+                        onClick = { distanceDropdownExpanded = true }
                     )
-                },
-                modifier = Modifier.clickable { distanceDropdownExpanded = true },
-                colors = ListItemDefaults.colors(
-                    containerColor = Color.Transparent
-                )
-            )
-            DropdownMenu(
-                expanded = distanceDropdownExpanded,
-                onDismissRequest = { distanceDropdownExpanded = false },
-                containerColor = CardBackground
-            ) {
-                distanceOptions.forEach { (labelRes, value) ->
-                    DropdownMenuItem(
-                        text = { Text(stringResource(labelRes), color = TextPrimary) },
-                        onClick = {
-                            onDistanceSelected(value)
-                            distanceDropdownExpanded = false
-                        }
-                    )
-                }
-            }
-        }
-
-        // Start type
-        Box {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_start_type), color = TextPrimary) },
-                supportingContent = {
-                    val startTypeDisplayLabel = when (state.startType) {
-                        "flying" -> stringResource(R.string.settings_start_type_flying)
-                        "standing" -> stringResource(R.string.settings_start_type_standing)
-                        else -> state.startType.replaceFirstChar { it.uppercase() }
-                    }
-                    Text(startTypeDisplayLabel, color = TextSecondary)
-                },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.Timer,
-                        contentDescription = null,
-                        tint = TextSecondary
-                    )
-                },
-                modifier = Modifier.clickable { startTypeDropdownExpanded = true },
-                colors = ListItemDefaults.colors(
-                    containerColor = Color.Transparent
-                )
-            )
-            DropdownMenu(
-                expanded = startTypeDropdownExpanded,
-                onDismissRequest = { startTypeDropdownExpanded = false },
-                containerColor = CardBackground
-            ) {
-                startTypeOptions.forEach { (labelRes, value) ->
-                    DropdownMenuItem(
-                        text = { Text(stringResource(labelRes), color = TextPrimary) },
-                        onClick = {
-                            onStartTypeSelected(value)
-                            startTypeDropdownExpanded = false
-                        }
-                    )
-                }
-            }
-        }
-
-        // Start mode
-        Box {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_start_mode), color = TextPrimary) },
-                supportingContent = {
-                    val startModeDisplayLabel = when (state.startMode) {
-                        "flying" -> stringResource(R.string.settings_start_mode_flying)
-                        "touch" -> stringResource(R.string.settings_start_mode_touch)
-                        "countdown" -> stringResource(R.string.settings_start_mode_countdown)
-                        "voice" -> stringResource(R.string.settings_start_mode_voice)
-                        "inframe" -> stringResource(R.string.settings_start_mode_inframe)
-                        else -> state.startMode.replaceFirstChar { it.uppercase() }
-                    }
-                    Text(startModeDisplayLabel, color = TextSecondary)
-                },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.PlayArrow,
-                        contentDescription = null,
-                        tint = TextSecondary
-                    )
-                },
-                modifier = Modifier.clickable { startModeDropdownExpanded = true },
-                colors = ListItemDefaults.colors(
-                    containerColor = Color.Transparent
-                )
-            )
-            DropdownMenu(
-                expanded = startModeDropdownExpanded,
-                onDismissRequest = { startModeDropdownExpanded = false },
-                containerColor = CardBackground
-            ) {
-                startModeOptions.forEach { (labelRes, value) ->
-                    DropdownMenuItem(
-                        text = { Text(stringResource(labelRes), color = TextPrimary) },
-                        onClick = {
-                            onStartModeSelected(value)
-                            startModeDropdownExpanded = false
-                        }
-                    )
-                }
-            }
-        }
-
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = DividerColor
-        )
-
-        // Display section
-        SectionHeader(stringResource(R.string.settings_section_display))
-
-        // Speed unit
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_speed_unit), color = TextPrimary) },
-            leadingContent = {
-                Icon(
-                    imageVector = Icons.Outlined.Speed,
-                    contentDescription = null,
-                    tint = TextSecondary
-                )
-            },
-            supportingContent = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    listOf("m/s", "km/h", "mph").forEach { unit ->
-                        FilterChip(
-                            selected = state.speedUnit == unit,
-                            onClick = { onSpeedUnitSelected(unit) },
-                            label = { Text(unit, color = if (state.speedUnit == unit) Color.White else TextSecondary) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = CardBackground,
-                                selectedContainerColor = AccentBlue,
-                                labelColor = TextSecondary,
-                                selectedLabelColor = Color.White
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                borderColor = TextTertiary,
-                                selectedBorderColor = AccentBlue,
-                                enabled = true,
-                                selected = state.speedUnit == unit
+                    DropdownMenu(
+                        expanded = distanceDropdownExpanded,
+                        onDismissRequest = { distanceDropdownExpanded = false },
+                        containerColor = CardBackground
+                    ) {
+                        distanceOptions.forEach { (labelRes, value) ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(labelRes), color = TextPrimary) },
+                                onClick = {
+                                    onDistanceSelected(value)
+                                    distanceDropdownExpanded = false
+                                }
                             )
-                        )
+                        }
                     }
                 }
-            },
-            colors = ListItemDefaults.colors(
-                containerColor = Color.Transparent
-            )
-        )
 
-        // Theme picker
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_theme), color = TextPrimary) },
-            leadingContent = {
-                Icon(
-                    imageVector = Icons.Outlined.DarkMode,
-                    contentDescription = null,
-                    tint = TextSecondary
-                )
-            },
-            supportingContent = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    listOf(
-                        AppTheme.MIDNIGHT to stringResource(R.string.theme_midnight),
-                        AppTheme.LIGHT to stringResource(R.string.theme_light),
-                        AppTheme.DARKGOLD to stringResource(R.string.theme_gold)
-                    ).forEach { (theme, label) ->
-                        FilterChip(
-                            selected = state.appTheme == theme,
-                            onClick = { onThemeSelected(theme) },
-                            label = {
-                                Text(
-                                    label,
-                                    color = if (state.appTheme == theme) Color.White else TextSecondary,
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = CardBackground,
-                                selectedContainerColor = AccentBlue,
-                                labelColor = TextSecondary,
-                                selectedLabelColor = Color.White
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                borderColor = TextTertiary,
-                                selectedBorderColor = AccentBlue,
-                                enabled = true,
-                                selected = state.appTheme == theme
+                SettingsDivider()
+
+                // Start type picker
+                Box {
+                    SettingsRow(
+                        icon = Icons.Outlined.Timer,
+                        label = stringResource(R.string.settings_start_type),
+                        value = when (state.startType) {
+                            "flying" -> stringResource(R.string.settings_start_type_flying)
+                            "standing" -> stringResource(R.string.settings_start_type_standing)
+                            else -> state.startType.replaceFirstChar { it.uppercase() }
+                        },
+                        onClick = { startTypeDropdownExpanded = true }
+                    )
+                    DropdownMenu(
+                        expanded = startTypeDropdownExpanded,
+                        onDismissRequest = { startTypeDropdownExpanded = false },
+                        containerColor = CardBackground
+                    ) {
+                        startTypeOptions.forEach { (labelRes, value) ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(labelRes), color = TextPrimary) },
+                                onClick = {
+                                    onStartTypeSelected(value)
+                                    startTypeDropdownExpanded = false
+                                }
                             )
-                        )
+                        }
                     }
                 }
-            },
-            colors = ListItemDefaults.colors(
-                containerColor = Color.Transparent
-            )
-        )
 
-        // Language picker
-        var showLanguageDialog by remember { mutableStateOf(false) }
-        val currentLanguageTag = getCurrentLanguageTag()
+                SettingsDivider()
 
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_language_title), color = TextPrimary) },
-            leadingContent = {
-                Icon(
-                    imageVector = Icons.Outlined.Language,
-                    contentDescription = null,
-                    tint = TextSecondary
-                )
-            },
-            trailingContent = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = getLanguageDisplayName(currentLanguageTag),
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium
+                // Start mode picker
+                Box {
+                    SettingsRow(
+                        icon = Icons.Outlined.PlayArrow,
+                        label = stringResource(R.string.settings_start_mode),
+                        value = when (state.startMode) {
+                            "flying" -> stringResource(R.string.settings_start_mode_flying)
+                            "touch" -> stringResource(R.string.settings_start_mode_touch)
+                            "countdown" -> stringResource(R.string.settings_start_mode_countdown)
+                            "voice" -> stringResource(R.string.settings_start_mode_voice)
+                            "inframe" -> stringResource(R.string.settings_start_mode_inframe)
+                            else -> state.startMode.replaceFirstChar { it.uppercase() }
+                        },
+                        onClick = { startModeDropdownExpanded = true }
                     )
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = null,
-                        tint = TextTertiary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    DropdownMenu(
+                        expanded = startModeDropdownExpanded,
+                        onDismissRequest = { startModeDropdownExpanded = false },
+                        containerColor = CardBackground
+                    ) {
+                        startModeOptions.forEach { (labelRes, value) ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(labelRes), color = TextPrimary) },
+                                onClick = {
+                                    onStartModeSelected(value)
+                                    startModeDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
                 }
-            },
-            colors = ListItemDefaults.colors(
-                containerColor = Color.Transparent
-            ),
-            modifier = Modifier.clickable { showLanguageDialog = true }
-        )
 
-        if (showLanguageDialog) {
-            LanguagePickerDialog(
-                currentLanguage = currentLanguageTag,
-                onLanguageSelected = { tag ->
-                    applyLanguage(tag)
-                },
-                onDismiss = { showLanguageDialog = false }
-            )
-        }
+                SettingsDivider()
 
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = DividerColor
-        )
+                // Camera FPS
+                SettingsChipRow(
+                    icon = Icons.Outlined.Videocam,
+                    label = stringResource(R.string.settings_frame_rate),
+                    options = listOf(30, 60, 120),
+                    selectedOption = state.preferredFps,
+                    optionLabel = { stringResource(R.string.settings_fps_label, it) },
+                    onSelected = onFpsSelected
+                )
 
-        // Voice section
-        SectionHeader("VOICE")
+                SettingsDivider()
 
-        // Voice provider picker
-        var voiceProviderExpanded by remember { mutableStateOf(false) }
-        Box {
-            ListItem(
-                headlineContent = { Text("Voice Provider", color = TextPrimary) },
-                supportingContent = {
-                    val label = if (state.voiceProvider == "eleven_labs") "AI Voice (Premium)" else "System Voice"
-                    Text(label, color = TextSecondary)
-                },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.RecordVoiceOver,
-                        contentDescription = null,
-                        tint = TextSecondary
+                // Speed unit
+                SettingsChipRow(
+                    icon = Icons.Outlined.Speed,
+                    label = stringResource(R.string.settings_speed_unit),
+                    options = listOf("m/s", "km/h", "mph"),
+                    selectedOption = state.speedUnit,
+                    optionLabel = { it },
+                    onSelected = onSpeedUnitSelected
+                )
+
+                SettingsDivider()
+
+                // Voice provider
+                var voiceProviderExpanded by remember { mutableStateOf(false) }
+                Box {
+                    SettingsRow(
+                        icon = Icons.Outlined.RecordVoiceOver,
+                        label = "Start Voice",
+                        value = if (state.voiceProvider == "eleven_labs") "AI Voice (Premium)" else "System Voice",
+                        onClick = { voiceProviderExpanded = true }
                     )
-                },
-                modifier = Modifier.clickable { voiceProviderExpanded = true },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-            DropdownMenu(
-                expanded = voiceProviderExpanded,
-                onDismissRequest = { voiceProviderExpanded = false },
-                containerColor = CardBackground
-            ) {
-                DropdownMenuItem(
-                    text = { Text("AI Voice (Premium)", color = TextPrimary) },
-                    onClick = {
-                        onVoiceProviderSelected("eleven_labs")
-                        voiceProviderExpanded = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("System Voice", color = TextPrimary) },
-                    onClick = {
-                        onVoiceProviderSelected("system")
-                        voiceProviderExpanded = false
-                    }
-                )
-            }
-        }
-
-        // ElevenLabs voice picker (only shown when AI Voice selected)
-        if (state.voiceProvider == "eleven_labs") {
-            var voicePickerExpanded by remember { mutableStateOf(false) }
-            val voiceOptions = listOf(
-                "adam" to "Adam (Male)",
-                "josh" to "Josh (Male)",
-                "arnold" to "Arnold (Male)",
-                "rachel" to "Rachel (Female)",
-                "bella" to "Bella (Female)",
-                "elli" to "Elli (Female)"
-            )
-            val currentVoiceLabel = voiceOptions.firstOrNull { it.first == state.elevenLabsVoice }?.second ?: "Arnold (Male)"
-
-            Box {
-                ListItem(
-                    headlineContent = { Text("AI Voice", color = TextPrimary) },
-                    supportingContent = { Text(currentVoiceLabel, color = TextSecondary) },
-                    modifier = Modifier.clickable { voicePickerExpanded = true },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                )
-                DropdownMenu(
-                    expanded = voicePickerExpanded,
-                    onDismissRequest = { voicePickerExpanded = false },
-                    containerColor = CardBackground
-                ) {
-                    voiceOptions.forEach { (value, label) ->
+                    DropdownMenu(
+                        expanded = voiceProviderExpanded,
+                        onDismissRequest = { voiceProviderExpanded = false },
+                        containerColor = CardBackground
+                    ) {
                         DropdownMenuItem(
-                            text = { Text(label, color = TextPrimary) },
+                            text = { Text("AI Voice (Premium)", color = TextPrimary) },
                             onClick = {
-                                onElevenLabsVoiceSelected(value)
-                                voicePickerExpanded = false
+                                onVoiceProviderSelected("eleven_labs")
+                                voiceProviderExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("System Voice", color = TextPrimary) },
+                            onClick = {
+                                onVoiceProviderSelected("system")
+                                voiceProviderExpanded = false
                             }
                         )
                     }
                 }
-            }
 
-            // Preview button
-            ListItem(
-                headlineContent = {
-                    Text(
-                        "Preview Voice",
-                        color = AccentBlue,
-                        modifier = Modifier.clickable { onPreviewVoice() }
+                // ElevenLabs voice picker (only when AI Voice selected)
+                if (state.voiceProvider == "eleven_labs") {
+                    SettingsDivider()
+
+                    var voicePickerExpanded by remember { mutableStateOf(false) }
+                    val voiceOptions = listOf(
+                        "adam" to "Adam (Male)",
+                        "josh" to "Josh (Male)",
+                        "arnold" to "Arnold (Male)",
+                        "rachel" to "Rachel (Female)",
+                        "bella" to "Bella (Female)",
+                        "elli" to "Elli (Female)"
                     )
-                },
-                leadingContent = {
+                    val currentVoiceLabel = voiceOptions.firstOrNull { it.first == state.elevenLabsVoice }?.second ?: "Arnold (Male)"
+
+                    Box {
+                        SettingsRow(
+                            icon = null,
+                            label = "AI Voice",
+                            value = currentVoiceLabel,
+                            onClick = { voicePickerExpanded = true }
+                        )
+                        DropdownMenu(
+                            expanded = voicePickerExpanded,
+                            onDismissRequest = { voicePickerExpanded = false },
+                            containerColor = CardBackground
+                        ) {
+                            voiceOptions.forEach { (value, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label, color = TextPrimary) },
+                                    onClick = {
+                                        onElevenLabsVoiceSelected(value)
+                                        voicePickerExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                SettingsDivider()
+
+                // Language
+                var showLanguageDialog by remember { mutableStateOf(false) }
+                val currentLanguageTag = getCurrentLanguageTag()
+
+                SettingsRow(
+                    icon = Icons.Outlined.Language,
+                    label = stringResource(R.string.settings_language_title),
+                    value = getLanguageDisplayName(currentLanguageTag),
+                    onClick = { showLanguageDialog = true }
+                )
+
+                if (showLanguageDialog) {
+                    LanguagePickerDialog(
+                        currentLanguage = currentLanguageTag,
+                        onLanguageSelected = { tag ->
+                            applyLanguage(tag)
+                        },
+                        onDismiss = { showLanguageDialog = false }
+                    )
+                }
+
+                SettingsDivider()
+
+                // Preview voice button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onPreviewVoice)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Icon(
                         imageVector = Icons.Outlined.PlayArrow,
                         contentDescription = null,
-                        tint = AccentBlue
+                        tint = AccentBlue,
+                        modifier = Modifier.size(22.dp)
                     )
-                },
-                modifier = Modifier.clickable { onPreviewVoice() },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Text(
+                        text = "Preview Voice",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = AccentBlue
+                    )
+                }
+            }
+        }
+
+        SectionFooter("Photo Finish uses camera-based detection for instant timing with no calibration needed.")
+
+        // ── CROSSING FEEDBACK SECTION ──
+        SectionHeader("Crossing Feedback")
+
+        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+            Column {
+                // Announce times toggle
+                SettingsToggleRow(
+                    icon = Icons.Outlined.Mic,
+                    label = "Announce Times",
+                    checked = state.announceTimesEnabled,
+                    onCheckedChange = onAnnounceTimesChanged
+                )
+            }
+        }
+
+        SectionFooter("Audio and visual feedback when a crossing is detected. Voice uses AI for instant time readout.")
+
+        // ── NOTIFICATIONS SECTION ──
+        SectionHeader(stringResource(R.string.settings_section_notifications))
+
+        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+            SettingsRow(
+                icon = Icons.Outlined.Notifications,
+                label = stringResource(R.string.settings_notification_settings),
+                showChevron = true,
+                onClick = onNotificationSettingsClick
             )
         }
 
-        // Announce times toggle
-        ListItem(
-            headlineContent = { Text("Announce Times", color = TextPrimary) },
-            supportingContent = { Text("Read lap times aloud after each crossing", color = TextSecondary) },
-            trailingContent = {
-                Switch(
-                    checked = state.announceTimesEnabled,
-                    onCheckedChange = { onAnnounceTimesChanged(it) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = AccentBlue,
-                        uncheckedThumbColor = Color.White,
-                        uncheckedTrackColor = TextTertiary,
-                        uncheckedBorderColor = TextTertiary
-                    )
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
+        SectionFooter(stringResource(R.string.settings_notification_subtitle))
 
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = DividerColor
-        )
-
-        // Detection section
+        // ── DETECTION SECTION ──
         SectionHeader(stringResource(R.string.settings_section_detection))
 
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_sensitivity), color = TextPrimary) },
-            supportingContent = {
-                Column {
-                    Text(
-                        text = String.format("%.1f", state.detectionSensitivity),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
+        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+            Column {
+                // Sensitivity slider
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(R.string.settings_sensitivity),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = String.format("%.1f", state.detectionSensitivity),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary
+                        )
+                    }
                     Slider(
                         value = state.detectionSensitivity,
                         onValueChange = { onSensitivityChanged(it) },
@@ -641,248 +471,170 @@ private fun SettingsScreenContent(
                         )
                     )
                 }
-            },
-            colors = ListItemDefaults.colors(
-                containerColor = Color.Transparent
-            )
-        )
-
-        // Frame rate
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_frame_rate), color = TextPrimary) },
-            leadingContent = {
-                Icon(
-                    imageVector = Icons.Outlined.Videocam,
-                    contentDescription = null,
-                    tint = TextSecondary
-                )
-            },
-            supportingContent = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    listOf(30, 60, 120).forEach { fps ->
-                        FilterChip(
-                            selected = state.preferredFps == fps,
-                            onClick = { onFpsSelected(fps) },
-                            label = {
-                                Text(
-                                    stringResource(R.string.settings_fps_label, fps),
-                                    color = if (state.preferredFps == fps) Color.White else TextSecondary
-                                )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = CardBackground,
-                                selectedContainerColor = AccentBlue,
-                                labelColor = TextSecondary,
-                                selectedLabelColor = Color.White
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                borderColor = TextTertiary,
-                                selectedBorderColor = AccentBlue,
-                                enabled = true,
-                                selected = state.preferredFps == fps
-                            )
-                        )
-                    }
-                }
-            },
-            colors = ListItemDefaults.colors(
-                containerColor = Color.Transparent
-            )
-        )
-
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = DividerColor
-        )
-
-        // Notifications section
-        SectionHeader(stringResource(R.string.settings_section_notifications))
-
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_notification_settings), color = TextPrimary) },
-            supportingContent = { Text(stringResource(R.string.settings_notification_subtitle), color = TextSecondary) },
-            leadingContent = {
-                Icon(
-                    imageVector = Icons.Outlined.Notifications,
-                    contentDescription = null,
-                    tint = TextSecondary
-                )
-            },
-            trailingContent = {
-                Icon(
-                    imageVector = Icons.Outlined.ChevronRight,
-                    contentDescription = null,
-                    tint = TextTertiary
-                )
-            },
-            modifier = Modifier.clickable { onNotificationSettingsClick() },
-            colors = ListItemDefaults.colors(
-                containerColor = Color.Transparent
-            )
-        )
-
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = DividerColor
-        )
-
-        // Storage section
-        SectionHeader(stringResource(R.string.settings_section_storage))
-
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_thumbnail_storage), color = TextPrimary) },
-            supportingContent = {
-                Text(
-                    text = stringResource(R.string.settings_storage_used, thumbnailStorageSize),
-                    color = TextSecondary
-                )
-            },
-            leadingContent = {
-                Icon(
-                    imageVector = Icons.Outlined.Storage,
-                    contentDescription = null,
-                    tint = TextSecondary
-                )
-            },
-            colors = ListItemDefaults.colors(
-                containerColor = Color.Transparent
-            )
-        )
-
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = DividerColor
-        )
-
-        // About section
-        SectionHeader(stringResource(R.string.settings_section_about))
-
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_version), color = TextPrimary) },
-            supportingContent = {
-                Text(
-                    text = stringResource(R.string.settings_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                    color = TextSecondary
-                )
-            },
-            leadingContent = {
-                Icon(
-                    imageVector = Icons.Outlined.Info,
-                    contentDescription = null,
-                    tint = TextSecondary
-                )
-            },
-            colors = ListItemDefaults.colors(
-                containerColor = Color.Transparent
-            )
-        )
-
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = DividerColor
-        )
-
-        // Developer section (only in debug builds)
-        if (BuildConfig.DEBUG) {
-            SectionHeader(stringResource(R.string.settings_section_developer))
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_show_onboarding), color = TextPrimary) },
-                supportingContent = { Text(stringResource(R.string.settings_show_onboarding_subtitle), color = TextSecondary) },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = null,
-                        tint = TextSecondary
-                    )
-                },
-                trailingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = null,
-                        tint = TextTertiary
-                    )
-                },
-                modifier = Modifier.clickable { onShowOnboarding() },
-                colors = ListItemDefaults.colors(
-                    containerColor = Color.Transparent
-                )
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_debug_tools), color = TextPrimary) },
-                supportingContent = { Text(stringResource(R.string.settings_debug_tools_subtitle), color = TextSecondary) },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.Build,
-                        contentDescription = null,
-                        tint = TextSecondary
-                    )
-                },
-                trailingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = null,
-                        tint = TextTertiary
-                    )
-                },
-                modifier = Modifier.clickable { onDebugToolsClick() },
-                colors = ListItemDefaults.colors(
-                    containerColor = Color.Transparent
-                )
-            )
-
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 8.dp),
-                color = DividerColor
-            )
+            }
         }
 
-        // Data Management section
-        SectionHeader(stringResource(R.string.settings_section_data))
+        Spacer(modifier = Modifier.height(4.dp))
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .gunmetalCard()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_clear_data),
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = DestructiveRed
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.settings_clear_data_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = { showClearDataDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = DestructiveRed
-                    ),
-                    border = ButtonDefaults.outlinedButtonBorder(enabled = true).let {
-                        androidx.compose.foundation.BorderStroke(1.dp, DestructiveRed.copy(alpha = 0.5f))
-                    }
+        // ── DATA SECTION ──
+        SectionHeader(stringResource(R.string.settings_section_storage))
+
+        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+            Column {
+                // Storage used
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_thumbnail_storage),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = thumbnailStorageSize,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+
+                SettingsDivider()
+
+                // Clear data button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showClearDataDialog = true }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Delete,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        tint = DestructiveRed,
+                        modifier = Modifier.size(22.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.settings_clear_all_data))
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Text(
+                        text = stringResource(R.string.settings_clear_all_data),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = DestructiveRed
+                    )
                 }
             }
+        }
+
+        SectionFooter(stringResource(R.string.settings_clear_data_description))
+
+        // ── ABOUT SECTION ──
+        SectionHeader(stringResource(R.string.settings_section_about))
+
+        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_version),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // ── APPEARANCE SECTION ──
+        SectionHeader(stringResource(R.string.settings_section_display))
+
+        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(
+                    AppTheme.MIDNIGHT to stringResource(R.string.theme_midnight),
+                    AppTheme.LIGHT to stringResource(R.string.theme_light),
+                    AppTheme.DARKGOLD to stringResource(R.string.theme_gold)
+                ).forEach { (theme, label) ->
+                    val isSelected = state.appTheme == theme
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .then(
+                                if (isSelected) {
+                                    Modifier.surfaceCard()
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .clickable { onThemeSelected(theme) }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Outlined.DarkMode,
+                                contentDescription = null,
+                                tint = if (isSelected) AccentBlue else TextSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isSelected) TextPrimary else TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // ── DEVELOPER SECTION (debug only) ──
+        if (BuildConfig.DEBUG) {
+            SectionHeader(stringResource(R.string.settings_section_developer))
+
+            Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+                Column {
+                    SettingsRow(
+                        icon = Icons.Outlined.Refresh,
+                        label = stringResource(R.string.settings_show_onboarding),
+                        showChevron = true,
+                        onClick = onShowOnboarding
+                    )
+
+                    SettingsDivider()
+
+                    SettingsRow(
+                        icon = Icons.Outlined.Build,
+                        label = stringResource(R.string.settings_debug_tools),
+                        showChevron = true,
+                        onClick = onDebugToolsClick
+                    )
+                }
+            }
+
+            SectionFooter("Debug options for testing. Only visible in development builds.")
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -926,6 +678,171 @@ private fun SettingsScreenContent(
     }
 }
 
+// ── Reusable row components ──
+
+@Composable
+private fun SettingsRow(
+    icon: ImageVector?,
+    label: String,
+    value: String? = null,
+    showChevron: Boolean = false,
+    onClick: (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = TextPrimary,
+            modifier = Modifier.weight(1f)
+        )
+        if (value != null) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary
+            )
+        }
+        if (showChevron) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = TextTertiary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    icon: ImageVector?,
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = AccentBlue,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = TextPrimary,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = AccentBlue,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = TextTertiary,
+                uncheckedBorderColor = TextTertiary
+            )
+        )
+    }
+}
+
+@Composable
+private fun <T> SettingsChipRow(
+    icon: ImageVector?,
+    label: String,
+    options: List<T>,
+    selectedOption: T,
+    optionLabel: @Composable (T) -> String,
+    onSelected: (T) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = TextSecondary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(14.dp))
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = TextPrimary
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = if (icon != null) Modifier.padding(start = 36.dp) else Modifier
+        ) {
+            options.forEach { option ->
+                val isSelected = selectedOption == option
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelected(option) },
+                    label = {
+                        Text(
+                            optionLabel(option),
+                            color = if (isSelected) Color.White else TextSecondary
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = CardBackground,
+                        selectedContainerColor = AccentBlue,
+                        labelColor = TextSecondary,
+                        selectedLabelColor = Color.White
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        borderColor = TextTertiary,
+                        selectedBorderColor = AccentBlue,
+                        enabled = true,
+                        selected = isSelected
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        color = BorderSubtle
+    )
+}
+
 @Composable
 private fun SectionHeader(title: String) {
     Text(
@@ -934,7 +851,17 @@ private fun SectionHeader(title: String) {
         color = TextSecondary,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 1.5.sp,
-        modifier = Modifier.padding(vertical = 8.dp)
+        modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 8.dp)
+    )
+}
+
+@Composable
+private fun SectionFooter(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = TextSecondary.copy(alpha = 0.7f),
+        modifier = Modifier.padding(start = 4.dp, top = 6.dp, bottom = 4.dp, end = 16.dp)
     )
 }
 

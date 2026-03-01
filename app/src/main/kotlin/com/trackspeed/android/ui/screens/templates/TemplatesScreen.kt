@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ElectricBolt
+import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material.icons.outlined.SwapHoriz
@@ -260,7 +261,7 @@ fun TemplatesScreen(
             val templates = templatesByCategory[category] ?: continue
 
             item(key = "header_${category.name}") {
-                SectionHeader(title = category.displayName)
+                SectionHeader(title = category.displayName, color = category.accentColor())
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
@@ -291,15 +292,26 @@ fun TemplatesScreen(
 }
 
 @Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelSmall.copy(
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.5.sp
-        ),
-        color = TextSecondary
-    )
+private fun SectionHeader(title: String, color: Color = TextSecondary) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.5.sp
+            ),
+            color = TextMuted
+        )
+    }
 }
 
 @Composable
@@ -360,6 +372,7 @@ private fun TemplateCard(
                         text = formatDistance(template.distance),
                         color = accentColor
                     )
+                    PhoneCountBadge(count = template.minPhones)
                     StartTypeBadge(
                         text = formatStartType(template.startType)
                     )
@@ -407,6 +420,38 @@ private fun DistanceBadge(
             color = color,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
         )
+    }
+}
+
+@Composable
+private fun PhoneCountBadge(
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(6.dp),
+        color = BorderSubtle
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Smartphone,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(11.dp)
+            )
+            Text(
+                text = "$count",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 11.sp
+                ),
+                color = TextSecondary
+            )
+        }
     }
 }
 
