@@ -226,7 +226,7 @@ private fun PaywallContent(
                         fontWeight = FontWeight.Bold,
                         fontSize = 32.sp
                     ),
-                    color = Color.White,
+                    color = TextPrimary,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 24.dp)
