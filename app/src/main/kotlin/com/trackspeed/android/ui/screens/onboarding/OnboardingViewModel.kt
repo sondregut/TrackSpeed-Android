@@ -26,27 +26,24 @@ enum class OnboardingStep {
     WELCOME,               // 0
     VALUE_PROPOSITION,     // 1
     HOW_IT_WORKS,          // 2
-    NOTIFICATION,          // 3  - moved earlier (after how it works, like iOS)
-    TRACK_PREVIEW,         // 4  - visual track illustration
-    FLYING_TIME,           // 5  - moved before track progress
+    NOTIFICATION,          // 3
+    TRACK_PREVIEW,         // 4
+    FLYING_TIME,           // 5
     GOAL_TIME,             // 6
-    GOAL_MOTIVATION,       // 7
-    TRACK_PROGRESS,        // 8  - progress chart preview
-    START_TYPES,           // 9
-    MULTI_DEVICE,          // 10
-    ATTRIBUTION,           // 11
-    RATING,                // 12
-    COMPETITOR_COMPARISON, // 13
-    AUTH,                  // 14
-    CAMERA_PERMISSION,     // 15
-    PROFILE_SETUP,         // 16
-    TRIAL_INTRO,           // 17
-    TRIAL_REMINDER,        // 18
-    PAYWALL,               // 19
-    PROMO_CODE,            // 20
-    REFERRAL,              // 21
-    SPIN_WHEEL,            // 22
-    COMPLETION;            // 23
+    GOAL_MOTIVATION,       // 7  - combined with TrackProgress (personalized chart + research)
+    START_TYPES,           // 8
+    MULTI_DEVICE,          // 9
+    ATTRIBUTION,           // 10
+    RATING,                // 11
+    COMPETITOR_COMPARISON, // 12
+    AUTH,                  // 13
+    CAMERA_PERMISSION,     // 14
+    PROFILE_SETUP,         // 15
+    TRIAL_INTRO,           // 16
+    TRIAL_REMINDER,        // 17
+    PAYWALL,               // 18
+    SPIN_WHEEL,            // 19
+    COMPLETION;            // 20
 
     val progress: Float get() = ordinal.toFloat() / (entries.size - 1).toFloat()
     val showsProgressBar: Boolean get() = this != WELCOME && this != COMPLETION

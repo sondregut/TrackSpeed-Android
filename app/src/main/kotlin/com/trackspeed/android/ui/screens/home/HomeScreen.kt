@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -205,7 +206,7 @@ fun HomeScreen(
                     userName = userName,
                     totalRunCount = totalRunCount,
                     isInBillingGracePeriod = isInBillingGracePeriod,
-                    onSoloModeClick = { onTemplateClick(60.0, "standing", 2) },
+                    onSoloModeClick = { onTemplateClick(60.0, "standing", 1) },
                     onAccelerationClick = { onTemplateClick(10.0, "standing", 2) },
                     onSprintClick = { onTemplateClick(60.0, "standing", 2) },
                     onTakeOffClick = { onTemplateClick(20.0, "flying", 2) },
@@ -275,32 +276,27 @@ private fun HomeContent(
             .padding(horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Time-of-day greeting (matching iOS DashboardHomeView)
-        Text(
-            text = stringResource(R.string.home_greeting_with_name, stringResource(getGreetingRes()), userName),
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 28.sp
-            ),
-            color = TextPrimary,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Training run counter
-        Text(
-            text = if (totalRunCount == 0) {
-                stringResource(R.string.home_start_first_sprint)
-            } else {
-                pluralStringResource(R.plurals.home_sprints_recorded, totalRunCount, totalRunCount)
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            color = TextSecondary,
-            modifier = Modifier.fillMaxWidth()
-        )
+        // App logo + title (matching iOS DashboardHomeView header)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            androidx.compose.foundation.Image(
+                painter = painterResource(R.drawable.home_icon),
+                contentDescription = null,
+                modifier = Modifier.size(72.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "TrackSpeed",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.SemiBold
+                ),
+                color = TextPrimary
+            )
+        }
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -334,14 +330,14 @@ private fun HomeContent(
             ModeCard(
                 title = stringResource(R.string.home_solo_mode),
                 icon = Icons.Outlined.Sync,
-                iconBackgroundColor = Color(0xFF30D158),
+                iconColor = Color(0xFF30D158),
                 onClick = onSoloModeClick,
                 modifier = Modifier.weight(1f)
             )
             ModeCard(
                 title = stringResource(R.string.home_10m_acceleration),
                 icon = Icons.Outlined.LocalFireDepartment,
-                iconBackgroundColor = AccentNavy,
+                iconColor = Color(0xFFFF9500),
                 onClick = onAccelerationClick,
                 modifier = Modifier.weight(1f)
             )
@@ -356,14 +352,14 @@ private fun HomeContent(
             ModeCard(
                 title = stringResource(R.string.home_60m_sprint),
                 icon = Icons.AutoMirrored.Outlined.DirectionsRun,
-                iconBackgroundColor = TextSecondary,
+                iconColor = AccentNavy,
                 onClick = onSprintClick,
                 modifier = Modifier.weight(1f)
             )
             ModeCard(
                 title = stringResource(R.string.home_take_off_velocity),
                 icon = Icons.Outlined.RocketLaunch,
-                iconBackgroundColor = Color(0xFFBF8040),
+                iconColor = Color(0xFFBF8040),
                 onClick = onTakeOffClick,
                 modifier = Modifier.weight(1f)
             )
@@ -453,48 +449,44 @@ private fun HomeContent(
 private fun ModeCard(
     title: String,
     icon: ImageVector,
-    iconBackgroundColor: Color,
+    iconColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
-            .aspectRatio(1f)
-            .featureCard()
+            .surfaceCard()
             .clickable(onClick = onClick)
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(44.dp)
                     .clip(CircleShape)
-                    .background(iconBackgroundColor.copy(alpha = 0.2f)),
+                    .background(iconColor.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = iconBackgroundColor,
-                    modifier = Modifier.size(24.dp)
+                    tint = iconColor,
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleSmall.copy(
+                style = MaterialTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
                 color = TextPrimary,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }

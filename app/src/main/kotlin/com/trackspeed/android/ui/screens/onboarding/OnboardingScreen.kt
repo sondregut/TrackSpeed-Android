@@ -85,7 +85,14 @@ fun OnboardingScreen(
                 OnboardingStep.WELCOME -> WelcomeStep(
                     onGetStarted = { viewModel.goForward() },
                     onJoinSession = onGuestJoinSession,
-                    onSignIn = onSignIn
+                    onSignIn = onSignIn,
+                    onDebugSkip = {
+                        viewModel.completeOnboarding()
+                        onComplete()
+                    },
+                    onDebugPaywall = {
+                        viewModel.goToStep(OnboardingStep.PAYWALL)
+                    }
                 )
                 OnboardingStep.VALUE_PROPOSITION -> ValuePropositionStep(
                     onContinue = { viewModel.goForward() }
@@ -94,9 +101,6 @@ fun OnboardingScreen(
                     onContinue = { viewModel.goForward() }
                 )
                 OnboardingStep.TRACK_PREVIEW -> TrackPreviewStep(
-                    onContinue = { viewModel.goForward() }
-                )
-                OnboardingStep.TRACK_PROGRESS -> TrackProgressStep(
                     onContinue = { viewModel.goForward() }
                 )
                 OnboardingStep.FLYING_TIME -> FlyingTimeStep(
@@ -116,8 +120,9 @@ fun OnboardingScreen(
                     flyingDistance = state.profile.flyingDistance
                 )
                 OnboardingStep.GOAL_MOTIVATION -> GoalMotivationStep(
-                    personalRecord = state.profile.personalRecord,
+                    flyingPR = state.profile.flyingPR,
                     goalTime = state.profile.goalTime,
+                    flyingDistance = state.profile.flyingDistance,
                     onContinue = { viewModel.goForward() }
                 )
                 OnboardingStep.START_TYPES -> StartTypesStep(
@@ -163,21 +168,10 @@ fun OnboardingScreen(
                     onContinue = { viewModel.goForward() }
                 )
                 OnboardingStep.PAYWALL -> PaywallStep(
-                    onContinue = { viewModel.goForward() },
-                    onSkip = { viewModel.goForward() }
-                )
-                OnboardingStep.PROMO_CODE -> PromoCodeStep(
-                    promoCode = state.profile.promoCode ?: "",
-                    onPromoCodeChanged = { viewModel.setPromoCode(it) },
-                    redemptionState = state.promoRedemptionState,
-                    onSubmit = { code -> viewModel.submitPromoCode(code, "onboarding_promo") },
-                    onContinue = { viewModel.goForward() },
-                    onSkip = { viewModel.goForward() }
-                )
-                OnboardingStep.REFERRAL -> ReferralStep(
-                    referralCode = state.referralCode,
-                    referralLink = state.referralLink,
-                    onContinue = { viewModel.goForward() },
+                    onContinue = {
+                        viewModel.completeOnboarding()
+                        onComplete()
+                    },
                     onSkip = { viewModel.goForward() }
                 )
                 OnboardingStep.SPIN_WHEEL -> SpinWheelStep(
