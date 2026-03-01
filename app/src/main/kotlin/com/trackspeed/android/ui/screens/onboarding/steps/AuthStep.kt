@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -241,14 +240,29 @@ fun AuthStep(
                         )
                     }
 
-                    // Sign up with email link (underlined text, like iOS)
-                    Spacer(Modifier.height(16.dp))
-                    TextButton(onClick = { showEmailForm = true }) {
+                    // Sign up with email button (matches Google card style)
+                    OutlinedButton(
+                        onClick = { showEmailForm = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(100.dp),
+                        border = BorderStroke(1.dp, BorderSubtle),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = SurfaceDark),
+                        enabled = !state.isLoading
+                    ) {
+                        Icon(
+                            Icons.Default.Email,
+                            contentDescription = null,
+                            tint = TextPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
                         Text(
                             stringResource(R.string.onboarding_auth_email),
-                            color = TextSecondary,
-                            fontSize = 14.sp,
-                            textDecoration = TextDecoration.Underline
+                            color = TextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
