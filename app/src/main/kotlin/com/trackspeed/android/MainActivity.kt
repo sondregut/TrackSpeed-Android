@@ -1,6 +1,5 @@
 package com.trackspeed.android
 
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -16,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.trackspeed.android.data.repository.SettingsRepository
+import com.trackspeed.android.referral.ReferralService
 import com.trackspeed.android.ui.navigation.TrackSpeedNavHost
 import com.trackspeed.android.ui.screens.settings.SettingsViewModel
 import com.trackspeed.android.ui.theme.TrackSpeedTheme
@@ -85,56 +85,32 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun parseDeepLink(uri: Uri): DeepLinkEvent? {
-        // trackspeed://invite/CODE or https://mytrackspeed.com/invite/CODE
-        val pathSegments = uri.pathSegments
-        if (pathSegments.size >= 2 && pathSegments[0] == "invite") {
-            val code = pathSegments[1]
-            if (code.isNotBlank()) {
-                return DeepLinkEvent.Invite(code)
-            }
-        }
-        if (pathSegments.size == 1 && pathSegments[0] == "invite") {
-            // trackspeed://invite (no code) — ignore
-            return null
-        }
-
-        // trackspeed://promo or trackspeed://subscribe
-        val host = uri.host
-        if (uri.scheme == "trackspeed") {
-            return when (host) {
-                "invite" -> {
-                    // trackspeed://invite/CODE — host is "invite", path has the code
-                    val code = pathSegments.firstOrNull()
-                    if (!code.isNullOrBlank()) DeepLinkEvent.Invite(code) else null
-                }
-                "promo" -> DeepLinkEvent.Promo
-                "subscribe" -> DeepLinkEvent.Subscribe
+        if (uri.scheme == SCHEME_TRACKSPEED) {
+            return when (uri.host) {
+                HOST_INVITE -> uri.pathSegments.firstOrNull()?.takeIf { it.isNotBlank() }?.let { DeepLinkEvent.Invite(it) }
+                HOST_PROMO -> DeepLinkEvent.Promo
+                HOST_SUBSCRIBE -> DeepLinkEvent.Subscribe
                 else -> null
             }
         }
-
+        // HTTPS app links: https://mytrackspeed.com/invite/CODE
+        if (uri.pathSegments.size >= 2 && uri.pathSegments[0] == HOST_INVITE) {
+            val code = uri.pathSegments[1]
+            if (code.isNotBlank()) return DeepLinkEvent.Invite(code)
+        }
         return null
     }
 
     private fun storePendingReferralCode(code: String) {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(KEY_PENDING_REFERRAL_CODE, code).apply()
+        ReferralService.storePendingReferralCode(this, code)
         Log.d(TAG, "Stored pending referral code: $code")
     }
 
     companion object {
         private const val TAG = "MainActivity"
-        const val PREFS_NAME = "trackspeed"
-        const val KEY_PENDING_REFERRAL_CODE = "pendingReferralCode"
-
-        fun getPendingReferralCode(context: Context): String? {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            return prefs.getString(KEY_PENDING_REFERRAL_CODE, null)
-        }
-
-        fun clearPendingReferralCode(context: Context) {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.edit().remove(KEY_PENDING_REFERRAL_CODE).apply()
-        }
+        private const val SCHEME_TRACKSPEED = "trackspeed"
+        private const val HOST_INVITE = "invite"
+        private const val HOST_PROMO = "promo"
+        private const val HOST_SUBSCRIBE = "subscribe"
     }
 }

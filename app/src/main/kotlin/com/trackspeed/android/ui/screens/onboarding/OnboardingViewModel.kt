@@ -4,7 +4,6 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.trackspeed.android.MainActivity
 import com.trackspeed.android.billing.PromoCodeError
 import com.trackspeed.android.billing.PromoRedemptionResult
 import com.trackspeed.android.billing.SubscriptionManager
@@ -160,9 +159,9 @@ class OnboardingViewModel @Inject constructor(
     }
 
     private suspend fun processPendingReferralCode() {
-        val pendingCode = MainActivity.getPendingReferralCode(application) ?: return
+        val pendingCode = ReferralService.getPendingReferralCode(application) ?: return
         Log.d(TAG, "Processing pending referral code from deeplink: $pendingCode")
-        MainActivity.clearPendingReferralCode(application)
+        ReferralService.clearPendingReferralCode(application)
 
         // First try as promo code
         try {

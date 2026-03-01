@@ -43,6 +43,23 @@ class ReferralService @Inject constructor(
         private const val CODE_LENGTH = 6
         private const val APP_STORE_URL = "https://apps.apple.com/app/trackspeed/id6757509163"
         private const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.trackspeed.android"
+        private const val PREFS_NAME = "trackspeed"
+        private const val KEY_PENDING_REFERRAL_CODE = "pendingReferralCode"
+
+        fun getPendingReferralCode(context: Context): String? {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getString(KEY_PENDING_REFERRAL_CODE, null)
+        }
+
+        fun clearPendingReferralCode(context: Context) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().remove(KEY_PENDING_REFERRAL_CODE).apply()
+        }
+
+        fun storePendingReferralCode(context: Context, code: String) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString(KEY_PENDING_REFERRAL_CODE, code).apply()
+        }
     }
 
     private object Keys {
@@ -110,7 +127,7 @@ class ReferralService @Inject constructor(
      */
     suspend fun getShareMessage(): String {
         val code = getOrCreateReferralCode()
-        val link = REFERRAL_BASE_URL + code
+        val link = getReferralLink()
         return "Join me on TrackSpeed and use my code $code to get started!\n\nDownload for iOS: $APP_STORE_URL\nDownload for Android: $PLAY_STORE_URL\n\n$link"
     }
 

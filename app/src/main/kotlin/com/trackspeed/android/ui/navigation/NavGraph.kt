@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -47,7 +48,7 @@ sealed class Screen(val route: String) {
     data object Onboarding : Screen("onboarding")
     data object Home : Screen("home")
     data object BasicTiming : Screen("basic_timing?distance={distance}&startType={startType}&athleteIds={athleteIds}") {
-        fun createRoute(distance: Double = 60.0, startType: String = "standing", athleteIds: String = "") =
+        fun createRoute(distance: Double = 60.0, startType: String = "flying", athleteIds: String = "") =
             "basic_timing?distance=$distance&startType=$startType&athleteIds=$athleteIds"
     }
     data object RaceMode : Screen("race_mode?distance={distance}&startType={startType}") {
@@ -126,25 +127,13 @@ fun TrackSpeedNavHost(
     }
 
     // Handle deeplink events
-    val currentDeepLink by deepLinkEvent?.collectAsState() ?: mutableStateOf(null)
+    val currentDeepLink by deepLinkEvent?.collectAsState() ?: remember { mutableStateOf(null) }
     LaunchedEffect(currentDeepLink) {
         val event = currentDeepLink ?: return@LaunchedEffect
-        // Only navigate if the start destination has been resolved
         val start = resolvedStart ?: return@LaunchedEffect
-
-        when (event) {
-            is DeepLinkEvent.Invite -> {
-                // Code is already stored in SharedPreferences by MainActivity.
-                // If onboarding is done, navigate to paywall; otherwise let onboarding handle it.
-                if (start == Screen.Home.route) {
-                    navController.navigate(Screen.Paywall.route)
-                }
-            }
-            is DeepLinkEvent.Promo, is DeepLinkEvent.Subscribe -> {
-                if (start == Screen.Home.route) {
-                    navController.navigate(Screen.Paywall.route)
-                }
-            }
+        // All deeplink types navigate to paywall (invite code already stored in SharedPreferences)
+        if (start == Screen.Home.route) {
+            navController.navigate(Screen.Paywall.route)
         }
         onDeepLinkConsumed?.invoke()
     }
@@ -176,7 +165,11 @@ fun TrackSpeedNavHost(
                     navController.navigate(Screen.GuestJoinSession.route)
                 },
                 onSignIn = {
-                    navController.navigate(Screen.Auth.createRoute(signInMode = true))
+                    // Auth succeeded in the sign-in bottom sheet — complete onboarding
+                    onboardingViewModel.completeOnboarding()
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
                 }
             )
         }
@@ -232,12 +225,12 @@ fun TrackSpeedNavHost(
             route = Screen.BasicTiming.route,
             arguments = listOf(
                 navArgument("distance") { type = NavType.FloatType; defaultValue = 60f },
-                navArgument("startType") { type = NavType.StringType; defaultValue = "standing" },
+                navArgument("startType") { type = NavType.StringType; defaultValue = "flying" },
                 navArgument("athleteIds") { type = NavType.StringType; defaultValue = "" }
             )
         ) { backStackEntry ->
             val distance = backStackEntry.arguments?.getFloat("distance")?.toDouble() ?: 60.0
-            val startType = backStackEntry.arguments?.getString("startType") ?: "standing"
+            val startType = backStackEntry.arguments?.getString("startType") ?: "flying"
             BasicTimingScreen(
                 onNavigateBack = {
                     navController.popBackStack()
