@@ -26,6 +26,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -53,6 +54,7 @@ import com.trackspeed.android.data.repository.SettingsRepository
 import com.trackspeed.android.ui.components.BillingIssueBanner
 import com.trackspeed.android.ui.screens.history.SessionHistoryScreen
 import com.trackspeed.android.ui.screens.profile.ProfileScreen
+import com.trackspeed.android.model.StartType
 import com.trackspeed.android.ui.screens.templates.TemplatesScreen
 import com.trackspeed.android.ui.theme.*
 import androidx.annotation.StringRes
@@ -64,6 +66,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -223,10 +227,10 @@ fun HomeScreen(
             when (selectedTab) {
                 HomeTab.HOME -> HomeContent(
                     isInBillingGracePeriod = isInBillingGracePeriod,
-                    onSoloModeClick = { onTemplateClick(60.0, "standing", 1) },
-                    onAccelerationClick = { onTemplateClick(10.0, "standing", 2) },
-                    onSprintClick = { onTemplateClick(60.0, "standing", 2) },
-                    onTakeOffClick = { onTemplateClick(20.0, "flying", 2) },
+                    onSoloModeClick = { onTemplateClick(60.0, StartType.FLYING.rawValue, 1) },
+                    onAccelerationClick = { onTemplateClick(10.0, StartType.FLYING.rawValue, 2) },
+                    onSprintClick = { onTemplateClick(60.0, StartType.FLYING.rawValue, 2) },
+                    onTakeOffClick = { onTemplateClick(20.0, StartType.FLYING.rawValue, 2) },
                     onCustomSessionClick = onBasicModeClick,
                     onJoinSessionClick = onClockSyncClick,
                     onSeeAllClick = { selectedTab = HomeTab.HISTORY },
@@ -723,25 +727,27 @@ private fun RecentSessionCard(
         else -> "${session.distance}m"
     }
 
-    // Load thumbnail from session's first run (thumbnails stored at thumbnails/{sessionId}/lap_1.jpg)
-    val thumbnail = remember(session.id) {
-        try {
-            // Try session thumbnail first, then fall back to first run's thumbnail
-            val sessionPath = session.thumbnailPath
-            if (sessionPath != null && File(sessionPath).exists()) {
-                BitmapFactory.decodeFile(sessionPath)?.asImageBitmap()
-            } else {
-                // Look for first run thumbnail in the session directory
-                val dir = File(
-                    android.os.Environment.getDataDirectory(),
-                    "data/com.trackspeed.android/files/thumbnails/${session.id}"
-                )
-                val firstLap = dir.listFiles()
-                    ?.filter { it.extension == "jpg" }
-                    ?.minByOrNull { it.name }
-                firstLap?.let { BitmapFactory.decodeFile(it.absolutePath)?.asImageBitmap() }
-            }
-        } catch (_: Exception) { null }
+    // Load thumbnail off the main thread (thumbnails stored at thumbnails/{sessionId}/lap_1.jpg)
+    val context = LocalContext.current
+    val thumbnail by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, session.id) {
+        value = withContext(Dispatchers.IO) {
+            try {
+                val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
+                // Try session thumbnail first, then fall back to first run's thumbnail
+                val sessionPath = session.thumbnailPath
+                val fromSession = sessionPath?.let { BitmapFactory.decodeFile(it, opts) }
+                if (fromSession != null) {
+                    fromSession.asImageBitmap()
+                } else {
+                    // Look for first run thumbnail in the session directory
+                    val dir = File(context.filesDir, "thumbnails/${session.id}")
+                    val firstLap = dir.listFiles()
+                        ?.filter { it.extension == "jpg" }
+                        ?.minByOrNull { it.name }
+                    firstLap?.let { BitmapFactory.decodeFile(it.absolutePath, opts)?.asImageBitmap() }
+                }
+            } catch (_: Exception) { null }
+        }
     }
 
     Box(
@@ -764,9 +770,10 @@ private fun RecentSessionCard(
                     .clip(RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                if (thumbnail != null) {
+                val loadedThumbnail = thumbnail
+                if (loadedThumbnail != null) {
                     Image(
-                        bitmap = thumbnail,
+                        bitmap = loadedThumbnail,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
