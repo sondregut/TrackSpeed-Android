@@ -1,7 +1,8 @@
 package com.trackspeed.android.ui.screens.onboarding.steps
 
-import android.app.Activity
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,19 +14,18 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.android.play.core.review.ReviewManagerFactory
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 
@@ -34,46 +34,25 @@ private data class Testimonial(
     val role: String,
     val quote: String,
     val initials: String,
-    val color: Color
+    val color: Color,
+    @DrawableRes val photoRes: Int? = null
 )
 
-private val testimonials = listOf(
+@Composable
+private fun ratingTestimonials() = listOf(
     Testimonial(
-        name = "Sondre Guttormsen",
-        role = "Olympic Pole Vaulter",
-        quote = "I use TrackSpeed to dial in my run-up before competitions. The accuracy is impressive and I always know exactly what speed I'm hitting at takeoff.",
+        name = stringResource(R.string.onboarding_rating_sondre_name),
+        role = stringResource(R.string.onboarding_rating_sondre_role),
+        quote = stringResource(R.string.onboarding_rating_sondre_quote),
         initials = "SG",
-        color = Color(0xFF5C8DB8)
-    ),
-    Testimonial(
-        name = "Andreas Trajkovski",
-        role = "Macedonian Long Jump Record Holder",
-        quote = "As a long jumper, speed is everything. I time all my sprints with TrackSpeed and love how quick and easy it is to set up.",
-        initials = "AT",
-        color = Color(0xFF4CAF50)
+        color = Color(0xFF5C8DB8),
+        photoRes = R.drawable.sondre_profile
     )
 )
 
 @Composable
 fun RatingStep(onContinue: () -> Unit) {
-    val context = LocalContext.current
-
-    // Auto-trigger Play Store in-app review
-    LaunchedEffect(Unit) {
-        try {
-            val reviewManager = ReviewManagerFactory.create(context)
-            val request = reviewManager.requestReviewFlow()
-            request.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val reviewInfo = task.result
-                    val activity = context as? Activity
-                    if (activity != null) {
-                        reviewManager.launchReviewFlow(activity, reviewInfo)
-                    }
-                }
-            }
-        } catch (_: Exception) { }
-    }
+    val testimonials = ratingTestimonials()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -110,7 +89,7 @@ fun RatingStep(onContinue: () -> Unit) {
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("5.0", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(stringResource(R.string.onboarding_rating_score), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Spacer(Modifier.width(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         repeat(5) {
@@ -129,7 +108,7 @@ fun RatingStep(onContinue: () -> Unit) {
 
             // "Made for you" text
             Text(
-                "TrackSpeed was made for\npeople like you",
+                stringResource(R.string.onboarding_rating_made_for_you),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary,
@@ -144,20 +123,7 @@ fun RatingStep(onContinue: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 testimonials.forEach { t ->
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(t.color),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            t.initials,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
+                    TestimonialAvatar(testimonial = t, size = 52.dp)
                 }
                 // Extra placeholder avatar
                 Box(
@@ -223,6 +189,36 @@ fun RatingStep(onContinue: () -> Unit) {
 }
 
 @Composable
+private fun TestimonialAvatar(
+    testimonial: Testimonial,
+    size: androidx.compose.ui.unit.Dp
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(testimonial.color),
+        contentAlignment = Alignment.Center
+    ) {
+        if (testimonial.photoRes != null) {
+            Image(
+                painter = painterResource(testimonial.photoRes),
+                contentDescription = null,
+                modifier = Modifier.matchParentSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Text(
+                testimonial.initials,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
+    }
+}
+
+@Composable
 private fun TestimonialCard(testimonial: Testimonial) {
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -239,20 +235,7 @@ private fun TestimonialCard(testimonial: Testimonial) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(testimonial.color),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        testimonial.initials,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                TestimonialAvatar(testimonial = testimonial, size = 40.dp)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         testimonial.name,

@@ -27,7 +27,16 @@ object DatabaseModule {
             TrackSpeedDatabase::class.java,
             "trackspeed.db"
         )
-            .addMigrations(TrackSpeedDatabase.MIGRATION_1_2, TrackSpeedDatabase.MIGRATION_2_3, TrackSpeedDatabase.MIGRATION_3_4)
+            .addMigrations(
+                TrackSpeedDatabase.MIGRATION_1_2,
+                TrackSpeedDatabase.MIGRATION_2_3,
+                TrackSpeedDatabase.MIGRATION_3_4,
+                TrackSpeedDatabase.MIGRATION_4_5,
+                TrackSpeedDatabase.MIGRATION_5_6,
+                TrackSpeedDatabase.MIGRATION_6_7,
+                TrackSpeedDatabase.MIGRATION_7_8,
+                TrackSpeedDatabase.MIGRATION_8_9
+            )
             .build()
     }
 

@@ -1,22 +1,25 @@
 package com.trackspeed.android.audio
 
 import android.content.Context
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.os.Build
-import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import com.trackspeed.android.data.repository.SettingsRepository
+import com.trackspeed.android.model.StartSoundType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
 import javax.inject.Inject
@@ -47,6 +50,8 @@ enum class VoiceStartPhase(val displayText: String) {
     PRE_START("GET READY..."),
     ON_YOUR_MARKS("ON YOUR MARKS"),
     WAITING_FOR_SET("ON YOUR MARKS"),
+    READY("READY"),
+    WAITING_AFTER_READY("READY"),
     SET("SET"),
     WAITING_FOR_GO("SET"),
     GO("GO!"),
@@ -54,7 +59,8 @@ enum class VoiceStartPhase(val displayText: String) {
     CANCELLED("Cancelled");
 
     val isWaiting: Boolean
-        get() = this == PRELOADING || this == PRE_START || this == WAITING_FOR_SET || this == WAITING_FOR_GO
+        get() = this == PRELOADING || this == PRE_START || this == WAITING_FOR_SET ||
+            this == WAITING_AFTER_READY || this == WAITING_FOR_GO
 }
 
 /**
@@ -69,7 +75,8 @@ enum class VoiceStartPhase(val displayText: String) {
 @Singleton
 class VoiceStartService @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val elevenLabsService: ElevenLabsService
+    private val elevenLabsService: ElevenLabsService,
+    settingsRepository: SettingsRepository
 ) {
 
     companion object {
@@ -78,18 +85,18 @@ class VoiceStartService @Inject constructor(
         // Default timing ranges (seconds) - matching iOS defaults
         private const val PRE_START_DELAY_MIN = 3.0
         private const val PRE_START_DELAY_MAX = 5.0
-        private const val ON_YOUR_MARKS_DELAY_MIN = 5.0
-        private const val ON_YOUR_MARKS_DELAY_MAX = 10.0
+        private const val ON_YOUR_MARKS_DELAY_MIN = 8.0
+        private const val ON_YOUR_MARKS_DELAY_MAX = 12.0
         private const val SET_HOLD_TIME_MIN = 1.5
         private const val SET_HOLD_TIME_MAX = 2.3
 
         // Utterance IDs
         private const val UTTERANCE_ON_YOUR_MARKS = "on_your_marks"
+        private const val UTTERANCE_READY = "ready"
         private const val UTTERANCE_SET = "set"
         private const val UTTERANCE_GO = "go"
         private const val UTTERANCE_PREVIEW = "preview"
 
-        private const val BEEP_DURATION_MS = 200
         private const val VIBRATION_DURATION_MS = 80L
     }
 
@@ -123,16 +130,19 @@ class VoiceStartService @Inject constructor(
 
     private var voiceGender: VoiceGender = VoiceGender.MALE
     private var currentCommands: VoiceCommands = VoiceCommandPhrases.forLanguage("en")
+    private var currentLanguageTag: String = "en"
     var voiceProvider: VoiceProvider = VoiceProvider.ELEVEN_LABS
     var elevenLabsVoiceId: ElevenLabsVoiceId = ElevenLabsVoiceId.ARNOLD
+    private var startSoundType: StartSoundType = StartSoundType.BEEP
+    private var preStartDelayMin = PRE_START_DELAY_MIN
+    private var preStartDelayMax = PRE_START_DELAY_MAX
+    private var onYourMarksDelayMin = ON_YOUR_MARKS_DELAY_MIN
+    private var onYourMarksDelayMax = ON_YOUR_MARKS_DELAY_MAX
+    private var setHoldTimeMin = SET_HOLD_TIME_MIN
+    private var setHoldTimeMax = SET_HOLD_TIME_MAX
+    private var includeReadyCommand = SettingsRepository.Defaults.INCLUDE_READY_COMMAND
 
-    // Tone generator for the GO beep
-    private val toneGenerator: ToneGenerator? = try {
-        ToneGenerator(AudioManager.STREAM_MUSIC, ToneGenerator.MAX_VOLUME)
-    } catch (e: Exception) {
-        Log.w(TAG, "Failed to create ToneGenerator", e)
-        null
-    }
+    private val startSoundPlayer = StartSoundPlayer(context)
 
     // Vibrator for haptic feedback
     private val vibrator: Vibrator? = try {
@@ -148,8 +158,76 @@ class VoiceStartService @Inject constructor(
         null
     }
 
+    private val settingsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
     init {
         initializeTts()
+
+        // Sync voice settings from DataStore so countdown uses the user's choices
+        settingsScope.launch {
+            settingsRepository.voiceProvider.collect { provider ->
+                voiceProvider = VoiceProvider.fromString(provider)
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.elevenLabsVoice.collect { voice ->
+                elevenLabsVoiceId = ElevenLabsVoiceId.fromString(voice)
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.startSoundType.collect { rawValue ->
+                startSoundType = StartSoundType.fromRawValue(rawValue)
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.preStartDelayMin.collect { min ->
+                preStartDelayMin = min.toDouble()
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.preStartDelayMax.collect { max ->
+                preStartDelayMax = max.toDouble()
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.marksSetDelayMin.collect { min ->
+                onYourMarksDelayMin = min.toDouble()
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.marksSetDelayMax.collect { max ->
+                onYourMarksDelayMax = max.toDouble()
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.setGoHoldMin.collect { min ->
+                setHoldTimeMin = min.toDouble()
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.setGoHoldMax.collect { max ->
+                setHoldTimeMax = max.toDouble()
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.includeReadyCommand.collect { enabled ->
+                includeReadyCommand = enabled
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.appLanguage.collect { lang ->
+                val tag = if (lang == "system") "en" else lang
+                currentLanguageTag = tag
+                currentCommands = VoiceCommandPhrases.forLanguage(tag)
+                applyLanguageAndVoice()
+            }
+        }
+        settingsScope.launch {
+            settingsRepository.voiceGender.collect { gender ->
+                voiceGender = VoiceGender.fromString(gender)
+                applyVoicePreference()
+            }
+        }
     }
 
     private fun initializeTts() {
@@ -225,6 +303,7 @@ class VoiceStartService @Inject constructor(
      * Update the language for voice commands and TTS locale.
      */
     fun setLanguage(languageTag: String) {
+        currentLanguageTag = languageTag
         currentCommands = VoiceCommandPhrases.forLanguage(languageTag)
         applyLanguageAndVoice()
         Log.i(TAG, "Voice language set to: $languageTag (${currentCommands.onYourMarks})")
@@ -257,8 +336,11 @@ class VoiceStartService @Inject constructor(
             // Preload ElevenLabs audio if selected
             if (voiceProvider == VoiceProvider.ELEVEN_LABS) {
                 setPhase(VoiceStartPhase.PRELOADING)
-                val langTag = currentCommands.ttsLocale.language
-                elevenLabsService.preloadVoiceStartPhrases(elevenLabsVoiceId, langTag)
+                elevenLabsService.preloadVoiceStartPhrases(
+                    voiceId = elevenLabsVoiceId,
+                    languageCode = currentLanguageTag,
+                    includeReadyCommand = includeReadyCommand
+                )
             }
             runSequence(onComplete)
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -275,7 +357,7 @@ class VoiceStartService @Inject constructor(
     private suspend fun runSequence(onComplete: (Long) -> Unit) {
         // Phase 0: Pre-start delay - user sets phone down
         setPhase(VoiceStartPhase.PRE_START)
-        val preDelay = randomInRange(PRE_START_DELAY_MIN, PRE_START_DELAY_MAX)
+        val preDelay = randomInRange(preStartDelayMin, preStartDelayMax)
         Log.i(TAG, "Pre-start delay: ${String.format("%.1f", preDelay)}s")
         delay((preDelay * 1000).toLong())
 
@@ -285,23 +367,32 @@ class VoiceStartService @Inject constructor(
 
         // Phase 2: Wait after "On your marks"
         setPhase(VoiceStartPhase.WAITING_FOR_SET)
-        val marksDelay = randomInRange(ON_YOUR_MARKS_DELAY_MIN, ON_YOUR_MARKS_DELAY_MAX)
+        val marksDelay = randomInRange(onYourMarksDelayMin, onYourMarksDelayMax)
         Log.i(TAG, "Waiting ${String.format("%.1f", marksDelay)}s after '${currentCommands.onYourMarks}'")
         delay((marksDelay * 1000).toLong())
 
-        // Phase 3: "Set"
+        // Phase 3: Optional "Ready"
+        if (includeReadyCommand) {
+            setPhase(VoiceStartPhase.READY)
+            speak(currentCommands.ready)
+
+            setPhase(VoiceStartPhase.WAITING_AFTER_READY)
+            delay(500L)
+        }
+
+        // Phase 4: "Set"
         setPhase(VoiceStartPhase.SET)
         speak(currentCommands.set)
 
-        // Phase 4: Wait after "Set" (tension builds - random delay)
+        // Phase 5: Wait after "Set" (tension builds - random delay)
         setPhase(VoiceStartPhase.WAITING_FOR_GO)
-        val setDelay = randomInRange(SET_HOLD_TIME_MIN, SET_HOLD_TIME_MAX)
+        val setDelay = randomInRange(setHoldTimeMin, setHoldTimeMax)
         Log.i(TAG, "Waiting ${String.format("%.1f", setDelay)}s after 'Set' (tension)")
         delay((setDelay * 1000).toLong())
 
-        // Phase 5: GO! - Capture precise monotonic timestamp BEFORE playing sound
+        // Phase 6: GO! - Capture audio-compensated monotonic timestamp (accounts for speaker pipeline latency)
         setPhase(VoiceStartPhase.GO)
-        val startTimestamp = SystemClock.elapsedRealtimeNanos()
+        val startTimestamp = monotonicNanosAudioCompensated()
 
         // Haptic feedback on GO!
         triggerHaptic(heavy = true)
@@ -334,7 +425,8 @@ class VoiceStartService @Inject constructor(
         val engine = tts ?: return
         if (!_isTtsReady.value) return
 
-        val preview = "${currentCommands.onYourMarks}. ${currentCommands.set}. ${currentCommands.go}!"
+        val readyPreview = if (includeReadyCommand) "${currentCommands.ready}. " else ""
+        val preview = "${currentCommands.onYourMarks}. $readyPreview${currentCommands.set}. ${currentCommands.go}!"
         engine.speak(
             preview,
             TextToSpeech.QUEUE_FLUSH,
@@ -378,8 +470,18 @@ class VoiceStartService @Inject constructor(
         tts?.stop()
         tts?.shutdown()
         tts = null
-        toneGenerator?.release()
+        startSoundPlayer.release()
         _isTtsReady.value = false
+    }
+
+    /**
+     * Get a monotonic timestamp compensated for audio output latency.
+     * Use this as the "GO!" timestamp so the timing accounts for the delay
+     * between requesting audio playback and sound actually reaching the speaker.
+     * Matches iOS monotonicNanosAudioCompensated().
+     */
+    fun monotonicNanosAudioCompensated(): Long {
+        return AudioStartTiming.monotonicNanosAudioCompensated(context)
     }
 
     // --- Private helpers ---
@@ -460,7 +562,7 @@ class VoiceStartService @Inject constructor(
     }
 
     private fun playGoBeep() {
-        toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, BEEP_DURATION_MS)
+        startSoundPlayer.play(startSoundType)
     }
 
     private fun triggerHaptic(heavy: Boolean = false) {
@@ -476,6 +578,7 @@ class VoiceStartService @Inject constructor(
     }
 
     private fun randomInRange(min: Double, max: Double): Double {
-        return min + Random.nextDouble() * (max - min)
+        val upper = max.coerceAtLeast(min)
+        return min + Random.nextDouble() * (upper - min)
     }
 }

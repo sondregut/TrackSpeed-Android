@@ -10,9 +10,12 @@ import com.trackspeed.android.protocol.TimingSessionConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.roundToLong
 
 /**
  * High-level manager for clock synchronization.
@@ -33,6 +36,8 @@ class ClockSyncManager @Inject constructor(
 ) {
     companion object {
         private const val TAG = "ClockSyncManager"
+        private const val MAX_SEQUENCES_PER_SENDER = 500
+        private const val MAX_PROCESSED_MESSAGE_IDS = 500
     }
 
     /**
@@ -60,6 +65,12 @@ class ClockSyncManager @Inject constructor(
     private val _connectedGateCount = MutableStateFlow(0)
     val connectedGateCount: StateFlow<Int> = _connectedGateCount.asStateFlow()
 
+    private val _syncedGateCount = MutableStateFlow(0)
+    val syncedGateCount: StateFlow<Int> = _syncedGateCount.asStateFlow()
+
+    private val _localGateAssignment = MutableStateFlow<GateAssignment?>(null)
+    val localGateAssignment: StateFlow<GateAssignment?> = _localGateAssignment.asStateFlow()
+
     // Per-client handshake state tracking (server mode only)
     data class ClientState(
         val deviceAddress: String,
@@ -68,16 +79,29 @@ class ClockSyncManager @Inject constructor(
         val handshakeComplete: Boolean = false,
         val syncComplete: Boolean = false
     )
-    private val connectedClients = mutableMapOf<String, ClientState>()
-    private var nextGateIndex = 1  // Gate 0 = server (START), clients start at 1
+    private val connectedClients = ConcurrentHashMap<String, ClientState>()
+    private val clientClockOffsetsBySender = ConcurrentHashMap<String, Long>()
+    private val gateIndexBySenderId = ConcurrentHashMap<String, Int>()
+    private val processedMessageIds = linkedSetOf<String>()
+    private val receivedSequencesBySender = mutableMapOf<String, MutableSet<Long>>()
+    private val lastReceivedSessionIdBySender = mutableMapOf<String, String>()
     // Per-client timeout jobs for sending SessionConfig
-    private val clientReadyTimeoutJobs = mutableMapOf<String, Job>()
+    private val clientReadyTimeoutJobs = ConcurrentHashMap<String, Job>()
 
     // Drift tracker for long sessions
     private val driftTracker = DriftTracker()
 
     // Sync age tracking
     private var syncTimestampNanos: Long = 0L
+    private var hybridOffsetNanos: Long? = null
+    private data class FrozenSync(
+        val offsetNanos: Long,
+        val quality: SyncQuality,
+        val uncertaintyMs: Double,
+        val capturedAtNanos: Long
+    )
+    private var activeSessionSyncFrozen = false
+    private var frozenSync: FrozenSync? = null
 
     // Supabase session ID for cross-platform thumbnail/crossing sync
     private val _supabaseSessionId = MutableStateFlow<String?>(null)
@@ -134,6 +158,7 @@ class ClockSyncManager @Inject constructor(
             .onEach { bleState ->
                 when (bleState) {
                     BleClockSyncService.State.Idle -> {
+                        hybridOffsetNanos = null
                         _protocolState.value = ProtocolState.IDLE
                         _syncState.value = SyncState.NotSynced
                     }
@@ -151,6 +176,11 @@ class ClockSyncManager @Inject constructor(
                         // Resolve role from dual-mode if needed
                         bleClockSyncService.getResolvedRole()?.let { resolvedRole ->
                             _isServer.value = resolvedRole is BleClockSyncService.Role.Server
+                            _localGateAssignment.value = if (_isServer.value) {
+                                hostGateAssignment(sessionConfig)
+                            } else {
+                                null
+                            }
                         }
                         // For client mode, drive protocol from state (single server)
                         if (!_isServer.value) {
@@ -167,24 +197,32 @@ class ClockSyncManager @Inject constructor(
                         _syncState.value = SyncState.Syncing(bleState.progress)
                     }
                     is BleClockSyncService.State.Synced -> {
-                        _protocolState.value = ProtocolState.READY
-                        val now = SystemClock.elapsedRealtimeNanos()
-                        syncTimestampNanos = now
-                        driftTracker.addMeasurement(now, bleState.result.offsetNanos)
-                        _syncState.value = SyncState.Synced(
-                            offsetMs = bleState.result.offsetMs,
-                            quality = bleState.result.quality,
-                            uncertaintyMs = bleState.result.uncertaintyMs
-                        )
-                        // Client: notify server that sync is complete
-                        if (!_isServer.value) {
-                            bleClockSyncService.sendMessage(
-                                TimingPayload.SyncComplete(
-                                    offsetNanos = bleState.result.offsetNanos,
-                                    uncertaintyMs = bleState.result.uncertaintyMs
-                                )
+                        val frozen = frozenSync
+                        if (activeSessionSyncFrozen && frozen != null) {
+                            Log.i(TAG, "Ignoring active-session sync candidate; keeping frozen pre-session offset")
+                            _protocolState.value = ProtocolState.READY
+                            _syncState.value = frozen.toSyncState()
+                        } else {
+                            _protocolState.value = ProtocolState.READY
+                            val now = SystemClock.elapsedRealtimeNanos()
+                            syncTimestampNanos = now
+                            hybridOffsetNanos = null
+                            driftTracker.addMeasurement(now, bleState.result.offsetNanos)
+                            _syncState.value = SyncState.Synced(
+                                offsetMs = bleState.result.offsetMs,
+                                quality = bleState.result.quality,
+                                uncertaintyMs = bleState.result.uncertaintyMs
                             )
-                            Log.i(TAG, "Client: Sent SyncComplete to server")
+                            // Client: notify server that sync is complete
+                            if (!_isServer.value) {
+                                bleClockSyncService.sendMessage(
+                                    TimingPayload.SyncComplete(
+                                        offsetNanos = bleState.result.offsetNanos,
+                                        uncertaintyMs = bleState.result.uncertaintyMs
+                                    )
+                                )
+                                Log.i(TAG, "Client: Sent SyncComplete to server")
+                            }
                         }
                         // Start heartbeat so iOS peer doesn't mark us as stale
                         startHeartbeat()
@@ -204,7 +242,10 @@ class ClockSyncManager @Inject constructor(
         // Server mode: track per-client connections
         bleClockSyncService.connectionEvents
             .onEach { event ->
-                if (!_isServer.value) return@onEach
+                val resolvedAsServer = _isServer.value ||
+                    bleClockSyncService.getResolvedRole() is BleClockSyncService.Role.Server
+                if (!resolvedAsServer) return@onEach
+                _isServer.value = true
                 if (event.connected) {
                     onClientConnected(event.device.address)
                 } else {
@@ -216,7 +257,10 @@ class ClockSyncManager @Inject constructor(
         // Server mode: track per-client notification readiness
         bleClockSyncService.clientReadyDevices
             .onEach { deviceAddress ->
-                if (!_isServer.value) return@onEach
+                val resolvedAsServer = _isServer.value ||
+                    bleClockSyncService.getResolvedRole() is BleClockSyncService.Role.Server
+                if (!resolvedAsServer) return@onEach
+                _isServer.value = true
                 onClientReady(deviceAddress)
             }
             .launchIn(scope)
@@ -235,12 +279,12 @@ class ClockSyncManager @Inject constructor(
      * Registers the client and starts a timeout to send SessionConfig.
      */
     private fun onClientConnected(deviceAddress: String) {
-        val gateIndex = nextGateIndex++
+        val gateIndex = allocateNextClientGateIndex()
         connectedClients[deviceAddress] = ClientState(
             deviceAddress = deviceAddress,
             gateIndex = gateIndex
         )
-        _connectedGateCount.value = connectedClients.size + 1  // +1 for server itself
+        updateHostGateCounts()
         Log.i(TAG, "Host: Client $deviceAddress registered as gate $gateIndex " +
             "(${connectedClients.size} client(s), ${_connectedGateCount.value} total gates)")
 
@@ -259,9 +303,13 @@ class ClockSyncManager @Inject constructor(
      * Server mode: called when a client disconnects.
      */
     private fun onClientDisconnected(deviceAddress: String) {
+        val disconnectedSenderId = connectedClients[deviceAddress]?.senderId
         connectedClients.remove(deviceAddress)
+        if (disconnectedSenderId != null) {
+            clientClockOffsetsBySender.remove(disconnectedSenderId)
+        }
         clientReadyTimeoutJobs.remove(deviceAddress)?.cancel()
-        _connectedGateCount.value = connectedClients.size + 1
+        updateHostGateCounts()
         Log.i(TAG, "Host: Client $deviceAddress disconnected (${connectedClients.size} client(s) remaining)")
     }
 
@@ -285,7 +333,8 @@ class ClockSyncManager @Inject constructor(
      */
     private fun sendSessionConfigToDevice(deviceAddress: String) {
         Log.i(TAG, "Host: Sending SessionConfig to $deviceAddress (distance=${sessionConfig.distance}, " +
-            "startType=${sessionConfig.startType}, gates=${sessionConfig.numberOfGates})")
+            "startType=${sessionConfig.startType}, gates=${sessionConfig.numberOfGates}, " +
+            "hostPro=${sessionConfig.hostIsProUser})")
         bleClockSyncService.sendCriticalMessageToDevice(
             TimingPayload.SessionConfig(config = sessionConfig),
             deviceAddress
@@ -297,12 +346,24 @@ class ClockSyncManager @Inject constructor(
      * Implements the iOS-compatible handshake state machine.
      */
     private fun handleIncomingMessage(message: com.trackspeed.android.protocol.TimingMessage) {
+        if (!isMessageTargetedToLocalDevice(message)) {
+            Log.d(TAG, "Ignoring targeted handshake message for ${targetDescription(message)}")
+            return
+        }
+        if (shouldDropStaleSessionEnvelope(message)) {
+            return
+        }
+        if (shouldDropDuplicateEnvelope(message)) {
+            return
+        }
+
         when (val payload = message.payload) {
 
             // ── Joiner receives SessionConfig from host ──
             is TimingPayload.SessionConfig -> {
                 Log.i(TAG, "Joiner: Received SessionConfig: distance=${payload.config.distance}, " +
-                    "startType=${payload.config.startType}, gates=${payload.config.numberOfGates}")
+                    "startType=${payload.config.startType}, gates=${payload.config.numberOfGates}, " +
+                    "hostPro=${payload.config.hostIsProUser}")
                 sessionConfig = payload.config
 
                 // Send SessionConfigAck (non-critical)
@@ -313,7 +374,7 @@ class ClockSyncManager @Inject constructor(
                 bleClockSyncService.sendCriticalMessage(
                     TimingPayload.RoleRequest(
                         preferredRole = TimingRole.FINISH_LINE,
-                        deviceId = android.os.Build.MODEL
+                        deviceId = bleClockSyncService.localDeviceId
                     )
                 )
                 Log.i(TAG, "Joiner: Sent RoleRequest (preferred=FINISH_LINE)")
@@ -323,35 +384,48 @@ class ClockSyncManager @Inject constructor(
 
             // ── Host receives RoleRequest from joiner ──
             is TimingPayload.RoleRequest -> {
+                if (!payload.deviceId.equals(message.senderId, ignoreCase = true)) {
+                    Log.w(
+                        TAG,
+                        "Ignoring RoleRequest with sender/device mismatch: " +
+                            "sender=${message.senderId.take(8)} device=${payload.deviceId.take(8)}"
+                    )
+                    return
+                }
                 Log.i(TAG, "Host: Received RoleRequest from ${payload.deviceId}" +
                     (payload.preferredRole?.let { ", preferred=$it" } ?: ""))
 
                 // Look up the BLE device address for this sender to route per-client
                 val senderAddress = bleClockSyncService.getDeviceAddress(message.senderId)
                 val clientState = senderAddress?.let { connectedClients[it] }
-                val gateIndex = clientState?.gateIndex ?: 1
+                val gateIndex = gateIndexBySenderId[message.senderId]
+                    ?: clientState?.gateIndex
+                    ?: firstAvailableClientGateIndex()
+                gateIndexBySenderId[message.senderId] = gateIndex
 
                 // Update client state with senderId mapping
                 if (senderAddress != null && clientState != null) {
-                    connectedClients[senderAddress] = clientState.copy(senderId = message.senderId)
+                    connectedClients[senderAddress] = clientState.copy(
+                        senderId = message.senderId,
+                        gateIndex = gateIndex
+                    )
                 }
 
-                val assignedRole = TimingRole.FINISH_LINE  // All clients are FINISH/intermediate gates
+                val gateAssignment = assignmentForGateIndex(gateIndex)
+                val assignedRole = gateAssignment.role
 
                 if (senderAddress != null) {
                     // Send GateAssigned to specific device (critical)
                     bleClockSyncService.sendCriticalMessageToDevice(
                         TimingPayload.GateAssigned(
-                            assignment = GateAssignment(
-                                role = assignedRole,
-                                gateIndex = gateIndex,
-                                distanceFromStart = sessionConfig.distance,
-                                targetDeviceId = payload.deviceId
-                            )
+                            assignment = gateAssignment.copy(targetDeviceId = payload.deviceId)
                         ),
-                        senderAddress
+                        senderAddress,
+                        targetDeviceId = payload.deviceId
                     )
-                    Log.i(TAG, "Host: Sent GateAssigned to $senderAddress (gate=$gateIndex)")
+                    Log.i(TAG, "Host: Sent GateAssigned to $senderAddress " +
+                        "(gate=${gateAssignment.gateIndex}, role=$assignedRole, " +
+                        "distance=${gateAssignment.distanceFromStart})")
 
                     // Send RoleAssigned to specific device (critical)
                     bleClockSyncService.sendCriticalMessageToDevice(
@@ -359,7 +433,8 @@ class ClockSyncManager @Inject constructor(
                             role = assignedRole,
                             targetDeviceId = payload.deviceId
                         ),
-                        senderAddress
+                        senderAddress,
+                        targetDeviceId = payload.deviceId
                     )
                     Log.i(TAG, "Host: Sent RoleAssigned to $senderAddress")
 
@@ -367,6 +442,7 @@ class ClockSyncManager @Inject constructor(
                     connectedClients[senderAddress] = connectedClients[senderAddress]!!.copy(
                         handshakeComplete = true
                     )
+                    updateHostGateCounts()
 
                     // Generate and send Supabase session ID (once, shared across all clients)
                     if (_supabaseSessionId.value == null) {
@@ -375,32 +451,31 @@ class ClockSyncManager @Inject constructor(
                     }
                     bleClockSyncService.sendCriticalMessageToDevice(
                         TimingPayload.SupabaseSession(sessionId = _supabaseSessionId.value!!),
-                        senderAddress
+                        senderAddress,
+                        targetDeviceId = payload.deviceId
                     )
                     Log.i(TAG, "Host: Sent SupabaseSession to $senderAddress")
                 } else {
                     // Fallback: broadcast (legacy single-client path)
                     bleClockSyncService.sendCriticalMessage(
                         TimingPayload.GateAssigned(
-                            assignment = GateAssignment(
-                                role = assignedRole,
-                                gateIndex = gateIndex,
-                                distanceFromStart = sessionConfig.distance,
-                                targetDeviceId = payload.deviceId
-                            )
-                        )
+                            assignment = gateAssignment.copy(targetDeviceId = payload.deviceId)
+                        ),
+                        targetDeviceId = payload.deviceId
                     )
                     bleClockSyncService.sendCriticalMessage(
                         TimingPayload.RoleAssigned(
                             role = assignedRole,
                             targetDeviceId = payload.deviceId
-                        )
+                        ),
+                        targetDeviceId = payload.deviceId
                     )
                     if (_supabaseSessionId.value == null) {
                         _supabaseSessionId.value = UUID.randomUUID().toString()
                     }
                     bleClockSyncService.sendCriticalMessage(
-                        TimingPayload.SupabaseSession(sessionId = _supabaseSessionId.value!!)
+                        TimingPayload.SupabaseSession(sessionId = _supabaseSessionId.value!!),
+                        targetDeviceId = payload.deviceId
                     )
                     Log.i(TAG, "Host: Sent handshake via broadcast (no sender address)")
                 }
@@ -414,6 +489,7 @@ class ClockSyncManager @Inject constructor(
             is TimingPayload.GateAssigned -> {
                 Log.i(TAG, "Joiner: Received GateAssigned: role=${payload.assignment.role.displayName}, " +
                     "gateIndex=${payload.assignment.gateIndex}")
+                _localGateAssignment.value = payload.assignment
 
                 // Send GateAssignedAck (non-critical)
                 bleClockSyncService.sendMessage(
@@ -429,6 +505,9 @@ class ClockSyncManager @Inject constructor(
             // ── Joiner receives RoleAssigned from host ──
             is TimingPayload.RoleAssigned -> {
                 Log.i(TAG, "Joiner: Received RoleAssigned: role=${payload.role}")
+                if (_localGateAssignment.value == null) {
+                    _localGateAssignment.value = fallbackAssignmentForRole(payload.role)
+                }
 
                 // Send RoleAssignedAck (non-critical)
                 bleClockSyncService.sendMessage(
@@ -450,8 +529,13 @@ class ClockSyncManager @Inject constructor(
                 // Mark this client as sync-complete
                 if (senderAddress != null) {
                     connectedClients[senderAddress]?.let {
-                        connectedClients[senderAddress] = it.copy(syncComplete = true)
+                        connectedClients[senderAddress] = it.copy(
+                            senderId = message.senderId,
+                            syncComplete = true
+                        )
                     }
+                    clientClockOffsetsBySender[message.senderId] = payload.offsetNanos
+                    updateHostGateCounts()
                     val syncedCount = connectedClients.values.count { it.syncComplete }
                     Log.i(TAG, "Host: $syncedCount/${connectedClients.size} clients synced")
                 }
@@ -471,8 +555,13 @@ class ClockSyncManager @Inject constructor(
 
             // ── Host receives SyncRequest ──
             is TimingPayload.SyncRequest -> {
-                Log.i(TAG, "Host: Received SyncRequest — peer will start clock sync pings")
-                _syncState.value = SyncState.Syncing(0f)
+                if (_isServer.value) {
+                    Log.i(TAG, "Host: Received SyncRequest — peer will start clock sync pings")
+                    markServerPeersAwaitingResync()
+                } else {
+                    Log.i(TAG, "Peer requested full clock re-sync")
+                    invalidateAndResync(reason = "peer request", announceRequest = false)
+                }
             }
 
             // ── Heartbeat ──
@@ -505,10 +594,140 @@ class ClockSyncManager @Inject constructor(
                 _supabaseSessionId.value = payload.sessionId
             }
 
+            is TimingPayload.HybridSessionInfo -> {
+                Log.i(
+                    TAG,
+                    "Received hybrid session info: ${payload.sessionId}, " +
+                        "offset=${payload.clockOffsetNanos}ns, uncertainty=${payload.uncertaintyMs}ms"
+                )
+                _supabaseSessionId.value = payload.sessionId
+                hybridOffsetNanos = payload.clockOffsetNanos
+                syncTimestampNanos = SystemClock.elapsedRealtimeNanos()
+                driftTracker.addMeasurement(syncTimestampNanos, payload.clockOffsetNanos)
+                _protocolState.value = ProtocolState.READY
+                _syncState.value = SyncState.Synced(
+                    offsetMs = payload.clockOffsetNanos / 1_000_000.0,
+                    quality = SyncQuality.fromUncertainty(payload.uncertaintyMs),
+                    uncertaintyMs = payload.uncertaintyMs
+                )
+                startHeartbeat()
+            }
+
             else -> {
                 Log.d(TAG, "Received unhandled message: ${payload::class.simpleName}")
             }
         }
+    }
+
+    /**
+     * Mirror iOS `RaceSession.shouldAdoptIncomingSessionId`: only handshake
+     * payloads from the host can re-stamp our envelope sessionId. Anything
+     * else stays scoped to whatever sessionId we're currently using.
+     */
+    private fun shouldAdoptIncomingSessionId(message: com.trackspeed.android.protocol.TimingMessage): Boolean {
+        return when (message.payload) {
+            is TimingPayload.SessionConfig,
+            is TimingPayload.RoleAssigned,
+            is TimingPayload.GateAssigned,
+            is TimingPayload.SupabaseSession,
+            is TimingPayload.HybridSessionInfo -> true
+            else -> false
+        }
+    }
+
+    private fun shouldDropStaleSessionEnvelope(message: com.trackspeed.android.protocol.TimingMessage): Boolean {
+        val currentSessionId = bleClockSyncService.currentSessionId
+        if (message.sessionId.equals(currentSessionId, ignoreCase = true)) {
+            return false
+        }
+
+        // Mirror iOS RaceSession: joiners may adopt the host's envelope session
+        // from the handshake/bootstrap messages only. Every other foreign
+        // session message is stale and must not mutate sync state.
+        if (!_isServer.value && shouldAdoptIncomingSessionId(message)) {
+            Log.i(
+                TAG,
+                "Adopting host envelope session ${message.sessionId.take(8)} from ${message.senderId.take(8)}"
+            )
+            bleClockSyncService.setSessionId(message.sessionId)
+            clearIncomingMessageDedupe()
+            return false
+        }
+
+        Log.w(
+            TAG,
+            "Ignoring message for different session from ${message.senderId.take(8)}; " +
+                "expected=${currentSessionId.take(8)}, got=${message.sessionId.take(8)}"
+        )
+        return true
+    }
+
+    private fun shouldDropDuplicateEnvelope(message: com.trackspeed.android.protocol.TimingMessage): Boolean {
+        val previousSessionId = lastReceivedSessionIdBySender[message.senderId]
+        if (previousSessionId != null && previousSessionId != message.sessionId) {
+            Log.d(TAG, "New handshake message session from ${message.senderId.take(8)}: ${message.sessionId.take(8)}")
+            receivedSequencesBySender[message.senderId]?.clear()
+        }
+        lastReceivedSessionIdBySender[message.senderId] = message.sessionId
+
+        val senderSequences = receivedSequencesBySender.getOrPut(message.senderId) { mutableSetOf() }
+        if (!senderSequences.add(message.seq)) {
+            Log.d(TAG, "Ignoring duplicate handshake seq=${message.seq} from ${message.senderId.take(8)}")
+            return true
+        }
+        if (senderSequences.size > MAX_SEQUENCES_PER_SENDER) {
+            val retained = senderSequences.sorted().takeLast(MAX_SEQUENCES_PER_SENDER)
+            senderSequences.clear()
+            senderSequences.addAll(retained)
+        }
+
+        val messageId = message.messageId
+        if (messageId != null) {
+            if (!processedMessageIds.add(messageId)) {
+                Log.d(TAG, "Ignoring duplicate handshake messageId=${messageId.take(8)}")
+                return true
+            }
+            cleanupProcessedMessageIdsIfNeeded()
+        }
+        return false
+    }
+
+    private fun cleanupProcessedMessageIdsIfNeeded() {
+        if (processedMessageIds.size <= MAX_PROCESSED_MESSAGE_IDS) return
+        val removeCount = processedMessageIds.size - (MAX_PROCESSED_MESSAGE_IDS / 2)
+        val toRemove = processedMessageIds.take(removeCount).toSet()
+        processedMessageIds.removeAll(toRemove)
+    }
+
+    private fun clearIncomingMessageDedupe() {
+        processedMessageIds.clear()
+        receivedSequencesBySender.clear()
+        lastReceivedSessionIdBySender.clear()
+    }
+
+    private fun isMessageTargetedToLocalDevice(message: com.trackspeed.android.protocol.TimingMessage): Boolean {
+        val localDeviceId = bleClockSyncService.localDeviceId
+        val envelopeTarget = message.targetDeviceId
+        if (envelopeTarget != null && envelopeTarget != localDeviceId) {
+            return false
+        }
+
+        return when (val payload = message.payload) {
+            is TimingPayload.RoleAssigned ->
+                payload.targetDeviceId == null || payload.targetDeviceId == localDeviceId
+            is TimingPayload.GateAssigned ->
+                payload.assignment.targetDeviceId == null || payload.assignment.targetDeviceId == localDeviceId
+            else -> true
+        }
+    }
+
+    private fun targetDescription(message: com.trackspeed.android.protocol.TimingMessage): String {
+        val payloadTarget = when (val payload = message.payload) {
+            is TimingPayload.RoleAssigned -> payload.targetDeviceId
+            is TimingPayload.GateAssigned -> payload.assignment.targetDeviceId
+            else -> null
+        }
+        return (message.targetDeviceId ?: payloadTarget ?: "unknown").take(8)
     }
 
     /**
@@ -547,8 +766,15 @@ class ClockSyncManager @Inject constructor(
      */
     fun startAsServer(config: TimingSessionConfig) {
         Log.i(TAG, "Starting as sync server (reference clock): distance=${config.distance}, startType=${config.startType}")
+        clearHostClientState()
+        clearIncomingMessageDedupe()
+        clearFrozenActiveSessionSync()
+        gateIndexBySenderId.clear()
         sessionConfig = config
         _isServer.value = true
+        _localGateAssignment.value = hostGateAssignment(config)
+        _connectedGateCount.value = 1
+        _syncedGateCount.value = 1
         _protocolState.value = ProtocolState.IDLE
         driftTracker.reset()
         bleClockSyncService.startAsServer()
@@ -560,7 +786,14 @@ class ClockSyncManager @Inject constructor(
      */
     fun startAsClient() {
         Log.i(TAG, "Starting as sync client (joiner)")
+        clearHostClientState()
+        clearIncomingMessageDedupe()
+        clearFrozenActiveSessionSync()
+        gateIndexBySenderId.clear()
         _isServer.value = false
+        _localGateAssignment.value = null
+        _connectedGateCount.value = 0
+        _syncedGateCount.value = 0
         _protocolState.value = ProtocolState.IDLE
         driftTracker.reset()
         bleClockSyncService.startAsClient()
@@ -588,12 +821,17 @@ class ClockSyncManager @Inject constructor(
      */
     fun startAutoSync(config: TimingSessionConfig) {
         Log.i(TAG, "Starting auto-sync (dual-mode): distance=${config.distance}, startType=${config.startType}")
+        clearIncomingMessageDedupe()
+        clearFrozenActiveSessionSync()
         sessionConfig = config
         _isServer.value = false  // Will be resolved on connection
+        _localGateAssignment.value = null
         _protocolState.value = ProtocolState.IDLE
         connectedClients.clear()
-        nextGateIndex = 1
+        clientClockOffsetsBySender.clear()
+        gateIndexBySenderId.clear()
         _connectedGateCount.value = 0
+        _syncedGateCount.value = 0
         driftTracker.reset()
         bleClockSyncService.startDual()
     }
@@ -607,7 +845,7 @@ class ClockSyncManager @Inject constructor(
         miniSyncJob = scope.launch {
             while (isActive) {
                 delay(ClockSyncConfig.MINI_SYNC_REFRESH_INTERVAL_S * 1000)
-                if (isSynced()) {
+                if (isSynced() && !activeSessionSyncFrozen) {
                     Log.i(TAG, "Performing periodic mini-sync refresh...")
                     bleClockSyncService.performMiniSync()
                 }
@@ -621,6 +859,151 @@ class ClockSyncManager @Inject constructor(
     fun stopPeriodicRefresh() {
         miniSyncJob?.cancel()
         miniSyncJob = null
+    }
+
+    /**
+     * Active timing uses one pre-session offset, mirroring iOS RaceSession's
+     * frozen clock sync. Later sync attempts may run for diagnostics, but timing
+     * conversion keeps using this captured offset until the session resets.
+     */
+    fun freezeActiveSessionSync(reason: String): Boolean {
+        if (activeSessionSyncFrozen) return true
+
+        val currentSynced = _syncState.value as? SyncState.Synced
+        val result = bleClockSyncService.syncResult.value
+        val measuredOffsetNanos = result?.offsetNanos
+            ?: hybridOffsetNanos
+            ?: currentSynced?.offsetMs?.times(1_000_000.0)?.roundToLong()
+            ?: if (_isServer.value) 0L else null
+            ?: return false
+        val uncertaintyMs = result?.uncertaintyMs
+            ?: currentSynced?.uncertaintyMs
+            ?: if (_isServer.value) 0.0 else return false
+        val quality = result?.quality
+            ?: currentSynced?.quality
+            ?: SyncQuality.fromUncertainty(uncertaintyMs)
+
+        val now = SystemClock.elapsedRealtimeNanos()
+        // Freeze the effective drift-predicted conversion offset, not only the
+        // last raw measurement. Otherwise the pre-arm and active-session time
+        // domains can jump by the prediction that was already in effect.
+        val offsetNanos = driftTracker.predictOffsetOrNull(now) ?: measuredOffsetNanos
+        frozenSync = FrozenSync(
+            offsetNanos = offsetNanos,
+            quality = quality,
+            uncertaintyMs = uncertaintyMs,
+            capturedAtNanos = now
+        )
+        activeSessionSyncFrozen = true
+        syncTimestampNanos = now
+        stopPeriodicRefresh()
+        _protocolState.value = ProtocolState.READY
+        _syncState.value = frozenSync!!.toSyncState()
+        Log.i(
+            TAG,
+            "Frozen active-session sync after $reason: " +
+                "offset=${String.format(Locale.US, "%.2f", offsetNanos / 1_000_000.0)}ms, " +
+                "uncertainty=${String.format(Locale.US, "%.1f", uncertaintyMs)}ms"
+        )
+        return true
+    }
+
+    fun restoreFrozenSyncIfNeeded(reason: String): Boolean {
+        val frozen = frozenSync ?: return false
+        _protocolState.value = ProtocolState.READY
+        _syncState.value = frozen.toSyncState()
+        Log.i(TAG, "Restored frozen active-session sync after $reason")
+        return true
+    }
+
+    fun hasFrozenActiveSessionSync(): Boolean = activeSessionSyncFrozen && frozenSync != null
+
+    fun clearFrozenActiveSessionSync() {
+        activeSessionSyncFrozen = false
+        frozenSync = null
+    }
+
+    fun invalidateAndResync(reason: String, announceRequest: Boolean = true): Boolean {
+        if (activeSessionSyncFrozen) {
+            restoreFrozenSyncIfNeeded(reason)
+            Log.i(TAG, "Ignoring re-sync after $reason; active session uses frozen sync")
+            return false
+        }
+
+        driftTracker.reset()
+        hybridOffsetNanos = null
+        syncTimestampNanos = 0L
+        _protocolState.value = ProtocolState.SYNCING
+        _syncState.value = SyncState.Syncing(0f)
+
+        if (_isServer.value) {
+            markServerPeersAwaitingResync()
+            if (announceRequest) {
+                bleClockSyncService.sendCriticalMessage(TimingPayload.SyncRequest())
+            }
+            Log.i(TAG, "Reference clock requested peer re-sync after $reason")
+            return true
+        }
+
+        if (announceRequest) {
+            bleClockSyncService.sendMessage(TimingPayload.SyncRequest())
+        }
+        bleClockSyncService.startSync()
+        Log.i(TAG, "Started full clock re-sync after $reason")
+        return true
+    }
+
+    /**
+     * Host-side reconnect replay. Re-sends the authoritative session config and
+     * the peer's previous gate/role assignment using the stable protocol senderId.
+     */
+    fun resendSessionStateToPeer(
+        senderId: String,
+        supabaseSessionId: String?
+    ): Boolean {
+        if (!_isServer.value) {
+            Log.w(TAG, "Ignoring session-state resend on non-server device")
+            return false
+        }
+
+        val address = bleClockSyncService.getDeviceAddress(senderId) ?: run {
+            Log.w(TAG, "Cannot resend session state: no BLE address for ${senderId.take(8)}")
+            return false
+        }
+        val clientState = connectedClients[address]
+        val gateAssignment = clientState?.let { assignmentForGateIndex(it.gateIndex) }
+
+        sendSessionConfigToDevice(address)
+
+        if (gateAssignment != null) {
+            bleClockSyncService.sendCriticalMessageToDevice(
+                TimingPayload.GateAssigned(
+                    assignment = gateAssignment.copy(targetDeviceId = senderId)
+                ),
+                address,
+                targetDeviceId = senderId
+            )
+            bleClockSyncService.sendCriticalMessageToDevice(
+                TimingPayload.RoleAssigned(
+                    role = gateAssignment.role,
+                    targetDeviceId = senderId
+                ),
+                address,
+                targetDeviceId = senderId
+            )
+        }
+
+        val effectiveSupabaseSessionId = supabaseSessionId ?: _supabaseSessionId.value
+        if (effectiveSupabaseSessionId != null) {
+            bleClockSyncService.sendCriticalMessageToDevice(
+                TimingPayload.SupabaseSession(sessionId = effectiveSupabaseSessionId),
+                address,
+                targetDeviceId = senderId
+            )
+        }
+
+        Log.i(TAG, "Resent session state to ${senderId.take(8)} via $address")
+        return true
     }
 
     /**
@@ -655,14 +1038,19 @@ class ClockSyncManager @Inject constructor(
         clientReadyTimeoutJobs.values.forEach { it.cancel() }
         clientReadyTimeoutJobs.clear()
         connectedClients.clear()
-        nextGateIndex = 1
+        clientClockOffsetsBySender.clear()
+        gateIndexBySenderId.clear()
         _connectedGateCount.value = 0
+        _syncedGateCount.value = 0
+        _localGateAssignment.value = null
         stopPeriodicRefresh()
         stopHeartbeat()
         bleClockSyncService.stop()
         _protocolState.value = ProtocolState.IDLE
         _syncState.value = SyncState.NotSynced
         _supabaseSessionId.value = null
+        hybridOffsetNanos = null
+        clearFrozenActiveSessionSync()
     }
 
     /**
@@ -674,7 +1062,12 @@ class ClockSyncManager @Inject constructor(
      * Get the current clock offset in nanoseconds.
      * Returns 0 if not synced.
      */
-    fun getOffsetNanos(): Long = bleClockSyncService.getOffsetNanos()
+    fun getOffsetNanos(): Long {
+        return frozenSync?.takeIf { activeSessionSyncFrozen }?.offsetNanos
+            ?: bleClockSyncService.syncResult.value?.offsetNanos
+            ?: hybridOffsetNanos
+            ?: 0L
+    }
 
     /**
      * Get the current clock offset in milliseconds.
@@ -687,7 +1080,9 @@ class ClockSyncManager @Inject constructor(
      * Returns null if not synced.
      */
     fun getSyncQuality(): SyncQuality? {
-        return (bleClockSyncService.syncResult.value)?.quality
+        return frozenSync?.takeIf { activeSessionSyncFrozen }?.quality
+            ?: (bleClockSyncService.syncResult.value)?.quality
+            ?: (_syncState.value as? SyncState.Synced)?.quality
     }
 
     /**
@@ -695,9 +1090,11 @@ class ClockSyncManager @Inject constructor(
      * Returns 0 if not synced.
      */
     fun getSyncAgeSeconds(): Long {
-        if (syncTimestampNanos == 0L) return 0L
+        val timestamp = frozenSync?.takeIf { activeSessionSyncFrozen }?.capturedAtNanos
+            ?: syncTimestampNanos
+        if (timestamp == 0L) return 0L
         val now = SystemClock.elapsedRealtimeNanos()
-        return (now - syncTimestampNanos) / 1_000_000_000L
+        return (now - timestamp) / 1_000_000_000L
     }
 
     /**
@@ -730,10 +1127,10 @@ class ClockSyncManager @Inject constructor(
 
         return when {
             result.minRttMs >= ClockSyncConfig.PRECISION_MODE_MIN_RTT_MS ->
-                "RTT too high (${String.format("%.1f", result.minRttMs)}ms > ${ClockSyncConfig.PRECISION_MODE_MIN_RTT_MS.toInt()}ms)"
+                "RTT too high (${String.format(Locale.US, "%.1f", result.minRttMs)}ms > ${ClockSyncConfig.PRECISION_MODE_MIN_RTT_MS.toInt()}ms)"
             result.jitterMs >= ClockSyncConfig.PRECISION_MODE_MAX_JITTER_MS ->
-                "Jitter too high (${String.format("%.1f", result.jitterMs)}ms > ${ClockSyncConfig.PRECISION_MODE_MAX_JITTER_MS.toInt()}ms)"
-            result.quality < ClockSyncConfig.PRECISION_MODE_MIN_QUALITY ->
+                "Jitter too high (${String.format(Locale.US, "%.1f", result.jitterMs)}ms > ${ClockSyncConfig.PRECISION_MODE_MAX_JITTER_MS.toInt()}ms)"
+            !result.quality.isAtLeast(ClockSyncConfig.PRECISION_MODE_MIN_QUALITY) ->
                 "Quality too low (${result.quality} < ${ClockSyncConfig.PRECISION_MODE_MIN_QUALITY})"
             else -> null
         }
@@ -748,7 +1145,7 @@ class ClockSyncManager @Inject constructor(
      * @return Timestamp in remote device's clock reference
      */
     fun toRemoteTime(localNanos: Long): Long {
-        return bleClockSyncService.toRemoteTime(localNanos)
+        return localNanos + getOffsetNanos()
     }
 
     /**
@@ -760,7 +1157,7 @@ class ClockSyncManager @Inject constructor(
      * @return Timestamp in local clock reference
      */
     fun toLocalTime(remoteNanos: Long): Long {
-        return bleClockSyncService.toLocalTime(remoteNanos)
+        return remoteNanos - getOffsetNanos()
     }
 
     /**
@@ -770,8 +1167,144 @@ class ClockSyncManager @Inject constructor(
      * may become significant.
      */
     fun toRemoteTimeWithDrift(localNanos: Long): Long {
+        frozenSync?.takeIf { activeSessionSyncFrozen }?.let {
+            return localNanos + it.offsetNanos
+        }
         val predictedOffset = driftTracker.predictOffset(localNanos)
         return localNanos + predictedOffset
+    }
+
+    /**
+     * Convert a remote timestamp to local time with drift correction.
+     *
+     * Use this for long sessions where clock drift may be significant.
+     * Uses the drift-predicted offset at the current time.
+     */
+    fun toLocalTimeWithDrift(remoteNanos: Long): Long {
+        frozenSync?.takeIf { activeSessionSyncFrozen }?.let {
+            return remoteNanos - it.offsetNanos
+        }
+        val now = SystemClock.elapsedRealtimeNanos()
+        val predictedOffset = driftTracker.predictOffset(now)
+        return remoteNanos - predictedOffset
+    }
+
+    /**
+     * Convert a raw client timestamp into the host/reference clock domain.
+     *
+     * Client sync offsets use the convention:
+     * reference_time = client_local_time + offset.
+     */
+    fun toReferenceTime(senderId: String, senderLocalNanos: Long): Long {
+        return senderLocalNanos + (clientClockOffsetsBySender[senderId] ?: 0L)
+    }
+
+    private fun hostGateAssignment(config: TimingSessionConfig): GateAssignment {
+        return when (config.hostRole) {
+            TimingRole.START_LINE -> GateAssignment.start()
+            TimingRole.FINISH_LINE -> GateAssignment.finish(
+                gateIndex = (config.numberOfGates - 1).coerceAtLeast(1),
+                distance = config.distance
+            )
+            TimingRole.LAP_GATE -> GateAssignment.intermediate(
+                gateIndex = 1,
+                distanceFromStart = distanceForGateIndex(1, config)
+            )
+            TimingRole.CONTROL_ONLY -> GateAssignment(
+                role = TimingRole.CONTROL_ONLY,
+                gateIndex = -1,
+                distanceFromStart = 0.0
+            )
+        }
+    }
+
+    private fun allocateNextClientGateIndex(): Int {
+        return firstAvailableClientGateIndex()
+    }
+
+    private fun firstAvailableClientGateIndex(): Int {
+        val gateCount = sessionConfig.numberOfGates.coerceAtLeast(2)
+        val hostGateIndex = when (sessionConfig.hostRole) {
+            TimingRole.START_LINE -> 0
+            TimingRole.FINISH_LINE -> gateCount - 1
+            TimingRole.LAP_GATE -> 1
+            TimingRole.CONTROL_ONLY -> -1
+        }
+        val reserved = gateIndexBySenderId.values.toSet()
+        return (0 until gateCount).firstOrNull { gateIndex ->
+            gateIndex != hostGateIndex && gateIndex !in reserved
+        } ?: (0 until gateCount).first { it != hostGateIndex }
+    }
+
+    private fun updateHostGateCounts() {
+        if (!_isServer.value) return
+        _connectedGateCount.value = connectedClients.size + 1
+        _syncedGateCount.value = connectedClients.values.count { client ->
+            client.handshakeComplete && client.syncComplete
+        } + 1
+    }
+
+    private fun clearHostClientState() {
+        clientReadyTimeoutJobs.values.forEach { it.cancel() }
+        clientReadyTimeoutJobs.clear()
+        connectedClients.clear()
+        clientClockOffsetsBySender.clear()
+        gateIndexBySenderId.clear()
+    }
+
+    private fun assignmentForGateIndex(rawGateIndex: Int): GateAssignment {
+        val gateCount = sessionConfig.numberOfGates.coerceAtLeast(2)
+        val gateIndex = rawGateIndex.coerceIn(0, gateCount - 1)
+        return when (gateIndex) {
+            0 -> GateAssignment.start()
+            gateCount - 1 -> GateAssignment.finish(gateIndex, sessionConfig.distance)
+            else -> GateAssignment.intermediate(
+                gateIndex = gateIndex,
+                distanceFromStart = distanceForGateIndex(gateIndex, sessionConfig)
+            )
+        }
+    }
+
+    private fun fallbackAssignmentForRole(role: TimingRole): GateAssignment {
+        val gateCount = sessionConfig.numberOfGates.coerceAtLeast(2)
+        return when (role) {
+            TimingRole.START_LINE -> GateAssignment.start()
+            TimingRole.FINISH_LINE -> GateAssignment.finish(gateCount - 1, sessionConfig.distance)
+            TimingRole.LAP_GATE -> GateAssignment.intermediate(
+                gateIndex = 1,
+                distanceFromStart = distanceForGateIndex(1, sessionConfig)
+            )
+            TimingRole.CONTROL_ONLY -> GateAssignment(
+                role = TimingRole.CONTROL_ONLY,
+                gateIndex = -1,
+                distanceFromStart = 0.0
+            )
+        }
+    }
+
+    private fun distanceForGateIndex(gateIndex: Int, config: TimingSessionConfig): Double {
+        val finishIndex = (config.numberOfGates - 1).coerceAtLeast(1)
+        return config.distance * gateIndex.toDouble() / finishIndex.toDouble()
+    }
+
+    private fun markServerPeersAwaitingResync() {
+        clientClockOffsetsBySender.clear()
+        connectedClients.keys.toList().forEach { address ->
+            connectedClients[address]?.let { state ->
+                connectedClients[address] = state.copy(syncComplete = false)
+            }
+        }
+        updateHostGateCounts()
+        _protocolState.value = ProtocolState.SYNCING
+        _syncState.value = SyncState.Syncing(0f)
+    }
+
+    private fun FrozenSync.toSyncState(): SyncState.Synced {
+        return SyncState.Synced(
+            offsetMs = offsetNanos / 1_000_000.0,
+            quality = quality,
+            uncertaintyMs = uncertaintyMs
+        )
     }
 
     /**

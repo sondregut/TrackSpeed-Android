@@ -4,6 +4,8 @@ import android.graphics.Matrix
 import android.graphics.SurfaceTexture
 import android.view.Surface
 import android.view.TextureView
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -14,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
@@ -29,6 +32,7 @@ fun CameraPreview(
     modifier: Modifier = Modifier,
     gatePosition: Float,
     onGatePositionChanged: (Float) -> Unit,
+    gateLineDraggable: Boolean = true,
     fps: Int,
     detectionState: PhotoFinishDetector.State,
     sensorOrientation: Int = 90,
@@ -88,6 +92,7 @@ fun CameraPreview(
         GateLineOverlay(
             gatePosition = gatePosition,
             onGatePositionChanged = onGatePositionChanged,
+            isDraggable = gateLineDraggable,
             detectionState = detectionState,
             modifier = Modifier.fillMaxSize()
         )
@@ -143,6 +148,7 @@ private fun configureTransform(
 private fun GateLineOverlay(
     gatePosition: Float,
     onGatePositionChanged: (Float) -> Unit,
+    isDraggable: Boolean,
     detectionState: PhotoFinishDetector.State,
     modifier: Modifier = Modifier
 ) {
@@ -155,15 +161,52 @@ private fun GateLineOverlay(
         PhotoFinishDetector.State.COOLDOWN -> Color.Red
     }
 
-    Canvas(modifier = modifier) {
+    var canvasModifier = modifier
+    if (isDraggable) {
+        canvasModifier = canvasModifier
+            .pointerInput(onGatePositionChanged, isDraggable) {
+                detectTapGestures { offset ->
+                    if (size.width > 0) {
+                        onGatePositionChanged((offset.x / size.width).coerceIn(0.05f, 0.95f))
+                    }
+                }
+            }
+            .pointerInput(onGatePositionChanged, isDraggable) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        if (size.width > 0) {
+                            onGatePositionChanged((offset.x / size.width).coerceIn(0.05f, 0.95f))
+                        }
+                    },
+                    onDrag = { change, _ ->
+                        if (size.width > 0) {
+                            onGatePositionChanged((change.position.x / size.width).coerceIn(0.05f, 0.95f))
+                            change.consume()
+                        }
+                    }
+                )
+            }
+    }
+
+    Canvas(modifier = canvasModifier) {
         val x = size.width * gatePosition
 
-        // Gate line (fixed at center)
+        // Gate line
         drawLine(
             color = lineColor.copy(alpha = 0.8f),
             start = Offset(x, 0f),
             end = Offset(x, size.height),
             strokeWidth = 4f
+        )
+        drawCircle(
+            color = lineColor.copy(alpha = 0.95f),
+            radius = 10f,
+            center = Offset(x, size.height * 0.5f)
+        )
+        drawCircle(
+            color = Color.Black.copy(alpha = 0.55f),
+            radius = 5f,
+            center = Offset(x, size.height * 0.5f)
         )
     }
 }

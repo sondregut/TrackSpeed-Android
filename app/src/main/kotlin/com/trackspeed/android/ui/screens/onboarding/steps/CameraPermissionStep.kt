@@ -44,7 +44,8 @@ private enum class CameraPermissionState {
 @Composable
 fun CameraPermissionStep(
     onContinue: () -> Unit,
-    onSkip: () -> Unit
+    onSkip: () -> Unit,
+    onPermissionResult: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     var permissionState by remember {
@@ -67,6 +68,7 @@ fun CameraPermissionStep(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         permissionState = if (granted) CameraPermissionState.GRANTED else CameraPermissionState.DENIED
+        onPermissionResult(granted)
         if (granted) {
             // Continue after a brief delay to show success state
         }

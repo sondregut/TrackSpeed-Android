@@ -1,13 +1,18 @@
 package com.trackspeed.android.ui.screens.settings
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.audio.ElevenLabsService
 import com.trackspeed.android.audio.ElevenLabsVoiceId
 import com.trackspeed.android.audio.VoiceProvider
+import com.trackspeed.android.audio.VoiceStartService
 import com.trackspeed.android.billing.SubscriptionManager
 import com.trackspeed.android.data.repository.SettingsRepository
+import com.trackspeed.android.diagnostics.DetectionReviewLogStore
+import com.trackspeed.android.diagnostics.LogExporter
+import com.trackspeed.android.model.StartType
 import com.trackspeed.android.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -34,8 +39,17 @@ data class SettingsUiState(
     val isProUser: Boolean = false,
     val voiceProvider: String = SettingsRepository.Defaults.VOICE_PROVIDER,
     val elevenLabsVoice: String = SettingsRepository.Defaults.ELEVEN_LABS_VOICE,
+    val appLanguage: String = SettingsRepository.Defaults.APP_LANGUAGE,
     val announceTimesEnabled: Boolean = SettingsRepository.Defaults.ANNOUNCE_TIMES_ENABLED,
-    val startMode: String = SettingsRepository.Defaults.START_MODE
+    val preStartDelayMin: Float = SettingsRepository.Defaults.PRE_START_DELAY_MIN,
+    val marksSetDelayMin: Float = SettingsRepository.Defaults.MARKS_SET_DELAY_MIN,
+    val setGoHoldMin: Float = SettingsRepository.Defaults.SET_GO_HOLD_MIN,
+    val includeReadyCommand: Boolean = SettingsRepository.Defaults.INCLUDE_READY_COMMAND,
+    val saveCrossingFrames: Boolean = SettingsRepository.Defaults.SAVE_CROSSING_FRAMES,
+    val enableFrameScrubbing: Boolean = SettingsRepository.Defaults.ENABLE_FRAME_SCRUBBING,
+    val detectionDiagnosticsEnabled: Boolean = SettingsRepository.Defaults.DETECTION_DIAGNOSTICS_ENABLED,
+    val detectionReviewAutoUploadEnabled: Boolean = SettingsRepository.Defaults.DETECTION_REVIEW_AUTO_UPLOAD_ENABLED,
+    val cameraPerformanceDiagnosticsEnabled: Boolean = SettingsRepository.Defaults.CAMERA_PERFORMANCE_DIAGNOSTICS_ENABLED
 ) {
     /**
      * Returns a display-friendly distance label (e.g. "60m", "100m", "40yd").
@@ -50,10 +64,10 @@ data class SettingsUiState(
         }
 
     /**
-     * Returns a display-friendly start type label (e.g. "Standing", "Flying").
+     * Returns a display-friendly start type label.
      */
     val startTypeLabel: String
-        get() = startType.replaceFirstChar { it.uppercase() }
+        get() = StartType.fromRawValue(startType).displayName
 }
 
 @HiltViewModel
@@ -61,6 +75,9 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val subscriptionManager: SubscriptionManager,
     private val elevenLabsService: ElevenLabsService,
+    private val voiceStartService: VoiceStartService,
+    private val detectionReviewLogStore: DetectionReviewLogStore,
+    private val logExporter: LogExporter,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -86,7 +103,7 @@ class SettingsViewModel @Inject constructor(
         return when {
             totalBytes < 1024 -> "$totalBytes B"
             totalBytes < 1024 * 1024 -> "${totalBytes / 1024} KB"
-            else -> String.format("%.1f MB", totalBytes / (1024.0 * 1024.0))
+            else -> String.format(java.util.Locale.getDefault(), "%.1f MB", totalBytes / (1024.0 * 1024.0))
         }
     }
 
@@ -98,7 +115,16 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.appearanceMode,
         settingsRepository.onboardingCompleted,
         settingsRepository.preferredFps,
-        subscriptionManager.isProUser
+        settingsRepository.detectionDiagnosticsEnabled,
+        settingsRepository.cameraPerformanceDiagnosticsEnabled,
+        settingsRepository.detectionReviewAutoUploadEnabled,
+        subscriptionManager.isProUser,
+        settingsRepository.preStartDelayMin,
+        settingsRepository.marksSetDelayMin,
+        settingsRepository.setGoHoldMin,
+        settingsRepository.includeReadyCommand,
+        settingsRepository.saveCrossingFrames,
+        settingsRepository.enableFrameScrubbing
     ) { values ->
         SettingsUiState(
             defaultDistance = values[0] as Double,
@@ -108,7 +134,16 @@ class SettingsViewModel @Inject constructor(
             appTheme = appearanceModeToTheme(values[4] as String),
             onboardingCompleted = values[5] as Boolean,
             preferredFps = values[6] as Int,
-            isProUser = values[7] as Boolean
+            detectionDiagnosticsEnabled = values[7] as Boolean,
+            cameraPerformanceDiagnosticsEnabled = values[8] as Boolean,
+            detectionReviewAutoUploadEnabled = values[9] as Boolean,
+            isProUser = values[10] as Boolean,
+            preStartDelayMin = values[11] as Float,
+            marksSetDelayMin = values[12] as Float,
+            setGoHoldMin = values[13] as Float,
+            includeReadyCommand = values[14] as Boolean,
+            saveCrossingFrames = values[15] as Boolean,
+            enableFrameScrubbing = values[16] as Boolean
         )
     }
 
@@ -117,13 +152,13 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.voiceProvider,
         settingsRepository.elevenLabsVoice,
         settingsRepository.announceTimesEnabled,
-        settingsRepository.startMode
-    ) { core, voiceProvider, elevenLabsVoice, announceTimesEnabled, startMode ->
+        settingsRepository.appLanguage
+    ) { core, voiceProvider, elevenLabsVoice, announceTimesEnabled, appLanguage ->
         core.copy(
             voiceProvider = voiceProvider,
             elevenLabsVoice = elevenLabsVoice,
-            announceTimesEnabled = announceTimesEnabled,
-            startMode = startMode
+            appLanguage = appLanguage,
+            announceTimesEnabled = announceTimesEnabled
         )
     }.stateIn(
         scope = viewModelScope,
@@ -163,7 +198,7 @@ class SettingsViewModel @Inject constructor(
 
     fun setPreferredFps(fps: Int) {
         viewModelScope.launch {
-            settingsRepository.setPreferredFps(fps)
+            settingsRepository.setPreferredFps(SettingsRepository.Defaults.PREFERRED_FPS)
         }
     }
 
@@ -179,16 +214,94 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setAppLanguage(language: String) {
+        viewModelScope.launch {
+            settingsRepository.setAppLanguage(language)
+        }
+    }
+
     fun setAnnounceTimesEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setAnnounceTimesEnabled(enabled)
         }
     }
 
-    fun setStartMode(mode: String) {
+    fun setPreStartDelayMin(value: Float) {
         viewModelScope.launch {
-            settingsRepository.setStartMode(mode)
+            settingsRepository.setPreStartDelayMin(value)
+            settingsRepository.setPreStartDelayMax(value + 2f)
         }
+    }
+
+    fun setMarksSetDelayMin(value: Float) {
+        viewModelScope.launch {
+            settingsRepository.setMarksSetDelayMin(value)
+            settingsRepository.setMarksSetDelayMax(value + 4f)
+        }
+    }
+
+    fun setSetGoHoldMin(value: Float) {
+        viewModelScope.launch {
+            settingsRepository.setSetGoHoldMin(value)
+            settingsRepository.setSetGoHoldMax(value + 0.8f)
+        }
+    }
+
+    fun setIncludeReadyCommand(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setIncludeReadyCommand(enabled)
+        }
+    }
+
+    fun setSaveCrossingFrames(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setSaveCrossingFrames(enabled)
+        }
+    }
+
+    fun setEnableFrameScrubbing(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setEnableFrameScrubbing(enabled)
+        }
+    }
+
+    fun setDetectionDiagnosticsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setDetectionDiagnosticsEnabled(enabled)
+        }
+    }
+
+    fun setDetectionReviewAutoUploadEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setDetectionReviewAutoUploadEnabled(enabled)
+        }
+    }
+
+    fun setCameraPerformanceDiagnosticsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setCameraPerformanceDiagnosticsEnabled(enabled)
+        }
+    }
+
+    suspend fun exportDetectionReviewLog(): Uri {
+        return detectionReviewLogStore.exportCurrentLog()
+    }
+
+    suspend fun uploadDetectionReviewLog(): String {
+        return detectionReviewLogStore.uploadCurrentLog()
+    }
+
+    suspend fun clearDetectionReviewLogs() {
+        detectionReviewLogStore.clear()
+    }
+
+    suspend fun exportRecentLogs(window: LogExporter.TimeWindow): String {
+        return logExporter.exportRecent(window)
+    }
+
+    suspend fun replayFirstSessionTutorial() {
+        settingsRepository.setForceShowFirstSessionTutorial(true)
+        settingsRepository.setHasDismissedFirstSessionTutorial(false)
     }
 
     fun previewVoice() {
@@ -204,6 +317,8 @@ class SettingsViewModel @Inject constructor(
                 if (audioData != null) {
                     elevenLabsService.playAudio(audioData)
                 }
+            } else {
+                voiceStartService.previewVoice()
             }
         }
     }

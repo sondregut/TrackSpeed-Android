@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,9 +21,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,19 +49,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trackspeed.android.BuildConfig
 import com.trackspeed.android.data.export.shareCsv
 import com.trackspeed.android.data.local.entities.RunEntity
 import kotlinx.coroutines.launch
+import com.trackspeed.android.ui.components.DetectionReviewTarget
 import com.trackspeed.android.ui.components.ExpandedThumbnail
 import com.trackspeed.android.ui.components.ThumbnailViewerDialog
+import com.trackspeed.android.ui.util.formatDistance
+import com.trackspeed.android.ui.util.formatSessionMode
+import com.trackspeed.android.ui.util.formatSegmentLabel
+import com.trackspeed.android.ui.util.formatSplitDuration
 import com.trackspeed.android.ui.util.formatTime
 import com.trackspeed.android.ui.util.formatSpeed
+import com.trackspeed.android.ui.util.parseSegmentSplits
 import com.trackspeed.android.ui.util.parseAthleteColor
 import java.io.File
 import androidx.compose.ui.res.stringResource
 import com.trackspeed.android.R
 import java.text.SimpleDateFormat
 import java.util.Date
+import com.trackspeed.android.model.StartType
 import java.util.Locale
 
 private val BestGreen = Color(0xFF4CAF50)
@@ -69,6 +80,10 @@ private val SeasonGold = Color(0xFFFFD600)
 fun SessionDetailScreen(
     onNavigateBack: () -> Unit,
     onRunClick: (String, String) -> Unit = { _, _ -> },
+    onShareRunClick: (String, String) -> Unit = { _, _ -> },
+    onShareSessionClick: (String) -> Unit = {},
+    onVideoOverlayClick: (String, String) -> Unit = { _, _ -> },
+    onFramesClick: (String, String) -> Unit = { _, _ -> },
     viewModel: SessionDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -76,12 +91,89 @@ fun SessionDetailScreen(
     var expandedRunId by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var showMoreMenu by remember { mutableStateOf(false) }
+    var showDeleteSessionDialog by remember { mutableStateOf(false) }
+    var runToDelete by remember { mutableStateOf<RunEntity?>(null) }
+
+    LaunchedEffect(uiState.deleted) {
+        if (uiState.deleted) {
+            onNavigateBack()
+        }
+    }
 
     // Fullscreen thumbnail viewer
     ThumbnailViewerDialog(
         thumbnail = expandedThumbnail,
         onDismiss = { expandedThumbnail = null }
     )
+
+    if (showDeleteSessionDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteSessionDialog = false },
+            title = { Text(stringResource(R.string.session_detail_delete_session_title)) },
+            text = { Text(stringResource(R.string.session_detail_delete_session_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteSessionDialog = false
+                        viewModel.deleteSession()
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.session_history_delete_confirm),
+                        color = Color(0xFFFF3B30)
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteSessionDialog = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+            containerColor = SurfaceDark,
+            titleContentColor = TextPrimary,
+            textContentColor = TextSecondary
+        )
+    }
+
+    runToDelete?.let { run ->
+        AlertDialog(
+            onDismissRequest = { runToDelete = null },
+            title = { Text(stringResource(R.string.run_detail_delete_confirm_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.session_detail_delete_run_message,
+                        run.runNumber
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (expandedRunId == run.id) {
+                            expandedRunId = null
+                        }
+                        viewModel.deleteRun(run.id)
+                        runToDelete = null
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.run_detail_delete_confirm),
+                        color = Color(0xFFFF3B30)
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { runToDelete = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+            containerColor = SurfaceDark,
+            titleContentColor = TextPrimary,
+            textContentColor = TextSecondary
+        )
+    }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -104,18 +196,64 @@ fun SessionDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        scope.launch {
-                            val uri = viewModel.exportSessionCsv()
-                            if (uri != null) {
-                                shareCsv(context, uri)
+                        val expandedRun = uiState.allRuns.firstOrNull { it.id == expandedRunId }
+                        if (expandedRun != null) {
+                            onShareRunClick(expandedRun.id, expandedRun.sessionId)
+                        } else {
+                            uiState.session?.let { session ->
+                                onShareSessionClick(session.id)
                             }
                         }
                     }) {
                         Icon(
                             imageVector = Icons.Outlined.Share,
-                            contentDescription = stringResource(R.string.session_detail_export_cd),
+                            contentDescription = stringResource(R.string.session_detail_share_cd),
                             tint = TextPrimary
                         )
+                    }
+                    Box {
+                        IconButton(onClick = { showMoreMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.session_detail_more_cd),
+                                tint = TextPrimary
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false },
+                            containerColor = SurfaceDark
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = stringResource(R.string.session_detail_export_csv),
+                                        color = TextPrimary
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    scope.launch {
+                                        val uri = viewModel.exportSessionCsv()
+                                        if (uri != null) {
+                                            shareCsv(context, uri)
+                                        }
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = stringResource(R.string.session_detail_delete_session),
+                                        color = Color(0xFFFF3B30)
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    showDeleteSessionDialog = true
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -157,11 +295,22 @@ fun SessionDetailScreen(
                 item { Spacer(modifier = Modifier.height(12.dp)) }
             }
 
+            if (uiState.allRuns.size > 1) {
+                item {
+                    RunSortChips(
+                        selectedSort = uiState.runSort,
+                        onSortSelected = { viewModel.setRunSort(it) }
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
+
             // Table header
             if (uiState.runs.isNotEmpty()) {
                 item {
                     TableHeader(
-                        showAthlete = uiState.showAthleteColumn
+                        showAthlete = uiState.showAthleteColumn,
+                        showSpeedInResults = uiState.showSpeedInResults
                     )
                 }
             }
@@ -179,6 +328,7 @@ fun SessionDetailScreen(
                         run = run,
                         distance = uiState.session?.distance ?: run.distance,
                         speedUnit = uiState.speedUnit,
+                        showSpeedInResults = uiState.showSpeedInResults,
                         isBest = isBest,
                         showAthlete = uiState.showAthleteColumn,
                         onClick = {
@@ -195,10 +345,63 @@ fun SessionDetailScreen(
                     ) {
                         ExpandedThumbnailRow(
                             run = run,
+                            detectionReviewEnabled = BuildConfig.DEBUG && uiState.detectionDiagnosticsEnabled,
+                            onReviewSubmitted = { viewModel.submitCrossingReview(it) },
                             onThumbnailClick = { expandedThumbnail = it },
-                            onDetailClick = { onRunClick(run.id, run.sessionId) }
+                            onDetailClick = { onRunClick(run.id, run.sessionId) },
+                            onShareClick = { onShareRunClick(run.id, run.sessionId) },
+                            onVideoOverlayClick = { onVideoOverlayClick(run.id, run.sessionId) },
+                            onFramesClick = { onFramesClick(run.id, run.sessionId) },
+                            onDeleteClick = { runToDelete = run }
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RunSortChips(
+    selectedSort: SessionRunSort,
+    onSortSelected: (SessionRunSort) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.session_detail_sort_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = TextSecondary,
+            fontSize = 12.sp
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            SessionRunSort.entries.forEach { sort ->
+                val selected = selectedSort == sort
+                Surface(
+                    modifier = Modifier.clickable { onSortSelected(sort) },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (selected) AccentBlue else CardBackground
+                ) {
+                    Text(
+                        text = when (sort) {
+                            SessionRunSort.RUN_NUMBER -> stringResource(R.string.session_detail_sort_run_order)
+                            SessionRunSort.FASTEST_FIRST -> stringResource(R.string.session_detail_sort_fastest)
+                            SessionRunSort.SLOWEST_FIRST -> stringResource(R.string.session_detail_sort_slowest)
+                        },
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                        ),
+                        color = if (selected) Color.White else TextSecondary
+                    )
                 }
             }
         }
@@ -227,7 +430,7 @@ private fun SessionInfoBar(
                     .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "${session.distance.toInt()}m",
+                    text = formatDistance(session.distance),
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
@@ -243,9 +446,19 @@ private fun SessionInfoBar(
                 .padding(horizontal = 10.dp, vertical = 4.dp)
         ) {
             Text(
-                text = session.startType.replaceFirstChar {
-                    if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                },
+                text = StartType.fromRawValue(session.startType).displayName,
+                style = MaterialTheme.typography.labelMedium,
+                color = TextSecondary
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = formatSessionMode(session.numberOfPhones, session.numberOfGates),
                 style = MaterialTheme.typography.labelMedium,
                 color = TextSecondary
             )
@@ -346,7 +559,10 @@ private fun AthleteFilterChips(
 }
 
 @Composable
-private fun TableHeader(showAthlete: Boolean) {
+private fun TableHeader(
+    showAthlete: Boolean,
+    showSpeedInResults: Boolean
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -356,7 +572,9 @@ private fun TableHeader(showAthlete: Boolean) {
     ) {
         HeaderCell(text = stringResource(R.string.session_detail_header_num), weight = 0.08f)
         HeaderCell(text = stringResource(R.string.session_detail_header_time), weight = 0.25f)
-        HeaderCell(text = stringResource(R.string.session_detail_header_speed), weight = 0.25f)
+        if (showSpeedInResults) {
+            HeaderCell(text = stringResource(R.string.session_detail_header_speed), weight = 0.25f)
+        }
         HeaderCell(text = stringResource(R.string.session_detail_header_dist), weight = 0.17f)
         HeaderCell(text = stringResource(R.string.session_detail_header_type), weight = 0.17f)
         if (showAthlete) {
@@ -383,6 +601,7 @@ private fun CompactRunRow(
     run: RunEntity,
     distance: Double,
     speedUnit: String,
+    showSpeedInResults: Boolean,
     isBest: Boolean,
     showAthlete: Boolean,
     onClick: () -> Unit,
@@ -433,22 +652,24 @@ private fun CompactRunRow(
         }
 
         // Speed
-        Text(
-            text = formatSpeed(distance, run.timeSeconds, speedUnit),
-            modifier = Modifier.weight(0.25f),
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontFamily = FontFamily.Monospace
-            ),
-            color = TextMuted,
-            maxLines = 1
-        )
+        if (showSpeedInResults) {
+            Text(
+                text = formatSpeed(distance, run.timeSeconds, speedUnit),
+                modifier = Modifier.weight(0.25f),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = FontFamily.Monospace
+                ),
+                color = TextMuted,
+                maxLines = 1
+            )
+        }
 
         // Dist - accent colored pill like iOS
         Box(
             modifier = Modifier.weight(0.17f)
         ) {
             Text(
-                text = "${run.distance.toInt()}m",
+                text = formatDistance(run.distance),
                 style = MaterialTheme.typography.labelSmall,
                 color = AccentBlue,
                 modifier = Modifier
@@ -463,9 +684,7 @@ private fun CompactRunRow(
 
         // Type
         Text(
-            text = run.startType.replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-            },
+            text = StartType.fromRawValue(run.startType).displayName,
             modifier = Modifier.weight(0.17f),
             style = MaterialTheme.typography.labelSmall,
             color = TextMuted,
@@ -506,14 +725,25 @@ private fun CompactRunRow(
     )
 }
 
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 private fun ExpandedThumbnailRow(
     run: RunEntity,
+    detectionReviewEnabled: Boolean,
+    onReviewSubmitted: (com.trackspeed.android.ui.components.DetectionReviewSubmission) -> Unit,
     onThumbnailClick: (ExpandedThumbnail) -> Unit,
-    onDetailClick: () -> Unit
+    onDetailClick: () -> Unit,
+    onShareClick: () -> Unit,
+    onVideoOverlayClick: () -> Unit,
+    onFramesClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
+    val segments = remember(run.splitsJson) { parseSegmentSplits(run.splitsJson) }
+    val gatePosition = remember(run.finishGatePosition, run.gatePosition) {
+        (run.finishGatePosition ?: run.gatePosition).toFloat().coerceIn(0f, 1f)
+    }
     val bitmap by produceState<Bitmap?>(null, run.thumbnailPath) {
-        value = withContext(Dispatchers.IO) {
+        val loadedBitmap = withContext(Dispatchers.IO) {
             run.thumbnailPath?.let { path ->
                 try {
                     val file = File(path)
@@ -523,6 +753,7 @@ private fun ExpandedThumbnailRow(
                 }
             }
         }
+        value = loadedBitmap
     }
 
     Row(
@@ -551,7 +782,22 @@ private fun ExpandedThumbnailRow(
                             shape = RoundedCornerShape(8.dp)
                         )
                         .clickable {
-                            onThumbnailClick(ExpandedThumbnail(bitmap = currentBitmap))
+                            onThumbnailClick(
+                                ExpandedThumbnail(
+                                    bitmap = currentBitmap,
+                                    gatePosition = gatePosition,
+                                    reviewTarget = if (detectionReviewEnabled) {
+                                        run.toDetectionReviewTarget(gatePosition)
+                                    } else {
+                                        null
+                                    },
+                                    onReviewSubmitted = if (detectionReviewEnabled) {
+                                        onReviewSubmitted
+                                    } else {
+                                        null
+                                    }
+                                )
+                            )
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -561,6 +807,15 @@ private fun ExpandedThumbnailRow(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
+                    Canvas(modifier = Modifier.matchParentSize()) {
+                        val x = size.width * gatePosition
+                        drawLine(
+                            color = Color.Red.copy(alpha = 0.8f),
+                            start = androidx.compose.ui.geometry.Offset(x, 0f),
+                            end = androidx.compose.ui.geometry.Offset(x, size.height),
+                            strokeWidth = 3f
+                        )
+                    }
                 }
 
                 Text(
@@ -586,20 +841,91 @@ private fun ExpandedThumbnailRow(
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 color = TextSecondary
             )
+            if (segments.isNotEmpty()) {
+                Text(
+                    text = segments.joinToString("  ·  ") {
+                        "${formatSegmentLabel(it)} ${formatSplitDuration(it.splitNanos)}s"
+                    },
+                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                    color = TextMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
-        // View detail link
-        Text(
-            text = stringResource(R.string.run_detail_details),
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-            color = AccentBlue,
-            modifier = Modifier.clickable { onDetailClick() }
-        )
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.run_detail_details),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                color = AccentBlue,
+                modifier = Modifier.clickable { onDetailClick() }
+            )
+            Text(
+                text = stringResource(R.string.run_detail_share_run),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                color = AccentBlue,
+                modifier = Modifier.clickable { onShareClick() }
+            )
+            Text(
+                text = "Video Overlay",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                color = AccentBlue,
+                modifier = Modifier.clickable { onVideoOverlayClick() }
+            )
+            if (run.hasFrameScrubberPayload()) {
+                Text(
+                    text = "Frame Scrubber",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                    color = AccentBlue,
+                    modifier = Modifier.clickable { onFramesClick() }
+                )
+            }
+            Text(
+                text = stringResource(R.string.run_detail_delete_run),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                color = Color(0xFFFF3B30),
+                modifier = Modifier.clickable { onDeleteClick() }
+            )
+        }
     }
 
     HorizontalDivider(
         color = Color.White.copy(alpha = 0.05f),
         thickness = 0.5.dp
+    )
+}
+
+private fun RunEntity.toDetectionReviewTarget(gatePosition: Float): DetectionReviewTarget {
+    val isSolo = numberOfPhones <= 1
+    return DetectionReviewTarget(
+        sessionId = sessionId,
+        runId = id,
+        runNumber = runNumber,
+        numberOfPhones = numberOfPhones,
+        gateLabel = if (isSolo) "Crossing" else "Finish",
+        target = if (isSolo) "crossing" else "finish",
+        mode = if (isSolo) "solo" else "multi",
+        distanceMeters = distance,
+        startType = startType,
+        displayedTimeSeconds = timeSeconds,
+        originalGatePosition = (finishGatePosition ?: this.gatePosition).toFloat(),
+        crossingDirection = finishCrossingDirection ?: startCrossingDirection,
+        detectorX = gatePosition,
+        detectorY = finishDetectorY?.toFloat(),
+        crossingVelocityPxPerSec = finishCrossingVelocity ?: crossingVelocity,
+        workWidth = finishWorkResolutionWidth ?: workResolutionWidth,
+        interpolationAlpha = finishInterpolationAlpha,
+        framePick = finishFramePick,
+        s0 = finishS0,
+        s1 = finishS1,
+        isFrontCamera = finishIsFrontCamera,
+        detectorTriggerFramePts = finishDetectorTriggerFramePts,
+        chosenThumbnailFramePts = finishChosenThumbnailFramePts,
+        savedThumbnailFramePts = finishSavedThumbnailFramePts
     )
 }
 

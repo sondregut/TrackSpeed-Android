@@ -12,34 +12,56 @@ import android.util.Log
 import android.util.Range
 import android.util.Size
 import android.view.Surface
+import com.trackspeed.android.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Camera manager using standard Camera2 API at 30-120fps.
+ * Camera manager using Camera2 at 30 fps with auto-exposure.
  *
- * Photo Finish mode doesn't need 240fps high-speed capture.
- * Uses auto-exposure (point-and-shoot) with frame rate capping.
- *
- * Ported from iOS CameraManager.swift Point & Shoot mode.
+ * Locked to 30 fps to match iOS commit c46bbac4 ("Match detection pipeline
+ * to testing app: lock 30fps") — the new geometry-based DetectionEngine
+ * was tuned and validated against 30 fps frames; running at higher rates
+ * shifts noise / motion-blur thresholds the tuning depends on. The
+ * `preferredFps` setter is retained for API compatibility but ignored.
  */
 @Singleton
 class CameraManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    settingsRepository: SettingsRepository
 ) {
     companion object {
         private const val TAG = "CameraManager"
-        private val DEFAULT_FPS_ORDER = intArrayOf(120, 60, 30)
+        private const val LOCKED_FPS = 30
+        private const val DIAGNOSTIC_SUMMARY_FRAMES = 30
+        private const val DIAGNOSTIC_SUMMARY_INTERVAL_NANOS = 5_000_000_000L
+        private const val SLOW_AVG_PROCESSING_MS = 33.0
+        private const val SLOW_MAX_PROCESSING_MS = 60.0
+        private const val MAX_CAPTURE_METADATA_ENTRIES = 64
     }
 
-    /** Set preferred FPS before calling initialize(). */
-    var preferredFps: Int = 120
+    /**
+     * Kept for API compatibility — ignored. The engine is tuned for 30 fps
+     * and we don't currently support per-session overrides.
+     */
+    var preferredFps: Int = LOCKED_FPS
         set(value) {
-            field = value.coerceIn(30, 120)
+            // Always clamp to the locked value; log if a caller tried to
+            // change it so tuning regressions are visible in logcat.
+            if (value != LOCKED_FPS) {
+                Log.w(TAG, "preferredFps=$value ignored — camera is locked to ${LOCKED_FPS}fps")
+            }
+            field = LOCKED_FPS
         }
 
     // Camera state
@@ -58,6 +80,7 @@ class CameraManager @Inject constructor(
     private var imageReader: ImageReader? = null
     private var previewSurface: Surface? = null
     @Volatile private var isClosed = true
+    private val cameraGeneration = AtomicLong(0L)
 
     // Threading
     private var cameraThread: HandlerThread? = null
@@ -71,6 +94,14 @@ class CameraManager @Inject constructor(
     private var selectedSize: Size? = null
     private var achievedFps: Int = 30
     private var sensorOrientation: Int = 0
+    private var sensorTimestampSource: Int = CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN
+    private var timestampMapper = CameraTimestampMapper(sourceIsRealtime = false)
+
+    private data class CaptureMetadata(val exposureNanos: Long?)
+
+    private val captureMetadataLock = Any()
+    private val captureMetadataByTimestamp = LinkedHashMap<Long, CaptureMetadata>()
+    @Volatile private var latestExposureNanos: Long? = null
 
     /** Sensor orientation in degrees (0, 90, 180, 270) */
     fun getSensorOrientation(): Int = sensorOrientation
@@ -91,6 +122,22 @@ class CameraManager @Inject constructor(
     // Frame statistics
     private var frameCount = 0L
     private var lastFrameTimestamp = 0L
+    private var processingTimeSumMs = 0.0
+    private var processingTimeMaxMs = 0.0
+    private var processingTimeSamples = 0
+    private var lastProcessingSummaryLogNanos = 0L
+
+    @Volatile private var cameraPerformanceDiagnosticsEnabled = SettingsRepository.Defaults.CAMERA_PERFORMANCE_DIAGNOSTICS_ENABLED
+
+    private val settingsScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    init {
+        settingsScope.launch {
+            settingsRepository.cameraPerformanceDiagnosticsEnabled.collect { enabled ->
+                cameraPerformanceDiagnosticsEnabled = enabled
+            }
+        }
+    }
 
     sealed class CameraState {
         data object Closed : CameraState()
@@ -110,6 +157,7 @@ class CameraManager @Inject constructor(
         val uvRowStride: Int,
         val uvPixelStride: Int,
         val timestampNanos: Long,
+        val exposureNanos: Long?,
         val frameIndex: Long
     )
 
@@ -118,10 +166,12 @@ class CameraManager @Inject constructor(
     }
 
     /**
-     * Initialize camera - find best camera config for Photo Finish.
-     * Prefers highest FPS up to 120, with at least 720p resolution.
+     * Initialize the best 30 fps-capable camera config for Photo Finish.
      */
     fun initialize(useFrontCamera: Boolean = false): Boolean {
+        selectedCameraId = null
+        selectedSize = null
+        selectedFpsRange = null
         val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
         val targetFacing = if (useFrontCamera) CameraCharacteristics.LENS_FACING_FRONT
             else CameraCharacteristics.LENS_FACING_BACK
@@ -137,7 +187,10 @@ class CameraManager @Inject constructor(
                     CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP
                 ) ?: continue
 
-                val result = findBestConfig(configMap)
+                val fpsRanges = characteristics.get(
+                    CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES
+                ).orEmpty()
+                val result = findBestConfig(configMap, fpsRanges)
                 if (result != null) {
                     selectedCameraId = cameraId
                     selectedSize = result.first
@@ -146,7 +199,19 @@ class CameraManager @Inject constructor(
                     _currentFps.value = achievedFps
                     _isFrontCamera.value = useFrontCamera
                     sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
-                    Log.i(TAG, "Camera found: $cameraId (${if (useFrontCamera) "front" else "back"}), ${result.first.width}x${result.first.height} @ ${achievedFps}fps, sensor=$sensorOrientation°")
+                    sensorTimestampSource = characteristics.get(
+                        CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE
+                    ) ?: CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN
+                    timestampMapper = CameraTimestampMapper(
+                        sourceIsRealtime = sensorTimestampSource ==
+                            CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME
+                    )
+                    Log.i(
+                        TAG,
+                        "Camera found: $cameraId (${if (useFrontCamera) "front" else "back"}), " +
+                            "${result.first.width}x${result.first.height} @ ${achievedFps}fps, " +
+                            "sensor=$sensorOrientation°, timestampSource=$sensorTimestampSource"
+                    )
                     return true
                 }
             }
@@ -155,6 +220,9 @@ class CameraManager @Inject constructor(
             return false
         } catch (e: CameraAccessException) {
             Log.e(TAG, "Camera access error during initialization", e)
+            return false
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Invalid camera configuration during initialization", e)
             return false
         }
     }
@@ -166,69 +234,48 @@ class CameraManager @Inject constructor(
         val useFront = !_isFrontCamera.value
         closeCamera()
         if (initialize(useFront)) {
-            this.previewSurface = previewSurface
-            this.frameCallback = callback
-            isClosed = false
-            _cameraState.value = CameraState.Opening
-
-            cameraThread = HandlerThread("CameraThread").apply { start() }
-            cameraHandler = Handler(cameraThread!!.looper)
-            imageThread = HandlerThread("ImageThread").apply { start() }
-            imageHandler = Handler(imageThread!!.looper)
-
-            val sysCameraManager = context.getSystemService(Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
-            try {
-                @SuppressLint("MissingPermission")
-                sysCameraManager.openCamera(selectedCameraId!!, object : CameraDevice.StateCallback() {
-                    override fun onOpened(camera: CameraDevice) {
-                        cameraDevice = camera
-                        createCaptureSession()
-                    }
-                    override fun onDisconnected(camera: CameraDevice) { closeCamera() }
-                    override fun onError(camera: CameraDevice, error: Int) {
-                        _cameraState.value = CameraState.Error("Camera error: $error")
-                        closeCamera()
-                    }
-                }, cameraHandler)
-            } catch (e: CameraAccessException) {
-                _cameraState.value = CameraState.Error("Failed to switch camera: ${e.message}")
-            }
+            openCamera(previewSurface, callback)
+        } else {
+            _cameraState.value = CameraState.Error("Requested camera is not available")
         }
     }
 
-    private fun findBestConfig(configMap: android.hardware.camera2.params.StreamConfigurationMap): Pair<Size, Range<Int>>? {
+    private fun findBestConfig(
+        configMap: android.hardware.camera2.params.StreamConfigurationMap,
+        availableFpsRanges: Array<out Range<Int>>
+    ): Pair<Size, Range<Int>>? {
         val outputSizes = configMap.getOutputSizes(ImageFormat.YUV_420_888) ?: return null
-
-        // Find best resolution (prefer 1080p, accept 720p+)
-        val goodSizes = outputSizes.filter { it.width >= 1280 && it.width <= 1920 }
-            .sortedByDescending { it.width * it.height }
-
-        val targetSize = goodSizes.firstOrNull()
-            ?: outputSizes.filter { it.width >= 640 }.maxByOrNull { it.width * it.height }
-            ?: return null
-
-        // Build FPS priority: preferred first, then fallbacks in descending order
-        val fpsOrder = buildList {
-            add(preferredFps)
-            for (fps in DEFAULT_FPS_ORDER) {
-                if (fps != preferredFps && fps <= preferredFps) add(fps)
-            }
-            if (!contains(30)) add(30)
+        val selectedStream = CameraConfigurationSelector.selectStream(
+            candidates = outputSizes.map { size ->
+                CameraStreamCandidate(
+                    width = size.width,
+                    height = size.height,
+                    minimumFrameDurationNanos = configMap.getOutputMinFrameDuration(
+                        ImageFormat.YUV_420_888,
+                        size
+                    )
+                )
+            },
+            targetFps = LOCKED_FPS
+        ) ?: return null
+        val selectedRange = CameraConfigurationSelector.selectFpsRange(
+            availableFpsRanges.map { CameraFpsCandidate(it.lower, it.upper) },
+            LOCKED_FPS
+        ) ?: return null
+        val targetSize = outputSizes.first {
+            it.width == selectedStream.width && it.height == selectedStream.height
         }
-
-        // Try each FPS in order
-        for (targetFps in fpsOrder) {
-            val minDuration = configMap.getOutputMinFrameDuration(ImageFormat.YUV_420_888, targetSize)
-            if (minDuration > 0) {
-                val maxPossibleFps = (1_000_000_000L / minDuration).toInt()
-                if (maxPossibleFps >= targetFps) {
-                    return Pair(targetSize, Range(targetFps, targetFps))
-                }
-            }
+        if (selectedStream.minimumFrameDurationNanos > 1_000_000_000L / LOCKED_FPS) {
+            Log.w(
+                TAG,
+                "No YUV size sustains ${LOCKED_FPS}fps; using ${targetSize.width}x${targetSize.height} " +
+                    "at sensor maximum ${1_000_000_000L / selectedStream.minimumFrameDurationNanos}fps"
+            )
         }
-
-        // Fallback to 30fps
-        return Pair(targetSize, Range(30, 30))
+        if (selectedRange.lower != LOCKED_FPS || selectedRange.upper != LOCKED_FPS) {
+            Log.w(TAG, "Exact ${LOCKED_FPS}fps AE range unavailable; using ${selectedRange.lower}-${selectedRange.upper}fps")
+        }
+        return Pair(targetSize, Range(selectedRange.lower, selectedRange.upper))
     }
 
     /**
@@ -246,6 +293,7 @@ class CameraManager @Inject constructor(
         this.previewSurface = previewSurface
         this.frameCallback = callback
         isClosed = false
+        val generation = cameraGeneration.incrementAndGet()
         _cameraState.value = CameraState.Opening
 
         cameraThread = HandlerThread("CameraThread").apply { start() }
@@ -259,30 +307,45 @@ class CameraManager @Inject constructor(
         try {
             cameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
                 override fun onOpened(camera: CameraDevice) {
+                    if (generation != cameraGeneration.get() || isClosed) {
+                        camera.close()
+                        return
+                    }
                     cameraDevice = camera
                     Log.i(TAG, "Camera opened: $cameraId")
-                    createCaptureSession()
+                    createCaptureSession(generation)
                 }
 
                 override fun onDisconnected(camera: CameraDevice) {
                     Log.w(TAG, "Camera disconnected")
-                    closeCamera()
+                    camera.close()
+                    if (generation == cameraGeneration.get()) {
+                        closeCamera()
+                    }
                 }
 
                 override fun onError(camera: CameraDevice, error: Int) {
                     Log.e(TAG, "Camera error: $error")
-                    _cameraState.value = CameraState.Error("Camera error: $error")
-                    closeCamera()
+                    camera.close()
+                    if (generation == cameraGeneration.get()) {
+                        failCamera("Camera error: $error")
+                    }
                 }
             }, cameraHandler)
         } catch (e: CameraAccessException) {
             Log.e(TAG, "Failed to open camera", e)
-            _cameraState.value = CameraState.Error("Failed to open camera: ${e.message}")
+            failCamera("Failed to open camera: ${e.message}")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Camera permission was revoked while opening", e)
+            failCamera("Camera permission is required")
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Camera rejected the selected configuration", e)
+            failCamera("Camera configuration is not supported")
         }
     }
 
-    private fun createCaptureSession() {
-        if (isClosed) return
+    private fun createCaptureSession(generation: Long) {
+        if (isClosed || generation != cameraGeneration.get()) return
         val camera = cameraDevice ?: return
         val size = selectedSize ?: return
 
@@ -293,7 +356,7 @@ class CameraManager @Inject constructor(
             3
         ).apply {
             setOnImageAvailableListener({ reader ->
-                processImage(reader)
+                processImage(reader, generation)
             }, imageHandler)
         }
 
@@ -306,29 +369,39 @@ class CameraManager @Inject constructor(
                 surfaces,
                 object : CameraCaptureSession.StateCallback() {
                     override fun onConfigured(session: CameraCaptureSession) {
-                        if (isClosed) {
+                        if (isClosed || generation != cameraGeneration.get()) {
                             session.close()
                             return
                         }
                         captureSession = session
-                        startCapture(session)
+                        startCapture(session, generation)
                     }
 
                     override fun onConfigureFailed(session: CameraCaptureSession) {
                         Log.e(TAG, "Session configuration failed")
-                        _cameraState.value = CameraState.Error("Session configuration failed")
+                        session.close()
+                        if (generation == cameraGeneration.get()) {
+                            failCamera("Session configuration failed")
+                        }
                     }
                 },
                 cameraHandler
             )
         } catch (e: CameraAccessException) {
             Log.e(TAG, "Failed to create capture session", e)
-            _cameraState.value = CameraState.Error("Session creation failed: ${e.message}")
+            if (generation == cameraGeneration.get()) {
+                failCamera("Session creation failed: ${e.message}")
+            }
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Invalid capture-session surface configuration", e)
+            if (generation == cameraGeneration.get()) {
+                failCamera("Session surfaces are not supported")
+            }
         }
     }
 
-    private fun startCapture(session: CameraCaptureSession) {
-        if (isClosed) return
+    private fun startCapture(session: CameraCaptureSession, generation: Long) {
+        if (isClosed || generation != cameraGeneration.get()) return
         val camera = cameraDevice ?: return
         val fpsRange = selectedFpsRange ?: return
         val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
@@ -346,18 +419,11 @@ class CameraManager @Inject constructor(
                 // Auto white balance
                 set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO)
 
-                // Cap exposure duration to prevent motion blur at high FPS
-                val characteristics = cameraManager.getCameraCharacteristics(cameraId)
-                val exposureRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
-                if (exposureRange != null) {
-                    val maxExposureNs = when {
-                        fpsRange.upper >= 100 -> 4_000_000L   // 4ms @ 120fps
-                        fpsRange.upper >= 50 -> 8_000_000L    // 8ms @ 60fps
-                        else -> 16_700_000L                     // 16.7ms @ 30fps
-                    }
-                    // AE will auto-adjust ISO to compensate
-                    // We don't directly set sensor exposure in AE mode, but we can set AE antibanding
-                }
+                // Camera is locked at 30 fps; the AE driver will pick an
+                // exposure automatically within the 30 fps frame budget. We don't set sensor
+                // exposure manually in AE mode — leaving this branch out
+                // matches iOS commit c46bbac4 + 3726d455 (drop dead
+                // thermal-throttle branches now that FPS is locked).
 
                 // Lock focus at ~1.5-2.5m range
                 set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
@@ -378,21 +444,73 @@ class CameraManager @Inject constructor(
                 )
             }
 
-            session.setRepeatingRequest(requestBuilder.build(), null, cameraHandler)
+            if (isClosed || generation != cameraGeneration.get()) {
+                session.close()
+                return
+            }
+
+            session.setRepeatingRequest(
+                requestBuilder.build(),
+                object : CameraCaptureSession.CaptureCallback() {
+                    override fun onCaptureCompleted(
+                        session: CameraCaptureSession,
+                        request: CaptureRequest,
+                        result: TotalCaptureResult
+                    ) {
+                        if (generation != cameraGeneration.get()) return
+                        val sensorTimestamp = result.get(CaptureResult.SENSOR_TIMESTAMP) ?: return
+                        val exposure = result.get(CaptureResult.SENSOR_EXPOSURE_TIME)
+                        latestExposureNanos = exposure
+                        synchronized(captureMetadataLock) {
+                            captureMetadataByTimestamp[sensorTimestamp] = CaptureMetadata(exposure)
+                            while (captureMetadataByTimestamp.size > MAX_CAPTURE_METADATA_ENTRIES) {
+                                val oldest = captureMetadataByTimestamp.entries.iterator()
+                                if (!oldest.hasNext()) break
+                                oldest.next()
+                                oldest.remove()
+                            }
+                        }
+                    }
+                },
+                cameraHandler
+            )
 
             _cameraState.value = CameraState.Capturing
             Log.i(TAG, "Capture started at ${fpsRange.upper}fps, auto-exposure, focus locked")
         } catch (e: CameraAccessException) {
             Log.e(TAG, "Failed to start capture", e)
-            _cameraState.value = CameraState.Error("Capture start failed: ${e.message}")
+            if (generation == cameraGeneration.get()) {
+                failCamera("Capture start failed: ${e.message}")
+            }
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Camera rejected repeating request", e)
+            if (generation == cameraGeneration.get()) {
+                failCamera("Capture settings are not supported")
+            }
+        } catch (e: IllegalStateException) {
+            if (isClosed || generation != cameraGeneration.get()) {
+                Log.i(TAG, "Capture session closed before repeating request")
+                return
+            }
+            Log.e(TAG, "Capture session closed unexpectedly", e)
+            failCamera("Camera session ended unexpectedly")
         }
     }
 
-    private fun processImage(reader: ImageReader) {
+    private fun processImage(reader: ImageReader, generation: Long) {
         val image = reader.acquireLatestImage() ?: return
 
         try {
-            val timestamp = SystemClock.elapsedRealtimeNanos()
+            if (isClosed || generation != cameraGeneration.get()) return
+            val callbackTimestamp = SystemClock.elapsedRealtimeNanos()
+            val sensorTimestamp = image.timestamp
+            val exposureNanos = synchronized(captureMetadataLock) {
+                captureMetadataByTimestamp.remove(sensorTimestamp)?.exposureNanos
+            } ?: latestExposureNanos
+            val timestamp = timestampMapper.toElapsedRealtimeNanos(
+                sensorTimestampNanos = sensorTimestamp,
+                callbackElapsedRealtimeNanos = callbackTimestamp
+            ) ?: return
             frameCount++
 
             // Extract Y plane (luminance) from YUV_420_888
@@ -443,10 +561,14 @@ class CameraManager @Inject constructor(
                 uvRowStride = uvRowStride,
                 uvPixelStride = uvPixelStride,
                 timestampNanos = timestamp,
+                exposureNanos = exposureNanos,
                 frameIndex = frameCount
             )
 
+            val callbackStartNanos = SystemClock.elapsedRealtimeNanos()
             frameCallback?.onFrame(frameData)
+            val callbackMs = (SystemClock.elapsedRealtimeNanos() - callbackStartNanos) / 1_000_000.0
+            recordProcessingSummary(callbackMs, timestamp)
 
             // Update FPS statistics
             if (lastFrameTimestamp > 0) {
@@ -462,7 +584,47 @@ class CameraManager @Inject constructor(
         }
     }
 
+    private fun recordProcessingSummary(processingMs: Double, timestampNanos: Long) {
+        processingTimeSumMs += processingMs
+        processingTimeMaxMs = maxOf(processingTimeMaxMs, processingMs)
+        processingTimeSamples++
+
+        if (processingTimeSamples < DIAGNOSTIC_SUMMARY_FRAMES) return
+
+        val avgMs = processingTimeSumMs / processingTimeSamples
+        val isSlow = avgMs >= SLOW_AVG_PROCESSING_MS || processingTimeMaxMs >= SLOW_MAX_PROCESSING_MS
+        val shouldLog = (cameraPerformanceDiagnosticsEnabled || isSlow) &&
+            (lastProcessingSummaryLogNanos == 0L ||
+                timestampNanos - lastProcessingSummaryLogNanos >= DIAGNOSTIC_SUMMARY_INTERVAL_NANOS)
+
+        if (shouldLog) {
+            val size = selectedSize
+            val resolution = if (size != null) "${size.width}x${size.height}" else "unknown"
+            Log.i(
+                TAG,
+                "[PROC_MS] avg=${"%.1f".format(Locale.US, processingTimeSumMs / processingTimeSamples)} " +
+                    "max=${"%.1f".format(Locale.US, processingTimeMaxMs)} samples=$processingTimeSamples " +
+                    "frame=$frameCount fps=${_currentFps.value} target=$LOCKED_FPS resolution=$resolution"
+            )
+            lastProcessingSummaryLogNanos = timestampNanos
+        }
+
+        processingTimeSumMs = 0.0
+        processingTimeMaxMs = 0.0
+        processingTimeSamples = 0
+    }
+
     fun closeCamera() {
+        cleanupCameraResources(publishClosedState = true)
+    }
+
+    private fun failCamera(message: String) {
+        cleanupCameraResources(publishClosedState = false)
+        _cameraState.value = CameraState.Error(message)
+    }
+
+    private fun cleanupCameraResources(publishClosedState: Boolean) {
+        cameraGeneration.incrementAndGet()
         isClosed = true
 
         try { captureSession?.close() } catch (_: Exception) {}
@@ -487,10 +649,21 @@ class CameraManager @Inject constructor(
 
         frameCount = 0
         lastFrameTimestamp = 0
+        processingTimeSumMs = 0.0
+        processingTimeMaxMs = 0.0
+        processingTimeSamples = 0
+        lastProcessingSummaryLogNanos = 0L
         lastBufferWidth = 0
         lastBufferHeight = 0
+        synchronized(captureMetadataLock) {
+            captureMetadataByTimestamp.clear()
+        }
+        latestExposureNanos = null
+        timestampMapper.reset()
 
-        _cameraState.value = CameraState.Closed
+        if (publishClosedState) {
+            _cameraState.value = CameraState.Closed
+        }
         Log.i(TAG, "Camera closed")
     }
 

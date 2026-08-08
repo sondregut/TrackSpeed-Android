@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.cloud.AuthState
+import com.trackspeed.android.cloud.isRealAuthenticated
 import com.trackspeed.android.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +37,7 @@ class AuthViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isLoading = authState is AuthState.Loading,
                     error = (authState as? AuthState.Error)?.message,
-                    isAuthenticated = authState is AuthState.Authenticated
+                    isAuthenticated = authState.isRealAuthenticated()
                 )
             }
         }

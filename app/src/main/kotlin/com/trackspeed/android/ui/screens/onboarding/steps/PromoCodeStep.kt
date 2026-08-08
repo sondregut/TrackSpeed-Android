@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.billing.PromoCodeType
 import com.trackspeed.android.ui.screens.onboarding.PromoRedemptionState
 import com.trackspeed.android.ui.theme.*
 
@@ -42,7 +43,10 @@ fun PromoCodeStep(
 
     // Auto-advance after successful free code redemption
     LaunchedEffect(redemptionState) {
-        if (redemptionState is PromoRedemptionState.Success && redemptionState.result.type == "free") {
+        if (
+            redemptionState is PromoRedemptionState.Success &&
+            redemptionState.result.type == PromoCodeType.FREE
+        ) {
             kotlinx.coroutines.delay(2000)
             onContinue()
         }
@@ -163,10 +167,12 @@ fun PromoCodeStep(
                             tint = AccentGreen
                         )
                         Text(
-                            text = if (redemptionState.result.type == "free") {
-                                "Pro Activated!"
-                            } else {
-                                "30-day trial unlocked!"
+                            text = when (redemptionState.result.type) {
+                                PromoCodeType.FREE -> stringResource(R.string.paywall_pro_activated)
+                                PromoCodeType.TRIAL -> stringResource(R.string.paywall_offer_code_accepted)
+                                PromoCodeType.DISCOUNT -> stringResource(
+                                    R.string.paywall_discount_unlocked_loading
+                                )
                             },
                             fontSize = 14.sp,
                             color = AccentGreen,

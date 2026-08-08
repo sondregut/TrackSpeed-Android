@@ -135,7 +135,7 @@ fun ConnectionHealthIndicator(
             val detailText = buildString {
                 append("${latencyMs}ms")
                 if (syncUncertaintyMs != null) {
-                    append(" | \u00B1${String.format("%.1f", syncUncertaintyMs)}ms")
+                    append(" | \u00B1${String.format(java.util.Locale.getDefault(), "%.1f", syncUncertaintyMs)}ms")
                 }
             }
             Text(

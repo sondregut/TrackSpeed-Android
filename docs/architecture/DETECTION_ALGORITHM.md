@@ -1,439 +1,165 @@
-# TrackSpeed Android - Photo Finish Detection Algorithm
+# TrackSpeed Detection Engine
 
-**Version:** 2.0
-**Last Updated:** February 2026
+**Implementation:** `detection/DetectionEngine.kt` coordinated by
+`detection/GateEngine.kt`
 
-This document details the Photo Finish detection mode as implemented in the Android app, ported from the iOS `PhotoFinishDetector.swift`.
+**iOS reference:** current `DetectionEngine.swift`
 
-> **Note:** This replaces the original Precision mode specification (v1.0) which described a 240fps + background model + ML Kit pose detection approach. That design was never implemented. The actual algorithm uses frame differencing with connected-component labeling at 30-120fps, matching the iOS Photo Finish app behavior.
+**Last verified:** July 21, 2026
 
----
+The active detector is the geometry-based 30 fps engine, not the legacy
+`PhotoFinishDetector`/`ZeroAllocCCL` pipeline described by earlier project
+documents. The legacy class remains only for a UI state enum.
 
-## 1. Overview
+## Camera contract
 
-The Photo Finish detection mode uses a single-loop architecture processing every camera frame:
+`CameraManager` requests a standard Camera2 YUV session locked at 30 fps with
+automatic exposure/white balance, fixed focus, HDR/scene mode disabled, and
+video stabilization disabled.
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                   PHOTO FINISH DETECTION MODE                 │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│   ┌─────────────────────┐      ┌─────────────────────┐      │
-│   │   IMU (Gyroscope)   │      │   CAMERA MANAGER    │      │
-│   │                     │      │   (30-120 fps)      │      │
-│   │ • Stability gate    │      │ • YUV frames        │      │
-│   │ • 0.35 rad/s thresh │      │ • Auto-exposure     │      │
-│   │ • 0.5s arm delay    │      │ • Focus locked      │      │
-│   └─────────┬───────────┘      └─────────┬───────────┘      │
-│             │                            │                   │
-│             │  isPhoneStable             │  Y-plane luma     │
-│             ▼                            ▼                   │
-│   ┌──────────────────────────────────────────────────────┐  │
-│   │              PHOTO FINISH DETECTOR                    │  │
-│   │                                                       │  │
-│   │  1. Check IMU → reject if unstable                   │  │
-│   │  2. Downsample luma to 160x284 work resolution       │  │
-│   │  3. Frame differencing → motion mask                 │  │
-│   │  4. CCL (connected component labeling) → blobs       │  │
-│   │  5. Size filter (>=33% frame height)                 │  │
-│   │  6. Compute chestX via column density scan           │  │
-│   │  7. Velocity filter (>=60 px/s at work res)          │  │
-│   │  8. Gate crossing check (sign flip)                  │  │
-│   │  9. Trajectory regression for sub-frame timing       │  │
-│   │  10. Rolling shutter correction                      │  │
-│   └──────────────────────────────────────────────────────┘  │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-```
+Each `FrameData` contains copied Y/U/V planes plus:
 
----
+- a Camera2 sensor timestamp mapped into `elapsedRealtimeNanos()`;
+- `SENSOR_EXPOSURE_TIME` for the frame (or the latest valid exposure as a
+  metadata-order fallback);
+- the actual row/pixel strides and monotonically increasing frame index.
 
-## 2. Configuration Constants
+For cameras whose timestamp source is `REALTIME`, the sensor timestamp is used
+directly. For `UNKNOWN`, the minimum sensor-to-callback delta is calibrated for
+ten frames, those frames are withheld, and the frozen mapping is then used.
+This removes callback-queue latency from crossing interpolation and keeps race
+timestamps in the same domain as BLE clock sync.
 
-### 2.1 Work Resolution
+## Stability gate
 
-```kotlin
-const val WORK_W = 160   // Downsampled width (portrait)
-const val WORK_H = 284   // Downsampled height (portrait)
-```
+`GateEngine` blocks detection while the phone moves:
 
-All detection operates on the downsampled frame, not the full camera resolution. This keeps processing fast regardless of camera resolution (720p, 1080p, etc.).
+- preferred sensor: linear acceleration, threshold 0.15 g;
+- fallback: gyroscope, threshold 0.35 rad/s;
+- recovery: 750 ms below threshold before stable again.
 
-### 2.2 IMU Stability
+Motion blocking resets detector warmup so an exposure or viewpoint snap after
+movement cannot immediately fire.
 
-```kotlin
-const val GYRO_THRESHOLD = 0.35            // rad/s - reject frames during shake
-const val STABLE_DURATION_TO_ARM_S = 0.5   // Must be stable 0.5s before detection
+## Processing geometry and baseline thresholds
+
+```text
+process size                 180 × 320 portrait
+absolute frame-diff          > 15 luma levels
+minimum component height     35% of process height
+minimum component width      8% of process width
+strict fill / aspect         ≥ 20% / ≤ 1.2
+lenient fill / aspect        ≥ 12% / ≤ 1.7
+torso sampling row           minY + 30% of component height
+gate band                    center column ±2
+thick gate projection        center column ±4
+warmup                       10 delivered frames
+cooldown                     0.3 seconds
 ```
 
-### 2.3 Detection Thresholds
-
-```kotlin
-// Blob size
-const val MIN_BLOB_HEIGHT_FOR_CROSSING = 0.33f  // 33% of frame height
-
-// Motion mask
-const val DEFAULT_DIFF_THRESHOLD = 14    // Pixel difference to count as motion
-const val MIN_DIFF_THRESHOLD = 8         // Clamp floor after calibration
-const val MAX_DIFF_THRESHOLD = 40        // Clamp ceiling after calibration
-
-// Velocity
-const val MIN_VELOCITY_PX_PER_SEC = 60.0f  // At work resolution (160x284)
-
-// Column density for body validation
-val MIN_COLUMN_DENSITY_FOR_BODY = (WORK_H * 0.15f).toInt()  // ~42 pixels
-const val MIN_REGION_WIDTH_FOR_BODY = 8    // Consecutive dense columns
-```
-
-### 2.4 Timing
-
-```kotlin
-const val COOLDOWN_DURATION_S = 0.3         // Between crossings
-const val WARMUP_DURATION_S = 0.30          // Frames before detection starts
-const val REARM_DURATION_S = 0.2            // Frames at hysteresis before rearm
-const val MIN_TIME_BETWEEN_CROSSINGS_S = 0.3
-const val ARMING_GRACE_PERIOD_S = 0.20      // Ignore crossings right after arming
-```
-
-### 2.5 Rearm Hysteresis
-
-```kotlin
-const val HYSTERESIS_DISTANCE_FRACTION = 0.25f  // 25% of frame width
-const val EXIT_ZONE_FRACTION = 0.35f            // Blob must exit 35% from gate
-```
-
-### 2.6 Trajectory
-
-```kotlin
-const val TRAJECTORY_BUFFER_SIZE = 6   // Points for linear regression
-const val MIN_DIRECTION_CHANGE_PX = 2.0f
-```
-
----
-
-## 3. Adaptive Noise Calibration
-
-During the warmup period (first ~10 frames), the detector collects luminance difference samples and computes an adaptive threshold using MAD (Median Absolute Deviation).
-
-```kotlin
-// Collect samples: subsample every 8th pixel from frame-to-frame difference
-// After warmup:
-val sorted = noiseCalibrationSamples.sorted()
-val median = sorted[n / 2]
-val absDeviations = sorted.map { abs(it - median) }.sorted()
-val mad = absDeviations[n / 2]
-
-// Threshold = median + 3.5 * MAD * 1.4826
-// (1.4826 converts MAD to standard deviation equivalent)
-val sigma = mad * 1.4826
-val rawThreshold = median + 3.5 * sigma
-val adaptiveDiffThreshold = rawThreshold.coerceIn(8.0, 40.0).toInt()
-```
-
-This adapts to different lighting conditions, camera sensors, and noise levels.
-
----
-
-## 4. Frame Differencing + Motion Mask
-
-For each frame after warmup:
-
-```kotlin
-// Downsample full resolution to 160x284
-downsampleLuma(yPlane, width, height, rowStride, currLumaSmall)
-
-// Build binary motion mask
-for (idx in 0 until WORK_W * WORK_H) {
-    val diff = abs(currLumaSmall[idx] - prevLumaSmall[idx])
-    motionMask[idx] = if (diff > adaptiveDiffThreshold) 255 else 0
-}
-```
-
-If fewer than 50 pixels have motion, the frame is skipped (no athlete present).
-
----
-
-## 5. Connected Component Labeling (ZeroAllocCCL)
-
-The `ZeroAllocCCL` class implements row-run connected component labeling with:
-- **Union-find with path compression** for label equivalence
-- **Pre-allocated buffers** for zero steady-state allocations
-- **Row-run encoding** (efficient for sparse masks)
-- **Blob statistics** (bounding box, centroid, area) accumulated during labeling
-
-```kotlin
-class ZeroAllocCCL(width: Int, height: Int, maxLabels: Int = 4096) {
-    // Pre-allocated: equivalence table, label stats, run buffers
-    // Returns: List<CCLBlob> with bbox, centroid, area, heightFrac
-}
-
-data class CCLBlob(
-    val bboxMinX: Int, val bboxMinY: Int,
-    val bboxWidth: Int, val bboxHeight: Int,
-    val centroidX: Float, val centroidY: Float,
-    val areaPixels: Int, val heightFrac: Float
-)
-```
-
----
-
-## 6. Blob Filtering + Chest Position
-
-### 6.1 Size Validation
-
-The largest blob by area is selected. Its height must be at least 33% of the frame height (`MIN_BLOB_HEIGHT_FOR_CROSSING`). Smaller blobs indicate the athlete is too far away.
-
-### 6.2 Chest X (Leading Edge) Computation
-
-Rather than using the blob centroid, the detector finds the "body edge" -- the leading edge of the torso in the direction of motion.
-
-Algorithm:
-1. Determine direction of motion from centroid movement between frames
-2. Scan columns from the leading edge inward
-3. For each column, find the longest contiguous run of motion pixels
-4. A column is "dense" if its longest run >= `MIN_COLUMN_DENSITY_FOR_BODY` (~42px)
-5. Need `MIN_REGION_WIDTH_FOR_BODY` (8) consecutive dense columns
-6. The first such column is the chest X position
-
-This gives a more precise gate crossing position than the blob centroid.
-
-### 6.3 Column Density Validation at Crossing
-
-When a gate crossing is detected, the detector performs an additional validation:
-- Extract the vertical column at the chest X position
-- Find the longest contiguous run of motion pixels
-- Reject if shorter than `MIN_COLUMN_DENSITY_FOR_BODY` (confirms solid body mass, not a stray arm/leg)
-
----
-
-## 7. Velocity Filter
-
-Velocity is computed between consecutive frames:
-
-```kotlin
-val dt = (ptsNanos - prevTimestamp) / 1_000_000_000.0f  // seconds
-val velocityPxPerSec = abs(chestX - prevChestX) / dt
-```
-
-Must exceed `MIN_VELOCITY_PX_PER_SEC` (60 px/s at 160x284 work resolution) to trigger. This rejects:
-- Static objects in the frame
-- Slow-moving background changes
-- Hands/arms moving through the gate slowly
-
----
-
-## 8. Crossing Detection State Machine
-
-### 8.1 States
-
-```kotlin
-enum class State {
-    UNSTABLE,        // Phone shaking, detection blocked
-    NO_ATHLETE,      // No motion or no valid blob
-    ATHLETE_TOO_FAR, // Blob too small (< 33% height)
-    READY,           // Valid blob, waiting for crossing
-    TRIGGERED,       // Crossing just detected
-    COOLDOWN         // Post-trigger cooldown (0.3s)
-}
-```
-
-### 8.2 State Transitions
-
-```
-                    isPhoneStable && 0.5s elapsed
-    ┌──────────────────────────────────────────────┐
-    │                                              │
-    ▼                                              │
-┌───────────────────┐                      ┌───────────────────┐
-│     UNSTABLE      │◄─── gyro > 0.35 ────│     ANY STATE     │
-│ "Hold Steady"     │                      │                   │
-└─────────┬─────────┘                      └───────────────────┘
-          │ stable for 0.5s
-          ▼
-┌───────────────────┐
-│    NO_ATHLETE     │◄── no motion / no blob
-│    "Ready"        │
-└─────────┬─────────┘
-          │ valid blob found
-          ▼
-┌───────────────────┐
-│ ATHLETE_TOO_FAR   │◄── blob < 33% height
-│   "Too Far"       │
-└─────────┬─────────┘
-          │ blob >= 33% height
-          ▼
-┌───────────────────┐
-│      READY        │◄──────────────────────────────────┐
-│    "Ready"        │                                    │
-└─────────┬─────────┘                                    │
-          │ chestX crosses gate line                     │
-          │ + velocity >= 60 px/s                        │
-          │ + armed + body mass confirmed                │
-          ▼                                              │
-┌───────────────────┐                                    │
-│    TRIGGERED      │                                    │
-│                   │                                    │
-│ • Compute time    │                                    │
-│ • Emit callback   │                                    │
-│ • Disarm          │                                    │
-└─────────┬─────────┘                                    │
-          │                                              │
-          ▼                                              │
-┌───────────────────┐                                    │
-│     COOLDOWN      │                                    │
-│     (0.3s)        │────────────────────────────────────┘
-└───────────────────┘
-```
-
-### 8.3 Rearm Hysteresis
-
-After a crossing, the detector disarms. To rearm:
-1. The blob must exit the gate zone (`EXIT_ZONE_FRACTION` = 35% of frame width from gate)
-2. Then the blob must move to `HYSTERESIS_DISTANCE_FRACTION` (25%) away from gate
-3. Must stay there for `rearmFramesRequired` consecutive frames
-
-Alternatively, if no valid blob is detected for `rearmFramesRequired` frames, the detector rearms automatically.
-
----
-
-## 9. Sub-Frame Interpolation
-
-### 9.1 Trajectory Regression (Primary)
-
-A circular buffer of 6 `TrajectoryPoint` records (chestX, chestY, timestamp, blobWidth) is maintained. When a crossing triggers, linear regression is performed:
-
-```kotlin
-// Fit line: chestX(t) = velocity * t + intercept
-// Using least squares on trajectory points
-val n = points.size
-// ... sum of t, x, t*x, t^2 ...
-val velocity = (n * sumTX - sumT * sumX) / denominator
-val intercept = (sumX - velocity * sumT) / n
-
-// Solve for gate crossing time
-val crossingTimeSeconds = (gateX - intercept) / velocity
-val crossingTimeNanos = points[0].timestamp + (crossingTimeSeconds * 1e9).toLong()
-```
-
-The regression is rejected if:
-- Velocity is too low (abs(velocity) <= 40)
-- Crossing time is unreasonable (< -0.15s or >= 0.3s from buffer window)
-
-### 9.2 Two-Frame Linear Interpolation (Fallback)
-
-If fewer than 3 trajectory points or regression fails:
-
-```kotlin
-val d0 = abs(prevChestX - gateX)
-val d1 = abs(chestX - gateX)
-val alpha = d0 / (d0 + d1)
-val interpolatedTime = prevTimestamp + (alpha * frameDuration)
-```
-
----
-
-## 10. Rolling Shutter Correction
-
-Rolling shutter cameras read rows sequentially. If the athlete is detected at row Y, that row was captured slightly after the frame's nominal timestamp.
-
-```kotlin
-object RollingShutterCalculator {
-    // Readout duration estimates (seconds)
-    fun getReadoutDuration(isFrontCamera: Boolean, fps: Double): Double {
-        return if (isFrontCamera) {
-            if (fps >= 100) 0.008 else 0.018
-        } else {
-            when {
-                fps >= 200 -> 0.003
-                fps >= 100 -> 0.005
-                else -> 0.012
-            }
-        }
-    }
-
-    // Compensation = readoutDuration * (chestY / frameHeight)
-    // Added to the interpolated crossing timestamp
-    fun calculateCompensationNanos(
-        isFrontCamera: Boolean, fps: Double, chestYNormalized: Float
-    ): Long
-}
-```
-
----
-
-## 11. Complete Frame Processing Pipeline
-
-```kotlin
-fun processFrame(yPlane, width, height, rowStride, frameNumber, ptsNanos): DetectionResult {
-    // 1. Paused check
-    // 2. Frame skip at 120fps (thermal optimization: process every 2nd frame)
-    // 3. Cooldown timer check
-    // 4. IMU stability gate
-    // 5. Early-exit on consecutive zero-motion frames (quick subsample check)
-    // 6. Downsample luma to 160x284
-    // 7. Warmup period (noise calibration)
-    // 8. Build motion mask (frame differencing with adaptive threshold)
-    // 9. Connected component labeling → blob list
-    // 10. Select largest blob, check height >= 33%
-    // 11. Compute chestX (leading edge via column density)
-    // 12. Store trajectory point
-    // 13. Compute velocity
-    // 14. Check rearm hysteresis
-    // 15. Check gate crossing (sign flip of distance)
-    // 16. Validate crossing (column density, blob size, min time)
-    // 17. Compute crossing time (trajectory regression or linear interpolation)
-    // 18. Apply rolling shutter correction
-    // 19. Emit crossing callback
-    // 20. Enter cooldown state
-}
-```
-
----
-
-## 12. Debug / UI State
-
-The detector exposes these values for the UI:
-
-```kotlin
-data class DetectionResult(
-    val triggered: Boolean,
-    val blobHeightFraction: Float,
-    val blobCenterX: Float?,
-    val velocityPxPerSec: Float,
-    val motionAmount: Float,       // Fraction of pixels with motion
-    val cameraStable: Boolean,
-    val rejection: RejectionReason, // NONE, CAMERA_SHAKING, TOO_FAR, TOO_SLOW, NO_BLOB, IN_COOLDOWN
-    val state: State
-)
-```
-
----
-
-## 13. Differences from Original Precision Mode Specification
-
-The original v1.0 of this document described a "Precision mode" that was designed but never implemented:
-
-| Feature | Precision Mode (v1.0, not built) | Photo Finish Mode (v2.0, actual) |
-|---------|----------------------------------|----------------------------------|
-| Frame rate | 240fps high-speed | 30-120fps standard |
-| Detection | Background model + occupancy | Frame differencing + CCL blobs |
-| Pose | ML Kit pose detection at 30Hz | None |
-| Torso tracking | Shoulder/hip landmarks + EMA | Column density scan |
-| Gate analysis | 3 vertical strips | Full-frame blob analysis |
-| Threshold model | Per-row median + MAD background | Per-frame adaptive diff threshold |
-| State machine | 5-state with occupancy levels | 6-state with velocity + size |
-| Interpolation | Quadratic (3+ samples) | Linear regression (6 trajectory points) |
-| Dependencies | ML Kit, high-speed Camera2 | Standard Camera2 only |
-| Calibration | Required (30 frames, static scene) | Automatic (warmup noise calibration) |
-
----
-
-## Appendix: iOS Source File Reference
-
-| Android Component | iOS Source File |
-|-------------------|-----------------|
-| `PhotoFinishDetector` | `PhotoFinishDetector.swift` |
-| `ZeroAllocCCL` | `ZeroAllocCCL.swift` |
-| `RollingShutterCalculator` | `RollingShutterCalculator.swift` |
-| `GateEngine` | `GateEngine.swift` |
-| `CameraManager` | `CameraManager.swift` (Point & Shoot mode) |
+The internal detection gate is the center process column, matching the current
+iOS engine. The displayed/recorded gate position is retained for calibration
+and post-hoc line adjustment; dragging it does not move the live detector's
+internal center column.
+
+## Validated runtime profile
+
+The table above lists bundled defaults. Current iOS can distribute a validated
+data-only profile under the Remote Config key
+`replica_detection_profile_v1`; Android implements the same schema and
+pipeline (`schemaVersion: 1`, `pipeline: replica_v1`).
+
+`ReplicaDetectionConfiguration` strictly validates the revision, enablement,
+expiry, app-version range, deterministic percentage rollout, parameter names,
+JSON types, numeric bounds, and cross-parameter relationships. Any unknown or
+invalid value rejects the complete candidate. A bad network response never
+replaces a valid cached profile, and an absent or ineligible candidate selects
+the bundled profile.
+
+`DetectionEngine.start()` copies the current profile into a session-local
+snapshot. A foreground/config refresh therefore affects the next timing run,
+not a run already in progress. Production timing retains the explicit iOS
+0.3-second cooldown override. The onboarding solo demo intentionally uses the
+profile cooldown. The `useLeadingEdgeTrigger` flag selects either current §23
+leading-edge support or the compiled pre-§23 local-support branch; both paths
+remain subject to the shared safety and scene-motion guards.
+
+## Per-frame pipeline
+
+1. Normalize portrait/landscape Y-plane orientation and downsample to 180×320.
+2. Compute absolute luma difference against the previous frame and build the
+   binary mask at threshold 15.
+3. Run allocation-controlled 8-neighbor connected-component labeling with
+   union-find.
+4. Reject flash/full-frame motion and prefilter components by size, fill, and
+   aspect. A component with qualifying vertical gate support can use the
+   lenient shape tier.
+5. Pick the largest qualifying component and compute its gate-band projection.
+   The merged vertical run must be at least
+   `max(30, 0.25 × componentHeight)`; gaps up to two pixels are merged.
+6. Infer direction from recent component centers. A movement of at least four
+   process pixels is required, using at most the previous eight frames.
+7. Apply temporal body/torso waits, limb-release logic, sparse-startup guard,
+   head-snag handling, low-contrast body fallback, and incoherent scene-motion
+   rejection in the same order as current iOS.
+8. Select the body x-anchor using current, detection-row, bounding-box, torso,
+   and vertically substantial body-front candidates. Rule order is significant
+   and is covered by parity fixtures.
+9. Use local strip width at the torso-relative row to interpolate the crossing
+   fraction between the previous and current frame.
+10. For exposure above 2 ms, add `0.75 × exposureSeconds`, matching the iOS
+    low-light timing correction.
+
+## Important rejection behavior
+
+The current iOS regression guards are intentionally part of functional logic:
+
+- broad, fragmented, position-independent scene motion is rejected;
+- tall but one-pixel-thin gate-row motion is rejected during weak buildup;
+- sparse startup motion without a credible torso is rejected;
+- a future torso/body-front candidate can defer firing until the body reaches
+  the line;
+- short leading arms/hands do not replace a vertically substantial torso/body
+  front;
+- the low-contrast fallback requires a multi-frame sequence and strong merged
+  gate-band support.
+
+Do not reorder these checks during cleanup. Several rules distinguish a true
+fast crossing from a single-frame lighting/shadow transition using the state
+built by earlier rules.
+
+## Timing result
+
+The detector returns:
+
+- interpolated monotonic crossing time;
+- interpolation fraction and previous/current frame choice;
+- direction and process-space velocity/geometry diagnostics;
+- the x-anchor rule selected for the crossing.
+
+`GateEngine` uses the interpolation fraction to choose the previous or current
+Y frame for the grayscale crossing thumbnail and adds the slit to the
+photo-finish composite. Multi-device code then converts the local monotonic
+timestamp with the established clock offset.
+
+## Verification
+
+The Android unit suite includes exact fixtures for:
+
+- the July 16 incoherent scene-motion rejection and real-crossing control;
+- temporal direction inference;
+- Camera2 timestamp-domain mapping;
+- low-light exposure correction;
+- clock-offset sign and estimator guards;
+- strict remote-profile validation and stable rollout hashing;
+- profile-driven current/legacy detector integration with flash rejection.
+
+The future-body/torso waits, low-contrast fallback, and x-anchor selector order
+were source-audited against current Swift. They should gain additional direct
+fixture coverage as new iOS production fixtures become available.
+
+The same iOS `DetectionSceneMotionGuardTests` are run as a reference check.
+Synthetic/unit tests cannot prove sensitivity on every camera sensor. Physical
+acceptance still requires recorded and live passes on representative Android
+devices in daylight, low light, both directions, and against camera shake and
+broad-shadow negative controls.

@@ -17,6 +17,9 @@ interface RunDao {
     @Query("SELECT * FROM runs WHERE id = :runId")
     suspend fun getRunById(runId: String): RunEntity?
 
+    @Query("SELECT * FROM runs WHERE cloudRunId = :cloudRunId LIMIT 1")
+    suspend fun getRunByCloudRunId(cloudRunId: String): RunEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(run: RunEntity)
 
@@ -62,6 +65,9 @@ interface RunDao {
         AND createdAt >= :seasonStartMillis
     """)
     suspend fun getSeasonBest(distance: Double, seasonStartMillis: Long): Double?
+
+    @Query("DELETE FROM runs")
+    suspend fun deleteAll()
 }
 
 data class SessionBestTime(

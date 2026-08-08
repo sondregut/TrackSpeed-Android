@@ -38,3 +38,6 @@
 -keep class dagger.hilt.** { *; }
 -keep class javax.inject.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ComponentSupplier { *; }
+
+# Optional RevenueCat UI preview annotation dependency.
+-dontwarn com.emergetools.snapshots.annotations.IgnoreEmergeSnapshot

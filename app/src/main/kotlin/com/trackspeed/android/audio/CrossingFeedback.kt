@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import com.trackspeed.android.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -14,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,6 +46,10 @@ class CrossingFeedback @Inject constructor(
         null
     }
 
+    // System TTS for time announcements when System Voice is selected
+    private var tts: TextToSpeech? = null
+    @Volatile private var ttsReady = false
+
     // Cached settings — populated from DataStore collectors, read lock-free on hot path
     @Volatile private var cachedBeepEnabled: Boolean = SettingsRepository.Defaults.CROSSING_BEEP_ENABLED
     @Volatile private var cachedAnnounceEnabled: Boolean = SettingsRepository.Defaults.ANNOUNCE_TIMES_ENABLED
@@ -57,6 +63,10 @@ class CrossingFeedback @Inject constructor(
         scope.launch { settingsRepository.voiceProvider.collect { cachedVoiceProvider = it } }
         scope.launch { settingsRepository.elevenLabsVoice.collect { cachedElevenLabsVoice = it } }
         scope.launch { settingsRepository.appLanguage.collect { cachedAppLanguage = it } }
+
+        tts = TextToSpeech(context) { status ->
+            ttsReady = status == TextToSpeech.SUCCESS
+        }
     }
 
     fun playCrossingBeep() {
@@ -79,18 +89,31 @@ class CrossingFeedback @Inject constructor(
 
         scope.launch {
             try {
+                val languageCode = cachedAppLanguage.let {
+                    if (it == "system") "en" else it
+                }
                 val voiceProvider = VoiceProvider.fromString(cachedVoiceProvider)
                 if (voiceProvider == VoiceProvider.ELEVEN_LABS) {
                     val voiceId = ElevenLabsVoiceId.fromString(cachedElevenLabsVoice)
-                    val languageCode = cachedAppLanguage.let {
-                        if (it == "system") "en" else it
-                    }
                     elevenLabsService.speakTime(seconds, voiceId, languageCode)
+                } else {
+                    announceTimeWithSystemTts(seconds, languageCode)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to announce time", e)
             }
         }
+    }
+
+    private fun announceTimeWithSystemTts(seconds: Double, languageCode: String) {
+        val engine = tts ?: return
+        if (!ttsReady) return
+
+        val commands = VoiceCommandPhrases.forLanguage(languageCode)
+        engine.language = commands.ttsLocale
+
+        val text = elevenLabsService.formatTimeForSpeech(seconds, languageCode)
+        engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "announce_${System.currentTimeMillis()}")
     }
 
     companion object {

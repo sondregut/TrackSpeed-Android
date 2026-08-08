@@ -169,7 +169,7 @@ private fun GoalProgressChart(
         }
 
         // Time label above first point (Now / flyingPR)
-        val prText = String.format("%.2f", flyingPR) + "s"
+        val prText = String.format(java.util.Locale.getDefault(), "%.2f", flyingPR) + "s"
         val prLabelResult = textMeasurer.measure(
             text = prText,
             style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TimerRed)
@@ -183,7 +183,7 @@ private fun GoalProgressChart(
         )
 
         // Time label above last point (Goal / goalTime)
-        val goalText = String.format("%.2f", goalTime) + "s"
+        val goalText = String.format(java.util.Locale.getDefault(), "%.2f", goalTime) + "s"
         val goalLabelResult = textMeasurer.measure(
             text = goalText,
             style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AccentGreen)
@@ -260,7 +260,7 @@ private fun ResearchCalloutCard() {
         }
         Column {
             Text(
-                text = "RESEARCH-BACKED",
+                text = stringResource(R.string.onboarding_progress_research_label),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = AccentNavy,

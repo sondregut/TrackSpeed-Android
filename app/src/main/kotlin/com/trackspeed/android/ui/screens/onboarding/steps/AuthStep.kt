@@ -34,19 +34,31 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.screens.auth.AuthViewModel
 import com.trackspeed.android.ui.theme.*
+import kotlinx.coroutines.delay
 
 @Composable
 fun AuthStep(
     onAuthenticated: () -> Unit,
+    onSkipAuth: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showEmailForm by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
+    var showSkipFallback by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isAuthenticated) {
         if (state.isAuthenticated) onAuthenticated()
+    }
+
+    LaunchedEffect(Unit) {
+        delay(10_000)
+        showSkipFallback = true
+    }
+
+    LaunchedEffect(state.error) {
+        if (state.error != null) showSkipFallback = true
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -63,7 +75,6 @@ fun AuthStep(
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
             )
-
             Spacer(Modifier.weight(1f))
 
             // Centered auth options
@@ -78,7 +89,7 @@ fun AuthStep(
                     OutlinedTextField(
                         value = state.email,
                         onValueChange = { viewModel.updateEmail(it) },
-                        placeholder = { Text("Email", color = TextMuted) },
+                        placeholder = { Text(stringResource(R.string.auth_email), color = TextMuted) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Email,
@@ -107,7 +118,7 @@ fun AuthStep(
                     OutlinedTextField(
                         value = state.password,
                         onValueChange = { viewModel.updatePassword(it) },
-                        placeholder = { Text("Password", color = TextMuted) },
+                        placeholder = { Text(stringResource(R.string.auth_password), color = TextMuted) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Lock,
@@ -147,7 +158,7 @@ fun AuthStep(
                         OutlinedTextField(
                             value = state.confirmPassword,
                             onValueChange = { viewModel.updateConfirmPassword(it) },
-                            placeholder = { Text("Confirm Password", color = TextMuted) },
+                            placeholder = { Text(stringResource(R.string.auth_confirm_password), color = TextMuted) },
                             leadingIcon = {
                                 Icon(
                                     Icons.Outlined.Lock,
@@ -274,6 +285,16 @@ fun AuthStep(
                         color = TimerRed,
                         fontSize = 13.sp
                     )
+                }
+
+                if (showSkipFallback) {
+                    TextButton(onClick = onSkipAuth) {
+                        Text(
+                            stringResource(R.string.onboarding_auth_later),
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
+                    }
                 }
             }
 

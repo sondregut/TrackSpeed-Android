@@ -1,7 +1,10 @@
 package com.trackspeed.android.ui.screens.athletes
 
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,19 +45,27 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.data.local.entities.AthleteEntity
 import com.trackspeed.android.ui.theme.*
+import java.util.Locale
+import com.trackspeed.android.R
 
 private val DeleteRed = Color(0xFFFF453A)
 
@@ -96,7 +107,7 @@ private fun AthleteListContent(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Add athlete"
+                        contentDescription = stringResource(R.string.athlete_chip_add_cd)
                     )
                 }
             }
@@ -111,7 +122,7 @@ private fun AthleteListContent(
             Spacer(modifier = Modifier.height(48.dp))
 
             Text(
-                text = "Athletes",
+                text = stringResource(R.string.profile_section_athletes),
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold
                 ),
@@ -237,7 +248,7 @@ private fun AthleteList(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
+                            contentDescription = stringResource(R.string.run_detail_delete_confirm),
                             tint = Color.White
                         )
                     }
@@ -255,11 +266,27 @@ private fun AthleteList(
     }
 }
 
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 private fun AthleteRow(
     athlete: AthleteEntity,
     onClick: () -> Unit
 ) {
+    val personalBests = athlete.personalBests()
+    val fastestBest = personalBests.values.minOrNull()
+    val detailText = athlete.nickname?.takeIf { it.isNotBlank() }
+    val avatarBitmap by produceState<Bitmap?>(
+        initialValue = null,
+        key1 = athlete.photoPath
+    ) {
+        val loadedBitmap = withContext(Dispatchers.IO) {
+            athlete.photoPath?.let { path ->
+                try { BitmapFactory.decodeFile(path) } catch (_: Exception) { null }
+            }
+        }
+        value = loadedBitmap
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -273,21 +300,33 @@ private fun AthleteRow(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar with color and initial
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(athleteColor(athlete.color)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = athlete.name.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = TextPrimary
+            val currentAvatarBitmap = avatarBitmap
+            if (currentAvatarBitmap != null) {
+                Image(
+                    bitmap = currentAvatarBitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
                 )
+            } else {
+                // Avatar with color and initial
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(athleteColor(athlete.color)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = athlete.name.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = TextPrimary
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(14.dp))
@@ -303,9 +342,9 @@ private fun AthleteRow(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                if (!athlete.nickname.isNullOrBlank()) {
+                if (detailText != null) {
                     Text(
-                        text = athlete.nickname,
+                        text = detailText,
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
                         maxLines = 1,
@@ -313,6 +352,31 @@ private fun AthleteRow(
                     )
                 }
             }
+
+            if (fastestBest != null) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier.padding(start = 12.dp)
+                ) {
+                    Text(
+                        text = String.format(Locale.US, "%.3fs", fastestBest),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = AccentGreen,
+                        maxLines = 1
+                    )
+
+                    Text(
+                        text = "${personalBests.size} PRs",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
 
             Icon(
                 imageVector = Icons.Outlined.ChevronRight,
@@ -397,7 +461,7 @@ internal fun athleteColor(colorName: String): Color {
         "blue" -> Color(0xFF2196F3)
         "purple" -> Color(0xFF9C27B0)
         "pink" -> Color(0xFFE91E63)
-        "teal" -> Color(0xFF009688)
+        "gray" -> Color(0xFF8E8E93)
         else -> Color(0xFF2196F3)
     }
 }

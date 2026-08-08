@@ -37,6 +37,7 @@ fun AttributionStep(
     promoCode: String,
     onPromoCodeChanged: (String) -> Unit,
     onSubmitPromoCode: (String, String) -> Unit,
+    isLoading: Boolean = false,
     onContinue: () -> Unit
 ) {
     var selected by remember { mutableStateOf<String?>(null) }
@@ -109,12 +110,8 @@ fun AttributionStep(
 
         // Continue button
         Button(
-            onClick = {
-                if (promoCode.isNotBlank()) {
-                    onSubmitPromoCode(promoCode, "onboarding_attribution")
-                }
-                onContinue()
-            },
+            onClick = { onContinue() },
+            enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 32.dp)
@@ -122,7 +119,15 @@ fun AttributionStep(
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
         ) {
-            Text(stringResource(R.string.common_continue), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.5.dp
+                )
+            } else {
+                Text(stringResource(R.string.common_continue), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
         Spacer(Modifier.height(32.dp))
     }

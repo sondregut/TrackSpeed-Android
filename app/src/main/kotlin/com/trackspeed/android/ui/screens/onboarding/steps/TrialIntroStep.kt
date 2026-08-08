@@ -15,18 +15,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 
 @Composable
-fun TrialIntroStep(onContinue: () -> Unit) {
+fun TrialIntroStep(trialDays: Int, onContinue: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -35,22 +32,8 @@ fun TrialIntroStep(onContinue: () -> Unit) {
     ) {
         Spacer(Modifier.weight(1f))
 
-        // Title: "We want you to" + "track your sprints for free"
         Text(
-            "We want you to",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Medium,
-            color = TextPrimary,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            buildAnnotatedString {
-                append("track your sprints for ")
-                withStyle(SpanStyle(color = AccentBlue)) {
-                    append("free")
-                }
-            },
+            stringResource(R.string.onboarding_trial_title),
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = TextPrimary,
@@ -65,15 +48,15 @@ fun TrialIntroStep(onContinue: () -> Unit) {
         ) {
             TrialBullet(
                 icon = Icons.Outlined.LockOpen,
-                text = "Full access for 7 days"
+                text = stringResource(R.string.onboarding_trial_access_days, trialDays)
             )
             TrialBullet(
                 icon = Icons.Outlined.Notifications,
-                text = "We'll remind you before it ends"
+                text = stringResource(R.string.onboarding_trial_benefit2_title)
             )
             TrialBullet(
                 icon = Icons.Outlined.Cancel,
-                text = "Cancel anytime, no questions asked"
+                text = stringResource(R.string.onboarding_trial_benefit3_title)
             )
         }
 

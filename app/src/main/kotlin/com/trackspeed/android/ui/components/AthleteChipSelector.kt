@@ -21,10 +21,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import com.trackspeed.android.ui.theme.AccentNavy
 import com.trackspeed.android.ui.theme.BorderSubtle
 import com.trackspeed.android.ui.theme.SurfaceDark
 import com.trackspeed.android.ui.theme.TextSecondary
+import com.trackspeed.android.R
 
 /**
  * Data class representing an athlete for chip display.
@@ -69,7 +71,7 @@ fun AthleteChipSelector(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "ATHLETE",
+                text = stringResource(R.string.athlete_chip_header),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.5.sp,
@@ -89,12 +91,12 @@ fun AthleteChipSelector(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Add,
-                        contentDescription = "Add athlete",
+                        contentDescription = stringResource(R.string.athlete_chip_add_cd),
                         tint = AccentNavy,
                         modifier = Modifier.size(12.dp)
                     )
                     Text(
-                        text = "Add",
+                        text = stringResource(R.string.athlete_chip_add),
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                         color = AccentNavy
                     )

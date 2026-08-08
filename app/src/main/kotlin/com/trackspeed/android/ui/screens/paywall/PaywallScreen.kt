@@ -3,8 +3,6 @@ package com.trackspeed.android.ui.screens.paywall
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,7 +17,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -46,9 +48,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -62,15 +66,25 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.R
-import com.trackspeed.android.billing.ProFeature
+import com.trackspeed.android.billing.PromoCodeType
 import com.trackspeed.android.ui.theme.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.text.NumberFormat
+import java.util.Currency
 
 private val SuccessGreen = Color(0xFF30D158)
 private val ErrorRed = Color(0xFFFF5252)
+private val PaywallHeroBlue = Color(0xFF087BFF)
+private val PaywallPageBackground = Color(0xFFF8F9FC)
+private val PaywallCardBorder = Color.Black.copy(alpha = 0.10f)
+private val PaywallTextDark = Color(0xFF090B10)
+private val PaywallTextSecondary = Color.Black.copy(alpha = 0.64f)
+private val PaywallStarGold = Color(0xFFF5C542)
 
 private const val PRIVACY_URL = "https://mytrackspeed.com/privacy"
 private const val TERMS_URL = "https://mytrackspeed.com/terms"
@@ -78,6 +92,8 @@ private const val TERMS_URL = "https://mytrackspeed.com/terms"
 @Composable
 fun PaywallScreen(
     onClose: () -> Unit,
+    preferDiscountPackage: Boolean = false,
+    showPromoSheetOnLaunch: Boolean = false,
     viewModel: PaywallViewModel = hiltViewModel()
 ) {
     val selectedPlan by viewModel.selectedPlan.collectAsStateWithLifecycle()
@@ -86,9 +102,31 @@ fun PaywallScreen(
     val offeringsError by viewModel.offeringsError.collectAsStateWithLifecycle()
     val isProUser by viewModel.isProUser.collectAsStateWithLifecycle()
     val promoSheetState by viewModel.promoSheetState.collectAsStateWithLifecycle()
+    val effectivePreferDiscountPackage by viewModel.preferDiscountPackage.collectAsStateWithLifecycle()
 
     val activity = LocalContext.current as? Activity
+    val coroutineScope = rememberCoroutineScope()
 
+    LaunchedEffect(preferDiscountPackage) {
+        viewModel.setAnalyticsSource(
+            if (preferDiscountPackage) PaywallViewModel.SOURCE_DISCOUNT else PaywallViewModel.SOURCE_PAYWALL
+        )
+    }
+    LaunchedEffect(showPromoSheetOnLaunch) {
+        if (showPromoSheetOnLaunch) viewModel.showPromoSheet()
+    }
+    LaunchedEffect(preferDiscountPackage, isLoadingOfferings) {
+        if (!preferDiscountPackage) {
+            viewModel.setPreferDiscountPackage(false)
+        } else if (!isLoadingOfferings) {
+            viewModel.preparePostOnboardingDiscountPaywall()
+        }
+    }
+    LaunchedEffect(isLoadingOfferings, effectivePreferDiscountPackage) {
+        if (!isLoadingOfferings) {
+            viewModel.trackPaywallViewedIfNeeded()
+        }
+    }
     LaunchedEffect(purchaseState) {
         if (purchaseState is PurchaseState.Success) {
             onClose()
@@ -100,22 +138,29 @@ fun PaywallScreen(
         }
     }
 
-    val monthlyPlan = viewModel.getMonthlyPlan()
+    val weeklyPlan = viewModel.getWeeklyPlan()
     val yearlyPlan = viewModel.getYearlyPlan()
+    val handleManualClose: () -> Unit = {
+        coroutineScope.launch {
+            viewModel.handleCloseTapped()
+            onClose()
+        }
+    }
 
-    PaywallContent(
+    TrackSpeedProPaywallContent(
         selectedPlan = selectedPlan,
         purchaseState = purchaseState,
         isLoadingOfferings = isLoadingOfferings,
         offeringsError = offeringsError,
-        monthlyPlan = monthlyPlan,
+        weeklyPlan = weeklyPlan,
         yearlyPlan = yearlyPlan,
-        onClose = onClose,
+        onClose = handleManualClose,
         onSelectPlan = { viewModel.selectPlan(it) },
         onPurchase = { activity?.let { viewModel.purchase(it) } },
         onRestore = { viewModel.restorePurchases() },
         onRetry = { viewModel.loadOfferings() },
         onClearError = { viewModel.clearError() },
+        closeRevealDelayMillis = 2_000L,
         promoSheetState = promoSheetState,
         onShowPromoSheet = { viewModel.showPromoSheet() },
         onHidePromoSheet = { viewModel.hidePromoSheet() },
@@ -126,12 +171,12 @@ fun PaywallScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PaywallContent(
+fun TrackSpeedProPaywallContent(
     selectedPlan: PlanType,
     purchaseState: PurchaseState,
     isLoadingOfferings: Boolean,
     offeringsError: String?,
-    monthlyPlan: PlanInfo,
+    weeklyPlan: PlanInfo,
     yearlyPlan: PlanInfo,
     onClose: () -> Unit,
     onSelectPlan: (PlanType) -> Unit,
@@ -143,272 +188,95 @@ private fun PaywallContent(
     onShowPromoSheet: () -> Unit = {},
     onHidePromoSheet: () -> Unit = {},
     onPromoCodeChanged: (String) -> Unit = {},
-    onRedeemPromoCode: () -> Unit = {}
+    onRedeemPromoCode: () -> Unit = {},
+    closeRevealDelayMillis: Long = 2_000L
 ) {
-    val context = LocalContext.current
-    var showCloseButton by remember { mutableStateOf(false) }
-    var showAllPlansSheet by remember { mutableStateOf(false) }
-    // Show close button after 2-second delay
+    var isCloseProminent by remember { mutableStateOf(false) }
+    var expandedTestimonial by remember { mutableStateOf<PaywallTestimonial?>(null) }
+
     LaunchedEffect(Unit) {
-        delay(2000)
-        showCloseButton = true
+        delay(closeRevealDelayMillis)
+        isCloseProminent = true
+    }
+
+    val selectedPlanInfo = when (selectedPlan) {
+        PlanType.YEARLY -> yearlyPlan
+        PlanType.WEEKLY -> weeklyPlan
+        PlanType.MONTHLY -> weeklyPlan
+    }
+    val hasSelectedPackage = selectedPlanInfo.rcPackage != null
+    val primaryButtonText = when {
+        !hasSelectedPackage && !isLoadingOfferings -> stringResource(R.string.paywall_load_pricing)
+        !hasSelectedPackage -> stringResource(R.string.paywall_loading)
+        selectedPlan == PlanType.YEARLY && yearlyPlan.freeTrialDays != null ->
+            stringResource(R.string.paywall_try_for_free)
+        else -> stringResource(R.string.common_continue)
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .gradientBackground()
+            .background(PaywallPageBackground)
     ) {
-        // Scrollable content
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 200.dp) // space for fixed bottom section
+                .padding(bottom = 240.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Hero image with gradient overlay
-            Box(
+            PaywallHeroSection()
+
+            PaywallSocialProofSection(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(340.dp)
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.paywall_hero),
-                    contentDescription = "TrackSpeed Pro",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-
-                // Gradient overlay fading into background
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Transparent,
-                                    BackgroundGradientTop.copy(alpha = 0.8f),
-                                    BackgroundGradientTop
-                                )
-                            )
-                        )
-                )
-
-                // Close button (top-right, appears after 2s)
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = showCloseButton,
-                    enter = fadeIn(),
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 48.dp, end = 16.dp)
-                ) {
-                    IconButton(
-                        onClick = onClose,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(BackgroundDark.copy(alpha = 0.4f))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-
-                // Title at bottom of hero
-                Text(
-                    text = "TrackSpeed Pro",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 32.sp
-                    ),
-                    color = TextPrimary,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 24.dp)
-                )
-            }
-
-            // Legal links below title
-            LegalLinksSection(
-                onRestore = onRestore,
-                onHaveCode = onShowPromoSheet,
-                modifier = Modifier.padding(top = 8.dp)
+                    .padding(horizontal = 24.dp),
+                onTestimonialClick = { expandedTestimonial = it }
             )
-
-            // Features section
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 40.dp)
-            ) {
-                ProFeature.entries.forEach { feature ->
-                    FeatureRow(
-                        title = feature.displayName,
-                        description = feature.description
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            }
         }
 
-        // Fixed bottom section
-        Column(
+        IconButton(
+            onClick = onClose,
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 10.dp, end = 16.dp)
+                .size(44.dp)
+                .alpha(if (isCloseProminent) 1f else 0.35f)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.42f))
         ) {
-            // Gradient fade above fixed section
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(32.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, BackgroundGradientBottom)
-                        )
-                    )
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = stringResource(R.string.paywall_close_cd),
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
             )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundGradientBottom)
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Error message
-                if (purchaseState is PurchaseState.Error) {
-                    Text(
-                        text = (purchaseState as PurchaseState.Error).message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ErrorRed,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onClearError() }
-                            .padding(bottom = 8.dp)
-                    )
-                }
-
-                // No commitment badge
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = SuccessGreen,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "No commitment, cancel anytime",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextPrimary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Get Started button (yearly, with chevron)
-                Button(
-                    onClick = {
-                        onSelectPlan(PlanType.YEARLY)
-                        onPurchase()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AccentBlue,
-                        contentColor = Color.White,
-                        disabledContainerColor = AccentBlue.copy(alpha = 0.4f)
-                    ),
-                    shape = RoundedCornerShape(28.dp),
-                    enabled = purchaseState !is PurchaseState.Loading && !isLoadingOfferings
-                ) {
-                    if (purchaseState is PurchaseState.Loading) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.5.dp
-                        )
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text(
-                                text = "Get Started",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp
-                                )
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text(
-                                text = "\u203A", // right angle bracket
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 20.sp
-                                ),
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Billing info
-                Text(
-                    text = "billed ${yearlyPlan.priceDisplay} per year",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // See all plans link
-                Text(
-                    text = "See all plans",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                    modifier = Modifier.clickable { showAllPlansSheet = true }
-                )
-            }
         }
-    }
 
-    // All Plans bottom sheet
-    if (showAllPlansSheet) {
-        AllPlansSheet(
-            monthlyPlan = monthlyPlan,
-            yearlyPlan = yearlyPlan,
+        StickyPurchasePanel(
+            modifier = Modifier.align(Alignment.BottomCenter),
             selectedPlan = selectedPlan,
+            weeklyPlan = weeklyPlan,
+            yearlyPlan = yearlyPlan,
             purchaseState = purchaseState,
+            isLoadingOfferings = isLoadingOfferings,
+            offeringsError = offeringsError,
+            primaryButtonText = primaryButtonText,
+            billingSummary = selectedPlanInfo.billingSummary(),
             onSelectPlan = onSelectPlan,
-            onPurchase = {
-                showAllPlansSheet = false
-                onPurchase()
+            onPrimaryAction = {
+                if (hasSelectedPackage) {
+                    onPurchase()
+                } else {
+                    onRetry()
+                }
             },
-            onDismiss = { showAllPlansSheet = false },
+            onClearError = onClearError,
+            onShowPromoSheet = onShowPromoSheet,
             onRestore = onRestore
         )
     }
 
-    // Promo code bottom sheet
     if (promoSheetState is PromoSheetState.Visible) {
         PromoCodeSheet(
             state = promoSheetState as PromoSheetState.Visible,
@@ -417,88 +285,760 @@ private fun PaywallContent(
             onRedeem = onRedeemPromoCode
         )
     }
-}
 
-@Composable
-private fun LegalLinksSection(
-    onRestore: () -> Unit,
-    onHaveCode: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Privacy",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
-            modifier = Modifier.clickable {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL)))
-            }
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = "Restore",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
-            modifier = Modifier.clickable { onRestore() }
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = "Have a code?",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
-            modifier = Modifier.clickable { onHaveCode() }
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = "Terms",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
-            modifier = Modifier.clickable {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TERMS_URL)))
-            }
-        )
+    expandedTestimonial?.let { testimonial ->
+        ModalBottomSheet(
+            onDismissRequest = { expandedTestimonial = null },
+            containerColor = PaywallPageBackground,
+            dragHandle = null
+        ) {
+            TestimonialDetailSheet(testimonial)
+        }
     }
 }
 
+private data class PaywallTestimonial(
+    val initials: String,
+    val photoResId: Int? = null,
+    val name: String,
+    val age: String,
+    val role: String,
+    val previewQuote: String,
+    val quote: String
+)
+
+private val paywallTestimonials = listOf(
+    PaywallTestimonial(
+        initials = "SG",
+        photoResId = R.drawable.sondre_profile,
+        name = "Sondre Guttormsen",
+        age = "Olympian",
+        role = "Olympic Pole Vaulter",
+        previewQuote = "I use TrackSpeed to dial in my run-up before competitions. The accuracy is impressive.",
+        quote = "I use TrackSpeed to dial in my run-up before competitions. The accuracy is impressive and I always know exactly what speed I'm hitting at takeoff."
+    ),
+    PaywallTestimonial(
+        initials = "ER",
+        name = "Ethan R.",
+        age = "Sprinter",
+        role = "Track Athlete",
+        previewQuote = "Timing gates were too expensive. This was a better choice.",
+        quote = "I always wanted timing gates, but they were so expensive. This was a much better choice."
+    ),
+    PaywallTestimonial(
+        initials = "ML",
+        name = "Marcus L.",
+        age = "Jumper",
+        role = "Horizontal Jumps",
+        previewQuote = "Laser system comparison was accurate. Got it right every time.",
+        quote = "Compared against a laser system and it was very accurate. Got it right every time."
+    ),
+    PaywallTestimonial(
+        initials = "AV",
+        name = "Ava V.",
+        age = "Sprinter",
+        role = "Sprinter",
+        previewQuote = "Photo finish review makes the timing feel trustworthy.",
+        quote = "The photo finish review makes the timing feel trustworthy."
+    ),
+    PaywallTestimonial(
+        initials = "JL",
+        name = "Jonas L.",
+        age = "Coach",
+        role = "Coach",
+        previewQuote = "Phones and tripods beat hauling timing hardware.",
+        quote = "Two phones and tripods are easier than hauling timing hardware."
+    )
+)
+
 @Composable
-private fun FeatureRow(
-    title: String,
-    description: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+private fun PaywallHeroSection() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(300.dp)
     ) {
-        Icon(
-            imageVector = Icons.Default.CheckCircle,
-            contentDescription = null,
-            tint = AccentBlue,
-            modifier = Modifier.size(28.dp)
+        Image(
+            painter = painterResource(R.drawable.paywall_hero),
+            contentDescription = stringResource(R.string.settings_trackspeed_pro),
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
 
-        Spacer(modifier = Modifier.width(14.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.78f),
+                            Color.Black.copy(alpha = 0.24f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
 
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(horizontal = 24.dp)
+                .padding(top = 86.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy((-2).dp)) {
+                Text(
+                    text = stringResource(R.string.paywall_hero_professional),
+                    color = Color.White,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Black,
+                    lineHeight = 31.sp
+                )
+                Text(
+                    text = stringResource(R.string.paywall_hero_timing_in),
+                    color = Color.White,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Black,
+                    lineHeight = 31.sp
+                )
+                Text(
+                    text = stringResource(R.string.paywall_hero_your_pocket),
+                    color = PaywallHeroBlue,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Black,
+                    lineHeight = 31.sp
+                )
+            }
+
             Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = TextPrimary
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
+                text = stringResource(R.string.paywall_hero_subtitle),
+                color = Color.White.copy(alpha = 0.86f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = 18.sp,
+                modifier = Modifier.width(190.dp)
             )
         }
     }
+}
+
+@Composable
+private fun PaywallSocialProofSection(
+    modifier: Modifier = Modifier,
+    onTestimonialClick: (PaywallTestimonial) -> Unit
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        TrustedByOlympiansCard()
+
+        paywallTestimonials.forEach { testimonial ->
+            TestimonialCard(
+                testimonial = testimonial,
+                onClick = { onTestimonialClick(testimonial) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrustedByOlympiansCard() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        color = Color.White,
+        shadowElevation = 7.dp,
+        border = BorderStroke(1.dp, PaywallCardBorder)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.paywall_trusted_by_olympians),
+                color = PaywallTextDark,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                AvatarStack()
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        repeat(5) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = PaywallStarGold,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = stringResource(R.string.paywall_social_proof),
+                        color = Color.Black.copy(alpha = 0.68f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 17.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AvatarStack() {
+    Box(
+        modifier = Modifier
+            .width(122.dp)
+            .height(48.dp)
+    ) {
+        paywallTestimonials.take(4).forEachIndexed { index, testimonial ->
+            TestimonialAvatar(
+                testimonial = testimonial,
+                size = 44,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = (index * 26).dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TestimonialCard(
+    testimonial: PaywallTestimonial,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(26.dp),
+        color = Color.White,
+        shadowElevation = 7.dp,
+        border = BorderStroke(1.dp, PaywallCardBorder)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TestimonialAvatar(testimonial = testimonial, size = 46)
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = testimonial.name,
+                        color = PaywallTextDark,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = testimonial.role,
+                        color = Color.Black.copy(alpha = 0.58f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    repeat(5) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = PaywallStarGold,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "\"${testimonial.previewQuote}\"",
+                color = Color.Black.copy(alpha = 0.86f),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = 23.sp,
+                maxLines = 4
+            )
+
+            Text(
+                text = stringResource(R.string.paywall_tap_to_read_more),
+                color = PaywallHeroBlue,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun TestimonialAvatar(
+    testimonial: PaywallTestimonial,
+    size: Int,
+    modifier: Modifier = Modifier
+) {
+    val avatarModifier = modifier
+        .size(size.dp)
+        .clip(CircleShape)
+        .border(3.dp, Color.White, CircleShape)
+
+    if (testimonial.photoResId != null) {
+        Image(
+            painter = painterResource(testimonial.photoResId),
+            contentDescription = testimonial.name,
+            modifier = avatarModifier,
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(
+            modifier = avatarModifier.background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        PaywallHeroBlue.copy(alpha = 0.36f),
+                        Color(0xFF0E1A2A)
+                    )
+                )
+            ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = testimonial.initials,
+                color = Color.White,
+                fontSize = (size * 0.43f).sp,
+                fontWeight = FontWeight.Black
+            )
+        }
+    }
+}
+
+@Composable
+private fun StickyPurchasePanel(
+    modifier: Modifier,
+    selectedPlan: PlanType,
+    weeklyPlan: PlanInfo,
+    yearlyPlan: PlanInfo,
+    purchaseState: PurchaseState,
+    isLoadingOfferings: Boolean,
+    offeringsError: String?,
+    primaryButtonText: String,
+    billingSummary: String,
+    onSelectPlan: (PlanType) -> Unit,
+    onPrimaryAction: () -> Unit,
+    onClearError: () -> Unit,
+    onShowPromoSheet: () -> Unit,
+    onRestore: () -> Unit
+) {
+    val context = LocalContext.current
+    val selectedPlanInfo = when (selectedPlan) {
+        PlanType.YEARLY -> yearlyPlan
+        PlanType.WEEKLY -> weeklyPlan
+        PlanType.MONTHLY -> weeklyPlan
+    }
+    val canTapPrimary = purchaseState !is PurchaseState.Loading &&
+        (selectedPlanInfo.rcPackage != null || !isLoadingOfferings)
+
+    Column(
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(28.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.White)
+                    )
+                )
+        )
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.White,
+            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+            shadowElevation = 14.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 18.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                PlanChoiceCard(
+                    title = stringResource(R.string.paywall_yearly_plan),
+                    detail = yearlyPlan.yearlyDetailText(offeringsError, isLoadingOfferings),
+                    subtitle = yearlyPlan.yearlySubtitleText(offeringsError, isLoadingOfferings),
+                    trailingPrice = yearlyPlan.yearlyTrailingPrice(offeringsError, isLoadingOfferings),
+                    isMostPopular = true,
+                    isSelected = selectedPlan == PlanType.YEARLY,
+                    onClick = { onSelectPlan(PlanType.YEARLY) }
+                )
+
+                PlanChoiceCard(
+                    title = stringResource(R.string.paywall_weekly),
+                    detail = null,
+                    subtitle = weeklyPlan.weeklySubtitleText(offeringsError, isLoadingOfferings),
+                    trailingPrice = weeklyPlan.weeklyTrailingPrice(offeringsError, isLoadingOfferings),
+                    isMostPopular = false,
+                    isSelected = selectedPlan == PlanType.WEEKLY,
+                    onClick = { onSelectPlan(PlanType.WEEKLY) }
+                )
+
+                if (purchaseState is PurchaseState.Error) {
+                    Text(
+                        text = purchaseState.message,
+                        color = ErrorRed,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onClearError() }
+                    )
+                } else if (offeringsError != null) {
+                    Text(
+                        text = offeringsError,
+                        color = ErrorRed,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Button(
+                    onClick = onPrimaryAction,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PaywallHeroBlue,
+                        contentColor = Color.White,
+                        disabledContainerColor = PaywallHeroBlue.copy(alpha = 0.38f),
+                        disabledContentColor = Color.White.copy(alpha = 0.72f)
+                    ),
+                    shape = RoundedCornerShape(24.dp),
+                    enabled = canTapPrimary
+                ) {
+                    if (purchaseState is PurchaseState.Loading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.5.dp
+                        )
+                    } else {
+                        Text(
+                            text = primaryButtonText,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.height(16.dp)
+                ) {
+                    Text(
+                        text = billingSummary,
+                        color = Color.Black.copy(alpha = 0.56f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "\u2022",
+                        color = Color.Black.copy(alpha = 0.56f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = stringResource(R.string.paywall_cancel_anytime),
+                        color = Color.Black.copy(alpha = 0.56f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PaywallLegalLink("Have a code?", onClick = onShowPromoSheet)
+                    PaywallLegalLink("Restore", onClick = onRestore)
+                    PaywallLegalLink("Terms") {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TERMS_URL)))
+                    }
+                    PaywallLegalLink("Privacy") {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanChoiceCard(
+    title: String,
+    detail: String?,
+    subtitle: String?,
+    trailingPrice: String,
+    isMostPopular: Boolean,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(68.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White)
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) PaywallHeroBlue else PaywallCardBorder,
+                shape = RoundedCornerShape(18.dp)
+            )
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp)
+                .padding(top = if (isMostPopular) 5.dp else 0.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = PaywallTextDark,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 1
+                )
+                if (detail != null) {
+                    Text(
+                        text = detail,
+                        color = PaywallTextSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        color = if (title == "Yearly Plan") PaywallHeroBlue else PaywallTextSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            Text(
+                text = trailingPrice,
+                color = PaywallTextDark,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1
+            )
+        }
+
+        if (isMostPopular) {
+            Text(
+                text = stringResource(R.string.paywall_most_popular),
+                color = Color.White,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 68.dp)
+                    .background(PaywallHeroBlue, RoundedCornerShape(4.dp))
+                    .padding(horizontal = 7.dp, vertical = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun PaywallLegalLink(
+    text: String,
+    onClick: () -> Unit
+) {
+    Text(
+        text = text,
+        color = Color.Black.copy(alpha = 0.56f),
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.clickable { onClick() }
+    )
+}
+
+@Composable
+private fun TestimonialDetailSheet(testimonial: PaywallTestimonial) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+            .padding(bottom = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        TestimonialAvatar(testimonial = testimonial, size = 58)
+
+        Text(
+            text = "\"${testimonial.quote}\"",
+            color = Color.Black.copy(alpha = 0.88f),
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 24.sp,
+            textAlign = TextAlign.Center
+        )
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = testimonial.name,
+                color = PaywallTextDark,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Black
+            )
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(16.dp)
+                    .background(Color.Black.copy(alpha = 0.18f))
+            )
+            Text(
+                text = testimonial.age,
+                color = PaywallTextDark,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Black
+            )
+        }
+
+        Text(
+            text = testimonial.role,
+            color = Color.Black.copy(alpha = 0.62f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun PlanInfo.yearlyDetailText(
+    offeringsError: String?,
+    isLoadingOfferings: Boolean
+): String? {
+    return when {
+        rcPackage != null -> stringResource(R.string.paywall_price_per_year, priceDisplay)
+        isLoadingOfferings -> null
+        offeringsError != null -> null
+        else -> null
+    }
+}
+
+@Composable
+private fun PlanInfo.yearlySubtitleText(
+    offeringsError: String?,
+    isLoadingOfferings: Boolean
+): String {
+    return when {
+        rcPackage != null && freeTrialDays != null -> stringResource(
+            R.string.paywall_free_trial_days,
+            freeTrialDays
+        )
+        rcPackage != null -> stringResource(R.string.paywall_billed_annually)
+        isLoadingOfferings -> stringResource(R.string.paywall_pricing_loading)
+        offeringsError != null -> stringResource(R.string.paywall_price_unavailable)
+        else -> stringResource(R.string.paywall_price_unavailable)
+    }
+}
+
+@Composable
+private fun PlanInfo.yearlyTrailingPrice(
+    offeringsError: String?,
+    isLoadingOfferings: Boolean
+): String {
+    return when {
+        rcPackage != null -> yearlyWeeklyPriceDisplay()
+        isLoadingOfferings -> stringResource(R.string.paywall_loading)
+        offeringsError != null -> stringResource(R.string.paywall_retry)
+        else -> stringResource(R.string.paywall_retry)
+    }
+}
+
+@Composable
+private fun PlanInfo.weeklySubtitleText(
+    offeringsError: String?,
+    isLoadingOfferings: Boolean
+): String? {
+    return when {
+        rcPackage != null -> null
+        isLoadingOfferings -> stringResource(R.string.paywall_pricing_loading)
+        offeringsError != null -> stringResource(R.string.paywall_price_unavailable)
+        else -> stringResource(R.string.paywall_price_unavailable)
+    }
+}
+
+@Composable
+private fun PlanInfo.weeklyTrailingPrice(
+    offeringsError: String?,
+    isLoadingOfferings: Boolean
+): String {
+    return when {
+        rcPackage != null -> stringResource(R.string.paywall_price_per_week, priceDisplay)
+        isLoadingOfferings -> stringResource(R.string.paywall_loading)
+        offeringsError != null -> stringResource(R.string.paywall_retry)
+        else -> stringResource(R.string.paywall_retry)
+    }
+}
+
+@Composable
+private fun PlanInfo.billingSummary(): String {
+    val period = when (type) {
+        PlanType.YEARLY -> stringResource(R.string.paywall_period_year)
+        PlanType.WEEKLY -> stringResource(R.string.paywall_period_week)
+        PlanType.MONTHLY -> stringResource(R.string.paywall_period_month)
+    }
+    return stringResource(R.string.paywall_billed_summary, priceDisplay, period)
+}
+
+private fun PlanInfo.yearlyWeeklyPriceDisplay(): String {
+    val price = rcPackage?.product?.price ?: return "\$0.96/week"
+    val weekly = price.amountMicros / 52.0 / 1_000_000.0
+    val formatter = NumberFormat.getCurrencyInstance().apply {
+        currency = Currency.getInstance(price.currencyCode)
+    }
+    return "${formatter.format(weekly)}/week"
 }
 
 // ---------- All Plans Bottom Sheet ----------
@@ -544,7 +1084,7 @@ private fun AllPlansSheet(
 
             // Header
             Text(
-                text = "TrackSpeed Pro",
+                text = stringResource(R.string.settings_trackspeed_pro),
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
@@ -552,7 +1092,7 @@ private fun AllPlansSheet(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Not ready to commit for a year?\nWe have plans for everyone.",
+                text = stringResource(R.string.paywall_other_plans_title),
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
                 textAlign = TextAlign.Center
@@ -562,8 +1102,11 @@ private fun AllPlansSheet(
 
             // Yearly plan card
             AllPlansPlanCard(
-                title = "Yearly",
-                subtitle = "billed ${yearlyPlan.priceDisplay} per year",
+                title = stringResource(R.string.paywall_yearly),
+                subtitle = stringResource(
+                    R.string.paywall_billed_per_year,
+                    yearlyPlan.priceDisplay
+                ),
                 trailingPrice = yearlyPlan.monthlyEquivalent ?: yearlyPlan.priceDisplay,
                 trailingLabel = "per month",
                 isSelected = selectedPlan == PlanType.YEARLY,
@@ -574,7 +1117,7 @@ private fun AllPlansSheet(
 
             // Monthly plan card
             AllPlansPlanCard(
-                title = "Monthly",
+                title = stringResource(R.string.paywall_monthly),
                 subtitle = null,
                 trailingPrice = monthlyPlan.priceDisplay,
                 trailingLabel = "per month",
@@ -597,7 +1140,7 @@ private fun AllPlansSheet(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "No commitment, cancel anytime",
+                    text = stringResource(R.string.paywall_no_commitment),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
@@ -627,7 +1170,7 @@ private fun AllPlansSheet(
                     )
                 } else {
                     Text(
-                        text = "Get Started",
+                        text = stringResource(R.string.onboarding_welcome_get_started),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
@@ -640,7 +1183,7 @@ private fun AllPlansSheet(
 
             // Not now
             Text(
-                text = "Not now, thanks",
+                text = stringResource(R.string.paywall_not_now),
                 style = MaterialTheme.typography.bodySmall,
                 color = TextMuted,
                 modifier = Modifier.clickable { onDismiss() }
@@ -654,7 +1197,7 @@ private fun AllPlansSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Privacy",
+                    text = stringResource(R.string.paywall_privacy),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     modifier = Modifier.clickable {
@@ -663,14 +1206,14 @@ private fun AllPlansSheet(
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    text = "Restore",
+                    text = stringResource(R.string.paywall_restore),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     modifier = Modifier.clickable { onRestore() }
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    text = "Terms",
+                    text = stringResource(R.string.paywall_terms),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     modifier = Modifier.clickable {
@@ -712,7 +1255,7 @@ private fun AllPlansPlanCard(
         if (isSelected) {
             Icon(
                 imageVector = Icons.Default.CheckCircle,
-                contentDescription = "Selected",
+                contentDescription = stringResource(R.string.paywall_selected_cd),
                 tint = AccentBlue,
                 modifier = Modifier.size(24.dp)
             )
@@ -799,7 +1342,7 @@ private fun PromoCodeSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Enter Promo Code",
+                text = stringResource(R.string.paywall_enter_promo_code),
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold
                 ),
@@ -809,7 +1352,7 @@ private fun PromoCodeSheet(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Enter your promo or influencer code below",
+                text = stringResource(R.string.paywall_enter_promo_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
                 textAlign = TextAlign.Center
@@ -820,7 +1363,9 @@ private fun PromoCodeSheet(
             OutlinedTextField(
                 value = state.code,
                 onValueChange = { onCodeChanged(it.uppercase()) },
-                placeholder = { Text("PROMO CODE", color = TextMuted) },
+                placeholder = {
+                    Text(stringResource(R.string.paywall_promo_placeholder), color = TextMuted)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextPrimary,
@@ -864,7 +1409,11 @@ private fun PromoCodeSheet(
                             color = AccentBlue,
                             strokeWidth = 2.dp
                         )
-                        Text("Verifying code...", fontSize = 14.sp, color = TextSecondary)
+                        Text(
+                            stringResource(R.string.paywall_verifying_code),
+                            fontSize = 14.sp,
+                            color = TextSecondary
+                        )
                     }
                 }
                 state.result != null -> {
@@ -879,10 +1428,12 @@ private fun PromoCodeSheet(
                             tint = SuccessGreen
                         )
                         Text(
-                            text = if (state.result.type == "free") {
-                                "Pro Activated!"
-                            } else {
-                                "30-day trial unlocked! Tap Get Started"
+                            text = when (state.result.type) {
+                                PromoCodeType.FREE -> stringResource(R.string.paywall_pro_activated)
+                                PromoCodeType.TRIAL -> stringResource(R.string.paywall_offer_code_accepted)
+                                PromoCodeType.DISCOUNT -> stringResource(
+                                    R.string.paywall_discount_unlocked_loading
+                                )
                             },
                             fontSize = 14.sp,
                             color = SuccessGreen,
@@ -933,7 +1484,7 @@ private fun PromoCodeSheet(
                     )
                 } else {
                     Text(
-                        text = "Apply Code",
+                        text = stringResource(R.string.paywall_apply_code),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold
                         )
@@ -944,7 +1495,7 @@ private fun PromoCodeSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Cancel",
+                text = stringResource(R.string.common_cancel),
                 style = MaterialTheme.typography.bodySmall,
                 color = TextMuted,
                 modifier = Modifier.clickable { onDismiss() }
@@ -959,22 +1510,22 @@ private fun PromoCodeSheet(
 @Composable
 private fun PaywallScreenPreview() {
     TrackSpeedTheme() {
-        PaywallContent(
+        TrackSpeedProPaywallContent(
             selectedPlan = PlanType.YEARLY,
             purchaseState = PurchaseState.Idle,
             isLoadingOfferings = false,
             offeringsError = null,
-            monthlyPlan = PlanInfo(
-                type = PlanType.MONTHLY,
-                priceDisplay = "$8.99",
-                periodDisplay = "month"
+            weeklyPlan = PlanInfo(
+                type = PlanType.WEEKLY,
+                priceDisplay = "$7.99",
+                periodDisplay = "week"
             ),
             yearlyPlan = PlanInfo(
                 type = PlanType.YEARLY,
-                priceDisplay = "$49.99",
+                priceDisplay = "$59.99",
                 periodDisplay = "year",
-                monthlyEquivalent = "$4.17",
-                savingsPercent = 54
+                monthlyEquivalent = "$5.00",
+                savingsPercent = 86
             ),
             onClose = {},
             onSelectPlan = {},

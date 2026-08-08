@@ -136,7 +136,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
 
                 // Y label
                 val label = textMeasurer.measure(
-                    String.format("%.2fs", value),
+                    String.format(java.util.Locale.getDefault(), "%.2fs", value),
                     style = TextStyle(
                         color = labelColor,
                         fontSize = 10.sp

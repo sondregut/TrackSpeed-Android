@@ -7,10 +7,13 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.billing.SubscriptionManager
-import com.trackspeed.android.ui.util.formatDistance
+import com.trackspeed.android.cloud.AuthState
+import com.trackspeed.android.cloud.DeviceIdProvider
 import com.trackspeed.android.data.local.dao.AthleteDao
+import com.trackspeed.android.data.repository.AuthRepository
 import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.data.repository.SettingsRepository
+import com.trackspeed.android.ui.util.formatDistance
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -47,8 +50,10 @@ data class ProfileUiState(
     val isProUser: Boolean = false,
     val athleteCount: Int = 0,
     val isSignedIn: Boolean = false,
+    val userEmail: String? = null,
     val showDeleteConfirmation: Boolean = false,
-    val showSignOutConfirmation: Boolean = false
+    val showSignOutConfirmation: Boolean = false,
+    val accountActionError: String? = null
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -58,11 +63,14 @@ class ProfileViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val subscriptionManager: SubscriptionManager,
     private val athleteDao: AthleteDao,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val authRepository: AuthRepository,
+    private val deviceIdProvider: DeviceIdProvider
 ) : ViewModel() {
 
     private val _showDeleteConfirmation = MutableStateFlow(false)
     private val _showSignOutConfirmation = MutableStateFlow(false)
+    private val _accountActionError = MutableStateFlow<String?>(null)
 
     private val athleteCount: StateFlow<Int> =
         athleteDao.getAthleteCount()
@@ -157,24 +165,31 @@ class ProfileViewModel @Inject constructor(
                 userName,
                 avatarPhotoPath,
                 _showDeleteConfirmation,
-                _showSignOutConfirmation
+                _showSignOutConfirmation,
+                _accountActionError,
+                authRepository.authState
             ) { values ->
-                Triple(
-                    values[0] as Int,
-                    Pair(values[1] as String, values[2] as String?),
-                    Pair(values[3] as Boolean, values[4] as Boolean)
+                ProfileAccountExtra(
+                    athleteCount = values[0] as Int,
+                    userName = values[1] as String,
+                    avatarPhotoPath = values[2] as String?,
+                    showDeleteConfirmation = values[3] as Boolean,
+                    showSignOutConfirmation = values[4] as Boolean,
+                    accountActionError = values[5] as String?,
+                    authState = values[6] as AuthState
                 )
             }
         ) { state, extra ->
-            val (count, namePair, dialogPair) = extra
+            val authenticated = extra.authState as? AuthState.Authenticated
             state.copy(
-                athleteCount = count,
-                userName = namePair.first,
-                avatarPhotoPath = namePair.second,
-                showDeleteConfirmation = dialogPair.first,
-                showSignOutConfirmation = dialogPair.second,
-                // Auth state: no Supabase Auth module installed yet, so default to guest
-                isSignedIn = false
+                athleteCount = extra.athleteCount,
+                userName = extra.userName,
+                avatarPhotoPath = extra.avatarPhotoPath,
+                showDeleteConfirmation = extra.showDeleteConfirmation,
+                showSignOutConfirmation = extra.showSignOutConfirmation,
+                accountActionError = extra.accountActionError,
+                isSignedIn = authenticated != null && !authenticated.isAnonymous,
+                userEmail = authenticated?.takeUnless { it.isAnonymous }?.email
             )
         }.stateIn(
             scope = viewModelScope,
@@ -238,12 +253,28 @@ class ProfileViewModel @Inject constructor(
 
     fun confirmSignOut() {
         _showSignOutConfirmation.value = false
-        // No-op: Supabase Auth module not installed yet
+        viewModelScope.launch {
+            runCatching {
+                authRepository.signOut()
+            }.onFailure {
+                _accountActionError.value = "Unable to sign out. Please try again."
+            }
+        }
     }
 
     fun confirmDeleteAccount() {
         _showDeleteConfirmation.value = false
-        // No-op: Supabase Auth module not installed yet
+        viewModelScope.launch {
+            runCatching {
+                authRepository.deleteAccount(deviceIdProvider.deviceId)
+            }.onFailure {
+                _accountActionError.value = "Unable to delete account. Please try again."
+            }
+        }
+    }
+
+    fun dismissAccountActionError() {
+        _accountActionError.value = null
     }
 
     /**
@@ -301,3 +332,13 @@ class ProfileViewModel @Inject constructor(
         return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
     }
 }
+
+private data class ProfileAccountExtra(
+    val athleteCount: Int,
+    val userName: String,
+    val avatarPhotoPath: String?,
+    val showDeleteConfirmation: Boolean,
+    val showSignOutConfirmation: Boolean,
+    val accountActionError: String?,
+    val authState: AuthState
+)

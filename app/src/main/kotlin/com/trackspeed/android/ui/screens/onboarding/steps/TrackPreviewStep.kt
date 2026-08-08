@@ -124,9 +124,9 @@ private fun LinearTrackIllustration(runnerProgress: Float) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                GateLabel(text = "START", color = GreenMarker)
-                GateLabel(text = "LAP", color = AccentBlue)
-                GateLabel(text = "FINISH", color = RedMarker)
+                GateLabel(text = stringResource(R.string.onboarding_preview_start_text), color = GreenMarker)
+                GateLabel(text = stringResource(R.string.onboarding_multidevice_lap), color = AccentBlue)
+                GateLabel(text = stringResource(R.string.onboarding_preview_finish_text), color = RedMarker)
             }
 
             Spacer(Modifier.height(8.dp))

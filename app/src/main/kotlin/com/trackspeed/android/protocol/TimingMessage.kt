@@ -9,7 +9,7 @@ import kotlinx.serialization.json.*
 // Protocol version – must match iOS kTimingProtocolVersion
 // ---------------------------------------------------------------------------
 
-const val TIMING_PROTOCOL_VERSION: Int = 3
+const val TIMING_PROTOCOL_VERSION: Int = 7
 
 // ---------------------------------------------------------------------------
 // TimingRole – mirrors iOS TimingRole enum (raw‐value String Codable)
@@ -72,8 +72,9 @@ data class TimingSessionConfig(
     val startType: String,
     val numberOfGates: Int,
     val hostRole: TimingRole,
-    val fpsMode: Int = 240,
-    val protocolVersion: Int = TIMING_PROTOCOL_VERSION
+    val fpsMode: Int = 30,
+    val protocolVersion: Int = TIMING_PROTOCOL_VERSION,
+    val hostIsProUser: Boolean = false
 )
 
 // ---------------------------------------------------------------------------
@@ -455,6 +456,19 @@ sealed class TimingPayload {
         val thumbnailData: String
     ) : TimingPayload()
 
+    @Serializable
+    data class ThumbnailMetadata(
+        val eventId: String,
+        val gateId: String,
+        val role: TimingRole,
+        val gateIndex: Int,
+        val gatePosition: Float,
+        val velocityPxPerSec: Float,
+        val crossingDirection: String? = null,
+        val workWidth: Int? = null,
+        val thumbnailDebug: JsonElement? = null
+    ) : TimingPayload()
+
     // ── Event Reconciliation Messages ───────────────────────────────────
 
     @Serializable
@@ -475,6 +489,28 @@ sealed class TimingPayload {
     data class ConfigVersion(
         val version: Long,
         val configType: String
+    ) : TimingPayload()
+
+    // ── Per-Gate Calibration / Post-Hoc Adjustment Messages ─────────────
+
+    @Serializable
+    data class CalibrationUpdate(
+        val role: TimingRole,
+        val gatePosition: Float,
+        val velocityPxPerSec: Float,
+        val crossingDirection: String? = null,
+        val workWidth: Int? = null,
+        val thumbnailDebug: JsonElement? = null
+    ) : TimingPayload()
+
+    @Serializable
+    data class AdjustmentUpdate(
+        val runId: String,
+        val gateLabel: String,
+        val newGatePosition: Double,
+        val correctedTimeSeconds: Double? = null,
+        val deltaSeconds: Double? = null,
+        val splitsJSON: String? = null
     ) : TimingPayload()
 }
 
@@ -566,11 +602,15 @@ internal object TimingPayloadSerializer : KSerializer<TimingPayload> {
         entry("audioSyncData", TimingPayload.AudioSyncData::class.java, TimingPayload.AudioSyncData.serializer()),
         // Thumbnail
         entry("thumbnailUpdate", TimingPayload.ThumbnailUpdate::class.java, TimingPayload.ThumbnailUpdate.serializer()),
+        entry("thumbnailMetadata", TimingPayload.ThumbnailMetadata::class.java, TimingPayload.ThumbnailMetadata.serializer()),
         // Event Reconciliation
         entry("eventSync", TimingPayload.EventSync::class.java, TimingPayload.EventSync.serializer()),
         entry("eventSyncResponse", TimingPayload.EventSyncResponse::class.java, TimingPayload.EventSyncResponse.serializer()),
         // Config Ordering
         entry("configVersion", TimingPayload.ConfigVersion::class.java, TimingPayload.ConfigVersion.serializer()),
+        // Calibration / post-hoc adjustments
+        entry("calibrationUpdate", TimingPayload.CalibrationUpdate::class.java, TimingPayload.CalibrationUpdate.serializer()),
+        entry("adjustmentUpdate", TimingPayload.AdjustmentUpdate::class.java, TimingPayload.AdjustmentUpdate.serializer()),
     )
 
     private fun <T : TimingPayload> entry(
@@ -631,6 +671,8 @@ data class TimingMessage(
     val sessionId: String,
     val messageId: String? = null,
     val eventId: String? = null,
+    val targetDeviceId: String? = null,
+    val runId: String? = null,
     val payload: TimingPayload,
     val createdAtNanos: Long
 ) {
@@ -658,7 +700,9 @@ data class TimingMessage(
                 is TimingPayload.NewRun,
                 is TimingPayload.CancelRun,
                 is TimingPayload.ResumeDetection,
-                is TimingPayload.PauseDetection -> true
+                is TimingPayload.PauseDetection,
+                is TimingPayload.ThumbnailUpdate,
+                is TimingPayload.ThumbnailMetadata -> true
                 else -> false
             }
         }
@@ -673,6 +717,8 @@ data class TimingMessage(
             sessionId: String,
             payload: TimingPayload,
             eventId: String? = null,
+            targetDeviceId: String? = null,
+            runId: String? = null,
             createdAtNanos: Long = monotonicNanos()
         ) = TimingMessage(
             protocolVersion = TIMING_PROTOCOL_VERSION,
@@ -681,6 +727,8 @@ data class TimingMessage(
             sessionId = sessionId,
             messageId = null,
             eventId = eventId,
+            targetDeviceId = targetDeviceId,
+            runId = runId,
             payload = payload,
             createdAtNanos = createdAtNanos
         )
@@ -694,6 +742,8 @@ data class TimingMessage(
             sessionId: String,
             payload: TimingPayload,
             eventId: String? = null,
+            targetDeviceId: String? = null,
+            runId: String? = null,
             createdAtNanos: Long = monotonicNanos()
         ) = TimingMessage(
             protocolVersion = TIMING_PROTOCOL_VERSION,
@@ -702,6 +752,8 @@ data class TimingMessage(
             sessionId = sessionId,
             messageId = java.util.UUID.randomUUID().toString().uppercase(),
             eventId = eventId,
+            targetDeviceId = targetDeviceId,
+            runId = runId,
             payload = payload,
             createdAtNanos = createdAtNanos
         )

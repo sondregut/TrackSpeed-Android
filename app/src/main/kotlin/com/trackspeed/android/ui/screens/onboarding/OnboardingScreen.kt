@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,10 +28,13 @@ import com.trackspeed.android.ui.theme.*
 fun OnboardingScreen(
     onComplete: () -> Unit,
     onGuestJoinSession: () -> Unit = {},
-    onSignIn: () -> Unit = {},
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(state.currentStep) {
+        viewModel.trackStepViewed(state.currentStep)
+    }
 
     Column(
         modifier = Modifier
@@ -83,31 +87,58 @@ fun OnboardingScreen(
         ) { step ->
             when (step) {
                 OnboardingStep.WELCOME -> WelcomeStep(
-                    onGetStarted = { viewModel.goForward() },
+                    selectedLanguage = state.appLanguage,
+                    onGetStarted = { viewModel.advanceAfterWelcome() },
                     onJoinSession = onGuestJoinSession,
-                    onSignIn = onSignIn,
+                    onSignIn = {
+                        if (viewModel.completeOnboardingIfPro()) {
+                            onComplete()
+                        }
+                    },
+                    onLanguageSelected = { viewModel.setAppLanguage(it) },
                     onDebugSkip = {
-                        viewModel.completeOnboarding()
-                        onComplete()
+                        if (viewModel.completeOnboardingIfPro()) {
+                            onComplete()
+                        }
                     },
                     onDebugPaywall = {
                         viewModel.goToStep(OnboardingStep.PAYWALL)
                     }
                 )
+                OnboardingStep.REFERRAL_WELCOME -> ReferralWelcomeStep(
+                    onContinue = { viewModel.goToStep(OnboardingStep.VALUE_PROPOSITION) }
+                )
                 OnboardingStep.VALUE_PROPOSITION -> ValuePropositionStep(
                     onContinue = { viewModel.goForward() }
                 )
-                OnboardingStep.HOW_IT_WORKS -> HowItWorksStep(
+                OnboardingStep.PAIN_POINTS -> PainPointsStep(
+                    selectedPainPoints = state.selectedPainPoints,
+                    onTogglePainPoint = { viewModel.togglePainPoint(it) },
                     onContinue = { viewModel.goForward() }
                 )
-                OnboardingStep.TRACK_PREVIEW -> TrackPreviewStep(
+                OnboardingStep.PAIN_SWIPE -> PainSwipeStep(
+                    selectedPainPoints = state.selectedPainPoints,
                     onContinue = { viewModel.goForward() }
+                )
+                OnboardingStep.HOW_IT_WORKS -> HowItWorksStep(
+                    selectedPainPoints = state.selectedPainPoints,
+                    onContinue = { viewModel.goForward() }
+                )
+                OnboardingStep.SOLO_DEMO -> SoloDemoStep(
+                    onContinue = { viewModel.goForward() },
+                    onSkip = { viewModel.goForward() }
                 )
                 OnboardingStep.FLYING_TIME -> FlyingTimeStep(
                     selectedDistance = state.profile.flyingDistance,
                     flyingPR = state.profile.flyingPR,
+                    usesEventPrEstimate = state.profile.usesEventPrEstimate,
+                    eventDiscipline = state.profile.discipline,
+                    eventPR = state.profile.personalRecord,
                     onDistanceSelected = { viewModel.setFlyingDistance(it) },
-                    onTimeChanged = { viewModel.setFlyingPR(it) },
+                    onTimeChanged = { viewModel.setMeasuredFlyingPR(it) },
+                    onUseEventPrEstimateChanged = { viewModel.setUsesEventPrEstimate(it) },
+                    onEventDisciplineSelected = { viewModel.setDiscipline(it) },
+                    onEventPrChanged = { viewModel.setPersonalRecord(it) },
                     onContinue = { viewModel.goForward() }
                 )
                 OnboardingStep.GOAL_TIME -> GoalTimeStep(
@@ -136,7 +167,10 @@ fun OnboardingScreen(
                     promoCode = state.profile.promoCode ?: "",
                     onPromoCodeChanged = { viewModel.setPromoCode(it) },
                     onSubmitPromoCode = { code, source -> viewModel.submitPromoCode(code, source) },
-                    onContinue = { viewModel.goForward() }
+                    isLoading = state.promoRedemptionState is PromoRedemptionState.Loading,
+                    onContinue = {
+                        viewModel.handleAttributionContinue { onComplete() }
+                    }
                 )
                 OnboardingStep.RATING -> RatingStep(
                     onContinue = { viewModel.goForward() }
@@ -145,11 +179,21 @@ fun OnboardingScreen(
                     onContinue = { viewModel.goForward() }
                 )
                 OnboardingStep.AUTH -> AuthStep(
-                    onAuthenticated = { viewModel.goForward() }
+                    onAuthenticated = {
+                        if (viewModel.completeOnboardingIfPro()) {
+                            onComplete()
+                        }
+                    },
+                    onSkipAuth = {
+                        if (viewModel.completeOnboardingIfPro()) {
+                            onComplete()
+                        }
+                    }
                 )
                 OnboardingStep.CAMERA_PERMISSION -> CameraPermissionStep(
                     onContinue = { viewModel.goForward() },
-                    onSkip = { viewModel.goForward() }
+                    onSkip = { viewModel.goForward() },
+                    onPermissionResult = { granted -> viewModel.trackCameraPermissionResult(granted) }
                 )
                 OnboardingStep.PROFILE_SETUP -> ProfileSetupStep(
                     displayName = state.profile.displayName ?: "",
@@ -159,20 +203,40 @@ fun OnboardingScreen(
                     onContinue = { viewModel.goForward() }
                 )
                 OnboardingStep.TRIAL_INTRO -> TrialIntroStep(
+                    trialDays = requireNotNull(state.annualFreeTrialDays),
                     onContinue = { viewModel.goForward() }
                 )
                 OnboardingStep.TRIAL_REMINDER -> TrialReminderStep(
                     onContinue = { viewModel.goForward() }
                 )
                 OnboardingStep.NOTIFICATION -> NotificationStep(
-                    onContinue = { viewModel.goForward() }
+                    onContinue = { viewModel.goForward() },
+                    onPermissionResult = { granted -> viewModel.trackNotificationPermissionResult(granted) },
+                    showTrialReminder = state.annualFreeTrialDays != null
                 )
                 OnboardingStep.PAYWALL -> PaywallStep(
                     onContinue = {
-                        viewModel.completeOnboarding()
-                        onComplete()
+                        if (state.isAuthenticated) {
+                            if (viewModel.completeOnboardingIfPro()) {
+                                onComplete()
+                            }
+                        } else {
+                            viewModel.goToStep(OnboardingStep.AUTH)
+                        }
                     },
-                    onSkip = { viewModel.goForward() }
+                    onSkip = { viewModel.goToStep(OnboardingStep.PAYWALL_RECOVERY) }
+                )
+                OnboardingStep.PAYWALL_RECOVERY -> PaywallRecoveryStep(
+                    onClaim = {
+                        if (state.isAuthenticated) {
+                            if (viewModel.completeOnboardingIfPro()) {
+                                onComplete()
+                            }
+                        } else {
+                            viewModel.goToStep(OnboardingStep.AUTH)
+                        }
+                    },
+                    onFullPrice = { viewModel.goToStep(OnboardingStep.PAYWALL) }
                 )
                 OnboardingStep.SPIN_WHEEL -> SpinWheelStep(
                     onContinue = { viewModel.goForward() },
@@ -180,8 +244,9 @@ fun OnboardingScreen(
                 )
                 OnboardingStep.COMPLETION -> CompletionStep(
                     onTrySoloMode = {
-                        viewModel.completeOnboarding()
-                        onComplete()
+                        if (viewModel.completeOnboardingIfPro()) {
+                            onComplete()
+                        }
                     }
                 )
             }

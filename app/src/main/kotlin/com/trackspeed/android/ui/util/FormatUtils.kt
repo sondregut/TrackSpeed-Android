@@ -1,6 +1,7 @@
 package com.trackspeed.android.ui.util
 
 import androidx.compose.ui.graphics.Color
+import com.trackspeed.android.util.HistoryDistanceFormatter
 
 fun parseAthleteColor(colorStr: String): Color {
     return when (colorStr.lowercase()) {
@@ -11,6 +12,7 @@ fun parseAthleteColor(colorStr: String): Color {
         "purple" -> Color(0xFFBF5AF2)
         "pink" -> Color(0xFFFF2D55)
         "yellow" -> Color(0xFFFFD60A)
+        "gray" -> Color(0xFF8E8E93)
         "cyan", "teal" -> Color(0xFF64D2FF)
         else -> Color(0xFF0A84FF)
     }
@@ -25,17 +27,21 @@ fun formatTime(seconds: Double): String {
     val hundredths = (totalMs % 1000) / 10
 
     return if (mins > 0) {
-        String.format("%d:%02d.%02d", mins, secs, hundredths)
+        String.format(java.util.Locale.getDefault(), "%d:%02d.%02d", mins, secs, hundredths)
     } else {
-        String.format("%d.%02d", secs, hundredths)
+        String.format(java.util.Locale.getDefault(), "%d.%02d", secs, hundredths)
     }
 }
 
 fun formatDistance(distance: Double): String {
-    return when {
-        distance == 36.576 -> "40yd"
-        distance % 1.0 == 0.0 -> "${distance.toInt()}m"
-        else -> "${distance}m"
+    return HistoryDistanceFormatter.labelForMeters(distance)
+}
+
+fun formatSessionMode(numberOfPhones: Int, numberOfGates: Int): String {
+    return if (numberOfGates > 2) {
+        "$numberOfPhones-Phone, $numberOfGates Gates"
+    } else {
+        "$numberOfPhones-Phone"
     }
 }
 
@@ -43,8 +49,8 @@ fun formatSpeed(distance: Double, timeSeconds: Double, speedUnit: String): Strin
     if (distance <= 0 || timeSeconds <= 0) return "--"
     val speedMs = distance / timeSeconds
     return when (speedUnit) {
-        "km/h" -> String.format("%.1f km/h", speedMs * 3.6)
-        "mph" -> String.format("%.1f mph", speedMs * 2.23694)
-        else -> String.format("%.1f m/s", speedMs)
+        "km/h" -> String.format(java.util.Locale.getDefault(), "%.1f km/h", speedMs * 3.6)
+        "mph" -> String.format(java.util.Locale.getDefault(), "%.1f mph", speedMs * 2.23694)
+        else -> String.format(java.util.Locale.getDefault(), "%.1f m/s", speedMs)
     }
 }

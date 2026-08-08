@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaPlayer
 import android.util.Log
 import com.trackspeed.android.BuildConfig
+import com.trackspeed.android.cloud.safeCloudErrorCode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
@@ -14,7 +15,9 @@ import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -160,7 +163,7 @@ class ElevenLabsService @Inject constructor(
             Log.d(TAG, "Generated speech for '$text' (${bytes.size} bytes, voice=${voiceId.name})")
             bytes
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to generate speech for '$text'", e)
+            Log.e(TAG, "Failed to generate speech for '$text': ${e.safeCloudErrorCode()}")
             null
         }
     }
@@ -182,40 +185,72 @@ class ElevenLabsService @Inject constructor(
 
     /**
      * Play audio bytes via MediaPlayer using a temp file.
+     * Suspends until playback completes so callers (e.g. countdown sequence) can
+     * wait for the phrase to finish before proceeding.
      */
-    suspend fun playAudio(data: ByteArray) = withContext(Dispatchers.IO) {
-        var tempFile: File? = null
-        try {
-            tempFile = File.createTempFile("elevenlabs_", ".mp3", context.cacheDir)
-            tempFile.writeBytes(data)
-
-            val player = MediaPlayer()
-            player.setDataSource(tempFile.absolutePath)
-            player.prepare()
-            player.start()
-
-            // Wait for playback to complete, then release
-            player.setOnCompletionListener {
-                it.release()
-                tempFile.delete()
+    suspend fun playAudio(data: ByteArray) {
+        val tempFile = withContext(Dispatchers.IO) {
+            File.createTempFile("elevenlabs_", ".mp3", context.cacheDir).also {
+                it.writeBytes(data)
             }
-            player.setOnErrorListener { mp, _, _ ->
-                mp.release()
-                tempFile.delete()
-                true
+        }
+
+        try {
+            // MediaPlayer callbacks require a Looper thread; use Main dispatcher.
+            withContext(Dispatchers.Main) {
+                suspendCancellableCoroutine<Unit> { continuation ->
+                    val player = MediaPlayer()
+
+                    player.setOnCompletionListener {
+                        it.release()
+                        tempFile.delete()
+                        if (continuation.isActive) continuation.resume(Unit)
+                    }
+                    player.setOnErrorListener { mp, _, _ ->
+                        mp.release()
+                        tempFile.delete()
+                        if (continuation.isActive) continuation.resume(Unit)
+                        true
+                    }
+
+                    try {
+                        player.setDataSource(tempFile.absolutePath)
+                        player.prepare()
+                        player.start()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to start MediaPlayer", e)
+                        player.release()
+                        tempFile.delete()
+                        if (continuation.isActive) continuation.resume(Unit)
+                    }
+
+                    continuation.invokeOnCancellation {
+                        player.release()
+                        tempFile.delete()
+                    }
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to play audio", e)
-            tempFile?.delete()
+            tempFile.delete()
         }
     }
 
     /**
      * Pre-cache voice start command phrases for the given voice and language.
      */
-    suspend fun preloadVoiceStartPhrases(voiceId: ElevenLabsVoiceId, languageCode: String = "en") {
+    suspend fun preloadVoiceStartPhrases(
+        voiceId: ElevenLabsVoiceId,
+        languageCode: String = "en",
+        includeReadyCommand: Boolean = false
+    ) {
         val commands = VoiceCommandPhrases.forLanguage(languageCode)
-        val phrases = listOf(commands.onYourMarks, commands.set, commands.go)
+        val phrases = buildList {
+            add(commands.onYourMarks)
+            if (includeReadyCommand) add(commands.ready)
+            add(commands.set)
+            add(commands.go)
+        }
         for (phrase in phrases) {
             generateSpeech(text = phrase, voiceId = voiceId, modelId = MODEL_MULTILINGUAL)
         }
@@ -232,7 +267,7 @@ class ElevenLabsService @Inject constructor(
         val fractionalPart = ((seconds - wholePart) * 100).toInt()
 
         return if (fractionalPart > 0) {
-            val fractionalStr = String.format("%02d", fractionalPart)
+            val fractionalStr = String.format(java.util.Locale.US, "%02d", fractionalPart)
             "$wholePart ${commands.decimalWord} $fractionalStr"
         } else {
             "$wholePart"
@@ -250,6 +285,6 @@ class ElevenLabsService @Inject constructor(
     private fun buildCacheKey(text: String, voiceId: String, modelId: String): String {
         val input = "$text|$voiceId|$modelId"
         val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
-        return digest.joinToString("") { "%02x".format(it) }
+        return digest.joinToString("") { "%02x".format(java.util.Locale.US, it) }
     }
 }

@@ -37,10 +37,8 @@
     <!-- Notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Foreground service for background timing -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA"
-        tools:targetApi="34" />
+    <!-- Contacts for referral invites -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <application
         android:name=".TrackSpeedApp"
@@ -53,6 +51,17 @@
         android:theme="@style/Theme.TrackSpeed"
         tools:targetApi="34">
 
+        <!--
+          TrackSpeed's camera timing UI is phone-first and has not completed
+          large-screen rotation acceptance yet. Android 16 ignores the
+          portrait activity constraint on large screens unless this temporary
+          compatibility property is present. Remove it after the adaptive
+          camera layouts have physical tablet coverage.
+        -->
+        <property
+            android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
+            android:value="true" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -62,7 +71,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <intent-filter android:autoVerify="true">
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />

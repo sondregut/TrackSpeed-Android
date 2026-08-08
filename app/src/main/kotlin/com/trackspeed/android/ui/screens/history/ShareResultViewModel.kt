@@ -9,6 +9,7 @@ import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.data.repository.SettingsRepository
 import com.trackspeed.android.ui.components.ShareCardData
 import com.trackspeed.android.ui.components.ShareCardTheme
+import com.trackspeed.android.ui.util.parseSegmentSplits
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -102,7 +103,8 @@ class ShareResultViewModel @Inject constructor(
             isPersonalBest = run.isPersonalBest,
             isSeasonBest = run.isSeasonBest,
             speedValue = speedValue,
-            speedUnit = speedUnit
+            speedUnit = speedUnit,
+            segments = parseSegmentSplits(run.splitsJson)
         )
     }
 }

@@ -14,7 +14,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.ThumbUp
@@ -78,6 +80,24 @@ fun NotificationSettingsScreen(
                 viewModel.setTrainingReminderEnabled(enabled)
             }
         },
+        onBillingIssueReminderChanged = { enabled ->
+            if (enabled && !state.hasNotificationPermission) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            } else {
+                viewModel.setBillingIssueReminderEnabled(enabled)
+            }
+        },
+        onPromoOfferReminderChanged = { enabled ->
+            if (enabled && !state.hasNotificationPermission) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            } else {
+                viewModel.setPromoOfferReminderEnabled(enabled)
+            }
+        },
         onRatingPromptChanged = { enabled ->
             if (enabled && !state.hasNotificationPermission) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -112,6 +132,8 @@ private fun NotificationSettingsContent(
     onBack: () -> Unit,
     onTryProReminderChanged: (Boolean) -> Unit,
     onTrainingReminderChanged: (Boolean) -> Unit,
+    onBillingIssueReminderChanged: (Boolean) -> Unit,
+    onPromoOfferReminderChanged: (Boolean) -> Unit,
     onRatingPromptChanged: (Boolean) -> Unit,
     onTestNotification: () -> Unit,
     onOpenSettings: () -> Unit
@@ -189,6 +211,34 @@ private fun NotificationSettingsContent(
                         description = stringResource(R.string.notification_settings_training_description, NotificationTiming.INACTIVITY_THRESHOLD_DAYS),
                         checked = state.trainingReminderEnabled,
                         onCheckedChange = onTrainingReminderChanged
+                    )
+
+                    HorizontalDivider(
+                        color = DividerColor,
+                        modifier = Modifier.padding(start = 56.dp)
+                    )
+
+                    NotificationToggleRow(
+                        icon = Icons.Outlined.CreditCard,
+                        iconTint = WarningYellow,
+                        title = stringResource(R.string.notification_settings_billing_title),
+                        description = stringResource(R.string.notification_settings_billing_description),
+                        checked = state.billingIssueReminderEnabled,
+                        onCheckedChange = onBillingIssueReminderChanged
+                    )
+
+                    HorizontalDivider(
+                        color = DividerColor,
+                        modifier = Modifier.padding(start = 56.dp)
+                    )
+
+                    NotificationToggleRow(
+                        icon = Icons.Outlined.LocalOffer,
+                        iconTint = AccentGreen,
+                        title = stringResource(R.string.notification_settings_promo_title),
+                        description = stringResource(R.string.notification_settings_promo_description, NotificationTiming.PROMO_OFFER_DELAY_DAYS),
+                        checked = state.promoOfferReminderEnabled,
+                        onCheckedChange = onPromoOfferReminderChanged
                     )
 
                     HorizontalDivider(
@@ -478,6 +528,8 @@ private fun NotificationSettingsPreview() {
             state = NotificationSettingsUiState(
                 tryProReminderEnabled = true,
                 trainingReminderEnabled = true,
+                billingIssueReminderEnabled = true,
+                promoOfferReminderEnabled = true,
                 ratingPromptEnabled = false,
                 hasNotificationPermission = true,
                 testNotificationScheduled = false
@@ -485,6 +537,8 @@ private fun NotificationSettingsPreview() {
             onBack = {},
             onTryProReminderChanged = {},
             onTrainingReminderChanged = {},
+            onBillingIssueReminderChanged = {},
+            onPromoOfferReminderChanged = {},
             onRatingPromptChanged = {},
             onTestNotification = {},
             onOpenSettings = {}
@@ -503,6 +557,8 @@ private fun NotificationSettingsNoPermissionPreview() {
             onBack = {},
             onTryProReminderChanged = {},
             onTrainingReminderChanged = {},
+            onBillingIssueReminderChanged = {},
+            onPromoOfferReminderChanged = {},
             onRatingPromptChanged = {},
             onTestNotification = {},
             onOpenSettings = {}

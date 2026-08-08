@@ -38,7 +38,7 @@ fun GoalTimeStep(
     onContinue: () -> Unit,
     flyingDistance: FlyingDistance? = null
 ) {
-    var goalText by remember(goalTime) { mutableStateOf(goalTime?.let { String.format("%.2f", it) } ?: "") }
+    var goalText by remember(goalTime) { mutableStateOf(goalTime?.let { String.format(java.util.Locale.getDefault(), "%.2f", it) } ?: "") }
     var isFocused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
@@ -49,7 +49,7 @@ fun GoalTimeStep(
     val speedText = remember(goalText, distanceMeters) {
         val time = goalText.replace(",", ".").toDoubleOrNull()
         if (time != null && time > 0 && distanceMeters != null) {
-            String.format("%.1f", distanceMeters / time)
+            String.format(java.util.Locale.getDefault(), "%.1f", distanceMeters / time)
         } else null
     }
 
@@ -154,7 +154,7 @@ fun GoalTimeStep(
                         }
                     )
                     Text(
-                        "seconds",
+                        stringResource(R.string.run_detail_seconds_label),
                         fontSize = 16.sp,
                         color = TextSecondary
                     )

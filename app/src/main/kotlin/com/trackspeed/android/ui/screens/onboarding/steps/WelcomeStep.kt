@@ -45,25 +45,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.trackspeed.android.BuildConfig
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.screens.auth.AuthViewModel
 import com.trackspeed.android.ui.screens.settings.LanguagePickerDialog
 import com.trackspeed.android.ui.screens.settings.applyLanguage
-import com.trackspeed.android.ui.screens.settings.getCurrentLanguageTag
 import com.trackspeed.android.ui.screens.settings.getLanguageDisplayName
 import com.trackspeed.android.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WelcomeStep(
+    selectedLanguage: String,
     onGetStarted: () -> Unit,
     onJoinSession: () -> Unit = {},
     onSignIn: () -> Unit,
+    onLanguageSelected: (String) -> Unit = {},
     onDebugSkip: () -> Unit = {},
     onDebugPaywall: () -> Unit = {}
 ) {
     var showLanguagePicker by remember { mutableStateOf(false) }
-    var currentLanguage by remember { mutableStateOf(getCurrentLanguageTag()) }
     var showSignInSheet by remember { mutableStateOf(false) }
     var appeared by remember { mutableStateOf(false) }
     val alpha by animateFloatAsState(
@@ -121,13 +122,17 @@ fun WelcomeStep(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Debug skip (subtle, matching iOS forward.fill at 0.3 opacity)
-                IconButton(onClick = onDebugSkip) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = TextSecondary.copy(alpha = 0.3f),
-                        modifier = Modifier.size(16.dp)
-                    )
+                if (BuildConfig.DEBUG) {
+                    IconButton(onClick = onDebugSkip) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = TextSecondary.copy(alpha = 0.3f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.size(48.dp))
                 }
 
                 // Language button (matching iOS ultraThinMaterial pill)
@@ -147,9 +152,14 @@ fun WelcomeStep(
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        getLanguageDisplayName(currentLanguage).take(12),
+                        if (selectedLanguage == "system") {
+                            stringResource(R.string.settings_language_system_short)
+                        } else {
+                            getLanguageDisplayName(selectedLanguage)
+                        },
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
                     )
                 }
             }
@@ -172,7 +182,7 @@ fun WelcomeStep(
                 Spacer(Modifier.height(20.dp))
                 // iOS: "Welcome to" in title2, textSecondary
                 Text(
-                    text = "Welcome to",
+                    text = stringResource(R.string.onboarding_welcome_prefix),
                     fontSize = 22.sp,
                     color = TextSecondary,
                     textAlign = TextAlign.Center,
@@ -191,7 +201,8 @@ fun WelcomeStep(
                 Spacer(Modifier.height(12.dp))
                 // iOS: "Professional sprint timing using your iPhone" in body, textSecondary
                 Text(
-                    text = stringResource(R.string.onboarding_welcome_tagline),
+                    text = stringResource(R.string.onboarding_value_subtitle) + "\n" +
+                        stringResource(R.string.onboarding_value_title),
                     fontSize = 16.sp,
                     color = TextSecondary,
                     textAlign = TextAlign.Center,
@@ -266,10 +277,10 @@ fun WelcomeStep(
         // Language picker dialog
         if (showLanguagePicker) {
             LanguagePickerDialog(
-                currentLanguage = currentLanguage,
+                currentLanguage = selectedLanguage,
                 onLanguageSelected = { tag ->
+                    onLanguageSelected(tag)
                     applyLanguage(tag)
-                    currentLanguage = tag
                 },
                 onDismiss = { showLanguagePicker = false }
             )
@@ -348,7 +359,7 @@ private fun SignInBottomSheet(
                     OutlinedTextField(
                         value = state.email,
                         onValueChange = { viewModel.updateEmail(it) },
-                        placeholder = { Text("Email", color = TextMuted) },
+                        placeholder = { Text(stringResource(R.string.auth_email), color = TextMuted) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Email,
@@ -379,7 +390,7 @@ private fun SignInBottomSheet(
                     OutlinedTextField(
                         value = state.password,
                         onValueChange = { viewModel.updatePassword(it) },
-                        placeholder = { Text("Password", color = TextMuted) },
+                        placeholder = { Text(stringResource(R.string.auth_password), color = TextMuted) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Lock,
@@ -420,7 +431,7 @@ private fun SignInBottomSheet(
                         OutlinedTextField(
                             value = state.confirmPassword,
                             onValueChange = { viewModel.updateConfirmPassword(it) },
-                            placeholder = { Text("Confirm Password", color = TextMuted) },
+                            placeholder = { Text(stringResource(R.string.auth_confirm_password), color = TextMuted) },
                             leadingIcon = {
                                 Icon(
                                     Icons.Outlined.Lock,

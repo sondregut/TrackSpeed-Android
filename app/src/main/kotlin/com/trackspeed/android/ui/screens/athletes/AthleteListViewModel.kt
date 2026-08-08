@@ -2,6 +2,7 @@ package com.trackspeed.android.ui.screens.athletes
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.cloud.CloudSyncService
 import com.trackspeed.android.data.local.dao.AthleteDao
 import com.trackspeed.android.data.local.entities.AthleteEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +21,8 @@ data class AthleteListUiState(
 
 @HiltViewModel
 class AthleteListViewModel @Inject constructor(
-    private val athleteDao: AthleteDao
+    private val athleteDao: AthleteDao,
+    private val cloudSyncService: CloudSyncService
 ) : ViewModel() {
 
     private val searchQuery = MutableStateFlow("")
@@ -51,6 +53,7 @@ class AthleteListViewModel @Inject constructor(
     fun deleteAthlete(athlete: AthleteEntity) {
         viewModelScope.launch {
             athleteDao.delete(athlete)
+            try { cloudSyncService.deleteAthlete(athlete.id) } catch (_: Exception) { }
         }
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
@@ -26,10 +27,17 @@ import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 
 @Composable
-fun NotificationStep(onContinue: () -> Unit) {
+fun NotificationStep(
+    onContinue: () -> Unit,
+    onPermissionResult: (Boolean) -> Unit = {},
+    showTrialReminder: Boolean = true
+) {
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { _ -> onContinue() }
+    ) { granted ->
+        onPermissionResult(granted)
+        onContinue()
+    }
 
     var appeared by remember { mutableStateOf(false) }
 
@@ -99,15 +107,21 @@ fun NotificationStep(onContinue: () -> Unit) {
         ) {
             NotificationBullet(
                 icon = Icons.Default.Schedule,
-                text = "Training reminders"
+                text = stringResource(R.string.onboarding_notification_training_reminders)
             )
             NotificationBullet(
                 icon = Icons.Default.EmojiEvents,
-                text = "Session results & personal bests"
+                text = stringResource(R.string.onboarding_notification_results_prs)
             )
+            if (showTrialReminder) {
+                NotificationBullet(
+                    icon = Icons.Default.Notifications,
+                    text = stringResource(R.string.onboarding_notification_trial_reminders)
+                )
+            }
             NotificationBullet(
-                icon = Icons.Default.Notifications,
-                text = "Trial reminders before charges"
+                icon = Icons.Default.LocalOffer,
+                text = stringResource(R.string.onboarding_notification_offers_tips)
             )
         }
 
@@ -120,6 +134,7 @@ fun NotificationStep(onContinue: () -> Unit) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 } else {
+                    onPermissionResult(true)
                     onContinue()
                 }
             },

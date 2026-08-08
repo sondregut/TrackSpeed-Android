@@ -2,8 +2,10 @@ package com.trackspeed.android.ui.screens.history
 
 import com.trackspeed.android.ui.theme.*
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.*
@@ -32,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -43,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,10 +55,15 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.res.stringResource
 import com.trackspeed.android.R
+import com.trackspeed.android.data.export.shareCsv
+import com.trackspeed.android.ui.util.formatDistance
+import com.trackspeed.android.ui.util.formatSessionMode
 import com.trackspeed.android.ui.util.formatTime
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
+import com.trackspeed.android.model.StartType
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 private val BestGreen = Color(0xFF30D158)
@@ -68,6 +78,8 @@ fun SessionHistoryScreen(
     val dateGroups by viewModel.dateGroups.collectAsState()
     val filterDistance by viewModel.filterDistance.collectAsState()
     val filterStartType by viewModel.filterStartType.collectAsState()
+    val timeFilter by viewModel.timeFilter.collectAsState()
+    val modeFilter by viewModel.modeFilter.collectAsState()
     val sortOrder by viewModel.sortOrder.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val distanceFilters by viewModel.distanceFilters.collectAsState()
@@ -76,7 +88,10 @@ fun SessionHistoryScreen(
     val hasActiveFilters by viewModel.hasActiveFilters.collectAsState()
     val historyStats by viewModel.historyStats.collectAsState()
 
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf<String?>(null) }
+    var showExportMenu by remember { mutableStateOf(false) }
 
     // Delete confirmation dialog
     if (showDeleteDialog != null) {
@@ -111,12 +126,73 @@ fun SessionHistoryScreen(
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(
-            text = stringResource(R.string.session_history_title),
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = TextPrimary
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.session_history_title),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary,
+                modifier = Modifier.weight(1f)
+            )
+
+            if (hasAnySessions) {
+                Box {
+                    IconButton(onClick = { showExportMenu = true }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Share,
+                            contentDescription = stringResource(R.string.session_history_export_cd),
+                            tint = TextPrimary
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showExportMenu,
+                        onDismissRequest = { showExportMenu = false },
+                        containerColor = SurfaceDark
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.session_history_export_all_csv), color = TextPrimary) },
+                            onClick = {
+                                showExportMenu = false
+                                scope.launch {
+                                    val uri = viewModel.exportAllSessionsCsv()
+                                    if (uri != null) {
+                                        shareCsv(context, uri)
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.session_history_export_empty_toast),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.session_history_share_summary), color = TextPrimary) },
+                            onClick = {
+                                showExportMenu = false
+                                scope.launch {
+                                    val summary = viewModel.buildAllSessionsSummary()
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, summary)
+                                    }
+                                    context.startActivity(
+                                        Intent.createChooser(
+                                            intent,
+                                            context.getString(R.string.session_history_share_summary_chooser)
+                                        )
+                                    )
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -133,6 +209,23 @@ fun SessionHistoryScreen(
         )
 
         Spacer(modifier = Modifier.height(12.dp))
+
+        FilterChipRow(
+            label = stringResource(R.string.session_history_filter_time),
+            options = HistoryTimeFilter.entries.map { filter ->
+                when (filter) {
+                    HistoryTimeFilter.ALL -> stringResource(R.string.session_history_time_all)
+                    HistoryTimeFilter.THIS_WEEK -> stringResource(R.string.session_history_time_this_week)
+                    HistoryTimeFilter.THIS_MONTH -> stringResource(R.string.session_history_time_this_month)
+                }
+            },
+            selectedIndex = HistoryTimeFilter.entries.indexOf(timeFilter),
+            onSelected = { index ->
+                viewModel.setTimeFilter(HistoryTimeFilter.entries[index])
+            }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Distance filter chips (Task 4 - dynamic)
         FilterChipRow(
@@ -162,6 +255,23 @@ fun SessionHistoryScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
+        FilterChipRow(
+            label = stringResource(R.string.session_history_filter_mode),
+            options = HistoryModeFilter.entries.map { filter ->
+                when (filter) {
+                    HistoryModeFilter.ALL -> stringResource(R.string.session_history_mode_all)
+                    HistoryModeFilter.ONE_PHONE -> stringResource(R.string.session_history_mode_one_phone)
+                    HistoryModeFilter.TWO_PHONE -> stringResource(R.string.session_history_mode_two_phone)
+                }
+            },
+            selectedIndex = HistoryModeFilter.entries.indexOf(modeFilter),
+            onSelected = { index ->
+                viewModel.setModeFilter(HistoryModeFilter.entries[index])
+            }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         // Sort order chips
         FilterChipRow(
             label = stringResource(R.string.session_history_filter_sort),
@@ -170,7 +280,7 @@ fun SessionHistoryScreen(
                     SortOrder.NEWEST -> stringResource(R.string.session_history_sort_newest)
                     SortOrder.OLDEST -> stringResource(R.string.session_history_sort_oldest)
                     SortOrder.FASTEST -> stringResource(R.string.session_history_sort_fastest)
-                    SortOrder.SLOWEST -> stringResource(R.string.session_history_sort_slowest)
+                    SortOrder.MOST_RUNS -> stringResource(R.string.session_history_sort_most_runs)
                 }
             },
             selectedIndex = SortOrder.entries.indexOf(sortOrder),
@@ -180,6 +290,11 @@ fun SessionHistoryScreen(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        if (hasActiveFilters) {
+            ActiveFiltersRow(onClear = { viewModel.clearFilters() })
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         val isEmpty = dateGroups.isEmpty()
 
@@ -288,6 +403,41 @@ fun SessionHistoryScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ActiveFiltersRow(
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(AccentBlue.copy(alpha = 0.12f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = AccentBlue
+        )
+        Text(
+            text = stringResource(R.string.session_history_filters_active),
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+            color = TextPrimary,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = stringResource(R.string.session_history_clear_filters_short),
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+            color = AccentBlue,
+            modifier = Modifier.clickable(onClick = onClear)
+        )
     }
 }
 
@@ -461,6 +611,7 @@ private fun FilterChipRow(
     }
 }
 
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 private fun SessionCard(
     cardData: SessionCardData,
@@ -474,7 +625,7 @@ private fun SessionCard(
 
     // Load thumbnail off UI thread
     val bitmap by produceState<Bitmap?>(null, session.thumbnailPath) {
-        value = withContext(Dispatchers.IO) {
+        val loadedBitmap = withContext(Dispatchers.IO) {
             session.thumbnailPath?.let { path ->
                 try {
                     val file = File(path)
@@ -484,6 +635,7 @@ private fun SessionCard(
                 }
             }
         }
+        value = loadedBitmap
     }
 
     Card(
@@ -566,7 +718,7 @@ private fun SessionCard(
                 ) {
                     if (session.distance > 0) {
                         Text(
-                            text = "${session.distance.toInt()}m",
+                            text = formatDistance(session.distance),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
@@ -594,9 +746,17 @@ private fun SessionCard(
                         )
                     }
                     Text(
-                        text = session.startType.replaceFirstChar {
-                            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                        },
+                        text = StartType.fromRawValue(session.startType).displayName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextMuted
+                    )
+                    Text(
+                        text = "\u2022",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextMuted.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = formatSessionMode(session.numberOfPhones, session.numberOfGates),
                         style = MaterialTheme.typography.labelSmall,
                         color = TextMuted
                     )
@@ -626,4 +786,3 @@ private fun SessionCard(
         }
     }
 }
-

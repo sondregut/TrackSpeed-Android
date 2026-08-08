@@ -23,11 +23,13 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import com.trackspeed.android.ui.theme.AccentNavy
 import com.trackspeed.android.ui.theme.BorderSubtle
 import com.trackspeed.android.ui.theme.SurfaceDark
 import com.trackspeed.android.ui.theme.TextPrimary
 import com.trackspeed.android.ui.theme.TextSecondary
+import com.trackspeed.android.R
 
 private val StartGreen = Color(0xFF30D158)
 private val FinishAmber = Color(0xFFFFAB00)
@@ -80,7 +82,7 @@ fun TrackVisualizationCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "TRACK LAYOUT",
+                    text = stringResource(R.string.onboarding_multidevice_track_layout),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.5.sp,

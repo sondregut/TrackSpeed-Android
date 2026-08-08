@@ -29,4 +29,7 @@ interface AthleteDao {
 
     @Query("SELECT COUNT(*) FROM athletes")
     fun getAthleteCount(): Flow<Int>
+
+    @Query("DELETE FROM athletes")
+    suspend fun deleteAll()
 }

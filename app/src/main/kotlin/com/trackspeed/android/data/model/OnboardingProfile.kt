@@ -4,6 +4,7 @@ data class OnboardingProfile(
     val role: UserRole? = null,
     val discipline: SportDiscipline? = null,
     val personalRecord: Double? = null,
+    val usesEventPrEstimate: Boolean = false,
     val flyingDistance: FlyingDistance? = null,
     val flyingPR: Double? = null,
     val goalTime: Double? = null,

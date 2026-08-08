@@ -34,34 +34,36 @@ import com.trackspeed.android.R
  */
 data class LanguageOption(
     val tag: String,
-    val nativeName: String,
-    val englishName: String
+    val nativeName: String
 )
 
 val supportedLanguages = listOf(
-    LanguageOption("system", "System Default", "System Default"),
-    LanguageOption("en", "English", "English"),
-    LanguageOption("de", "Deutsch", "German"),
-    LanguageOption("fr", "Fran\u00e7ais", "French"),
-    LanguageOption("hi", "\u0939\u093f\u0928\u094d\u0926\u0940", "Hindi"),
-    LanguageOption("it", "Italiano", "Italian"),
-    LanguageOption("ja", "\u65e5\u672c\u8a9e", "Japanese"),
-    LanguageOption("ko", "\ud55c\uad6d\uc5b4", "Korean"),
-    LanguageOption("nb", "Norsk bokm\u00e5l", "Norwegian"),
-    LanguageOption("nl", "Nederlands", "Dutch"),
-    LanguageOption("pt-BR", "Portugu\u00eas (Brasil)", "Portuguese (Brazil)"),
-    LanguageOption("ro", "Rom\u00e2n\u0103", "Romanian"),
-    LanguageOption("ru", "\u0420\u0443\u0441\u0441\u043a\u0438\u0439", "Russian"),
-    LanguageOption("zh-Hans", "\u7b80\u4f53\u4e2d\u6587", "Chinese (Simplified)"),
-    LanguageOption("zh-Hant", "\u7e41\u9ad4\u4e2d\u6587", "Chinese (Traditional)")
+    LanguageOption("system", ""),
+    LanguageOption("en", "English"),
+    LanguageOption("de", "Deutsch"),
+    LanguageOption("es", "Espa\u00f1ol"),
+    LanguageOption("fr", "Fran\u00e7ais"),
+    LanguageOption("hi", "\u0939\u093f\u0928\u094d\u0926\u0940"),
+    LanguageOption("it", "Italiano"),
+    LanguageOption("ja", "\u65e5\u672c\u8a9e"),
+    LanguageOption("ko", "\ud55c\uad6d\uc5b4"),
+    LanguageOption("nb", "Norsk bokm\u00e5l"),
+    LanguageOption("nl", "Nederlands"),
+    LanguageOption("pt-BR", "Portugu\u00eas (Brasil)"),
+    LanguageOption("ro", "Rom\u00e2n\u0103"),
+    LanguageOption("ru", "\u0420\u0443\u0441\u0441\u043a\u0438\u0439"),
+    LanguageOption("zh-Hans", "\u7b80\u4f53\u4e2d\u6587"),
+    LanguageOption("zh-Hant", "\u7e41\u9ad4\u4e2d\u6587")
 )
 
 /**
  * Get the display name for the current language setting.
  */
+@Composable
 fun getLanguageDisplayName(tag: String): String {
+    if (tag == "system") return stringResource(R.string.settings_language_system_default)
     return supportedLanguages.find { it.tag == tag }?.nativeName
-        ?: supportedLanguages.first().nativeName
+        ?: stringResource(R.string.settings_language_system_default)
 }
 
 /**
@@ -103,6 +105,11 @@ fun LanguagePickerDialog(
         text = {
             Column {
                 supportedLanguages.forEach { lang ->
+                    val displayName = if (lang.tag == "system") {
+                        stringResource(R.string.settings_language_system_default)
+                    } else {
+                        lang.nativeName
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -116,16 +123,9 @@ fun LanguagePickerDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = lang.nativeName,
+                                text = displayName,
                                 style = MaterialTheme.typography.bodyLarge
                             )
-                            if (lang.tag != "system" && lang.nativeName != lang.englishName) {
-                                Text(
-                                    text = lang.englishName,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
                         }
                         if (lang.tag == currentLanguage) {
                             Icon(

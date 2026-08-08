@@ -1,5 +1,6 @@
 package com.trackspeed.android.ui.components
 
+import com.trackspeed.android.model.StartType
 import com.trackspeed.android.ui.theme.*
 
 import androidx.compose.foundation.background
@@ -37,6 +38,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.trackspeed.android.R
 // Accent colors - use theme values
 
 /**
@@ -45,38 +48,44 @@ import androidx.compose.ui.unit.sp
 enum class StartMode(
     val displayName: String,
     val description: String,
-    val icon: ImageVector
+    val icon: ImageVector,
+    val rawValue: String
 ) {
     FLYING(
         displayName = "Flying",
         description = "Gate-triggered start. Timer starts when athlete crosses the gate line.",
-        icon = Icons.AutoMirrored.Filled.DirectionsRun
+        icon = Icons.AutoMirrored.Filled.DirectionsRun,
+        rawValue = "flying"
     ),
     COUNTDOWN(
         displayName = "Countdown",
         description = "3... 2... 1... BEEP! Visual countdown with automatic start.",
-        icon = Icons.Default.Timer
+        icon = Icons.Default.Timer,
+        rawValue = "countdown"
     ),
     VOICE(
         displayName = "Voice Command",
         description = "\"On your marks... Set... GO!\" Spoken commands like a real starter.",
-        icon = Icons.Default.Mic
+        icon = Icons.Default.Mic,
+        rawValue = "voiceCommand"
     ),
     TOUCH(
         displayName = "Touch Start",
         description = "Touch screen, hold, then lift finger to start the timer.",
-        icon = Icons.Default.TouchApp
+        icon = Icons.Default.TouchApp,
+        rawValue = "touchRelease"
     ),
     INFRAME(
         displayName = "In-Frame",
         description = "Stand in front of camera, step away to start.",
-        icon = Icons.Default.PersonOff
+        icon = Icons.Default.PersonOff,
+        rawValue = "inFrame"
     );
 
     companion object {
-        fun fromString(value: String): StartMode = when {
-            value.equals("standard", ignoreCase = true) -> FLYING
-            else -> entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: FLYING
+        fun fromString(value: String): StartMode {
+            val startType = StartType.fromRawValue(value)
+            return entries.firstOrNull { it.rawValue == startType.rawValue } ?: FLYING
         }
     }
 }
@@ -127,7 +136,7 @@ fun StartOverlaySelector(
         ) {
             // Title
             Text(
-                text = "Start Mode",
+                text = stringResource(R.string.start_selector_title),
                 color = TextPrimary,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,

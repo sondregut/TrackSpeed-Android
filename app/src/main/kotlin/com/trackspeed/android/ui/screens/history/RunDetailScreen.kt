@@ -4,6 +4,7 @@ import com.trackspeed.android.ui.theme.*
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,6 +31,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -74,14 +78,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trackspeed.android.BuildConfig
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.components.DetectionReviewTarget
+import com.trackspeed.android.protocol.SegmentSplit
 import com.trackspeed.android.ui.components.ExpandedThumbnail
 import com.trackspeed.android.ui.components.ThumbnailViewerDialog
+import com.trackspeed.android.ui.util.formatDistance
+import com.trackspeed.android.ui.util.formatSegmentLabel
+import com.trackspeed.android.ui.util.formatSplitDuration
 import com.trackspeed.android.ui.util.formatTime
+import com.trackspeed.android.ui.util.parseSegmentSplits
 import com.trackspeed.android.ui.util.parseAthleteColor
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
+import com.trackspeed.android.model.StartType
 import java.util.Locale
 
 private val BestGreen = Color(0xFF4CAF50)
@@ -91,6 +103,9 @@ private val SeasonGold = Color(0xFFFFD600)
 @Composable
 fun RunDetailScreen(
     onNavigateBack: () -> Unit,
+    onShareClick: (String, String) -> Unit = { _, _ -> },
+    onVideoOverlayClick: (String, String) -> Unit = { _, _ -> },
+    onFramesClick: (String, String) -> Unit = { _, _ -> },
     viewModel: RunDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -176,7 +191,7 @@ fun RunDetailScreen(
                         IconButton(onClick = { showMenu = true }) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More options",
+                                contentDescription = stringResource(R.string.session_detail_more_cd),
                                 tint = TextPrimary
                             )
                         }
@@ -185,6 +200,50 @@ fun RunDetailScreen(
                             onDismissRequest = { showMenu = false },
                             containerColor = SurfaceDark
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.run_detail_share_run), color = TextPrimary) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = null,
+                                        tint = TextSecondary
+                                    )
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    uiState.run?.let { onShareClick(it.id, it.sessionId) }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Video Overlay", color = TextPrimary) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Videocam,
+                                        contentDescription = null,
+                                        tint = TextSecondary
+                                    )
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    uiState.run?.let { onVideoOverlayClick(it.id, it.sessionId) }
+                                }
+                            )
+                            if (uiState.run?.hasFrameScrubberPayload() == true) {
+                                DropdownMenuItem(
+                                    text = { Text("Frame Scrubber", color = TextPrimary) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.PhotoLibrary,
+                                            contentDescription = null,
+                                            tint = TextSecondary
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        uiState.run?.let { onFramesClick(it.id, it.sessionId) }
+                                    }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.run_detail_edit_distance), color = TextPrimary) },
                                 onClick = {
@@ -239,6 +298,9 @@ fun RunDetailScreen(
             return@Scaffold
         }
 
+        val segments = remember(run.splitsJson) { parseSegmentSplits(run.splitsJson) }
+        val detectionReviewEnabled = BuildConfig.DEBUG && uiState.detectionDiagnosticsEnabled
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -265,9 +327,30 @@ fun RunDetailScreen(
                     isSeasonBest = run.isSeasonBest,
                     speedFormatted = uiState.speedFormatted,
                     speedUnit = uiState.speedUnit,
+                    showSpeedInResults = uiState.showSpeedInResults,
                     distance = run.distance,
                     reactionTime = run.reactionTime
                 )
+            }
+
+            item {
+                VideoOverlayActionCard(
+                    onClick = { onVideoOverlayClick(run.id, run.sessionId) }
+                )
+            }
+
+            if (run.hasFrameScrubberPayload()) {
+                item {
+                    FrameScrubberActionCard(
+                        onClick = { onFramesClick(run.id, run.sessionId) }
+                    )
+                }
+            }
+
+            if (segments.isNotEmpty()) {
+                item {
+                    SplitBreakdownCard(segments = segments)
+                }
             }
 
             // Gate images gallery
@@ -275,8 +358,14 @@ fun RunDetailScreen(
                 item {
                     GateImagesGallery(
                         thumbnailPath = run.thumbnailPath,
+                        run = run,
                         runNumber = run.runNumber,
                         timeSeconds = run.timeSeconds,
+                        gatePosition = (run.finishGatePosition ?: run.gatePosition)
+                            .toFloat()
+                            .coerceIn(0f, 1f),
+                        detectionReviewEnabled = detectionReviewEnabled,
+                        onReviewSubmitted = { viewModel.submitCrossingReview(it) },
                         onThumbnailClick = { expandedThumbnail = it }
                     )
                 }
@@ -347,6 +436,7 @@ private fun MainStatsCard(
     isSeasonBest: Boolean,
     speedFormatted: String,
     speedUnit: String,
+    showSpeedInResults: Boolean,
     distance: Double,
     reactionTime: Double?
 ) {
@@ -417,20 +507,22 @@ private fun MainStatsCard(
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Stats row: Distance, Speed, Reaction
+            // Stats row: Distance, optional Speed, Reaction
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 StatItem(
                     label = stringResource(R.string.run_detail_distance_label),
-                    value = stringResource(R.string.run_detail_distance_value, distance.toInt())
+                    value = formatDistance(distance)
                 )
 
-                StatItem(
-                    label = stringResource(R.string.run_detail_speed_label),
-                    value = if (speedFormatted != "--") "$speedFormatted $speedUnit" else "--"
-                )
+                if (showSpeedInResults) {
+                    StatItem(
+                        label = stringResource(R.string.run_detail_speed_label),
+                        value = if (speedFormatted != "--") "$speedFormatted $speedUnit" else "--"
+                    )
+                }
 
                 if (reactionTime != null) {
                     StatItem(
@@ -463,6 +555,98 @@ private fun StatItem(label: String, value: String) {
 }
 
 @Composable
+private fun VideoOverlayActionCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .gunmetalCard()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .background(AccentBlue.copy(alpha = 0.16f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Videocam,
+                    contentDescription = null,
+                    tint = AccentBlue
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Video Overlay",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = TextPrimary
+                )
+                Text(
+                    text = "Import a clip, mark the start frame, and export a TrackSpeed timer overlay.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FrameScrubberActionCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .gunmetalCard()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .background(BestGreen.copy(alpha = 0.16f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PhotoLibrary,
+                    contentDescription = null,
+                    tint = BestGreen
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Frame Scrubber",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = TextPrimary
+                )
+                Text(
+                    text = "Review saved gate frames and detector overlays for this run.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun Badge(text: String, color: Color) {
     Text(
         text = text,
@@ -485,14 +669,87 @@ private fun Badge(text: String, color: Color) {
 }
 
 @Composable
+private fun SplitBreakdownCard(segments: List<SegmentSplit>) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .gunmetalCard(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Splits",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.SemiBold
+                ),
+                color = TextSecondary
+            )
+
+            segments.forEachIndexed { index, segment ->
+                if (index > 0) {
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = formatSegmentLabel(segment),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = formatDistance(segment.distanceMeters),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "${formatSplitDuration(segment.splitNanos)}s",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = AccentBlue
+                        )
+                        Text(
+                            text = "${formatSplitDuration(segment.cumulativeSplitNanos)}s cumulative",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
+@Composable
 private fun GateImagesGallery(
     thumbnailPath: String,
+    run: com.trackspeed.android.data.local.entities.RunEntity,
     runNumber: Int,
     timeSeconds: Double,
+    gatePosition: Float,
+    detectionReviewEnabled: Boolean,
+    onReviewSubmitted: (com.trackspeed.android.ui.components.DetectionReviewSubmission) -> Unit,
     onThumbnailClick: (ExpandedThumbnail) -> Unit
 ) {
     val bitmap by produceState<Bitmap?>(null, thumbnailPath) {
-        value = withContext(Dispatchers.IO) {
+        val loadedBitmap = withContext(Dispatchers.IO) {
             try {
                 val file = File(thumbnailPath)
                 if (file.exists()) BitmapFactory.decodeFile(thumbnailPath) else null
@@ -500,6 +757,7 @@ private fun GateImagesGallery(
                 null
             }
         }
+        value = loadedBitmap
     }
 
     val currentBitmap = bitmap
@@ -560,7 +818,22 @@ private fun GateImagesGallery(
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable {
-                                    onThumbnailClick(ExpandedThumbnail(bitmap = currentBitmap))
+                                    onThumbnailClick(
+                                        ExpandedThumbnail(
+                                            bitmap = currentBitmap,
+                                            gatePosition = gatePosition,
+                                            reviewTarget = if (detectionReviewEnabled) {
+                                                run.toDetectionReviewTarget(gatePosition)
+                                            } else {
+                                                null
+                                            },
+                                            onReviewSubmitted = if (detectionReviewEnabled) {
+                                                onReviewSubmitted
+                                            } else {
+                                                null
+                                            }
+                                        )
+                                    )
                                 },
                             contentAlignment = Alignment.Center
                         ) {
@@ -570,6 +843,15 @@ private fun GateImagesGallery(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
+                            Canvas(modifier = Modifier.matchParentSize()) {
+                                val x = size.width * gatePosition
+                                drawLine(
+                                    color = Color.Red.copy(alpha = 0.8f),
+                                    start = androidx.compose.ui.geometry.Offset(x, 0f),
+                                    end = androidx.compose.ui.geometry.Offset(x, size.height),
+                                    strokeWidth = 3f
+                                )
+                            }
                         }
 
                         Text(
@@ -590,6 +872,38 @@ private fun GateImagesGallery(
             }
         }
     }
+}
+
+private fun com.trackspeed.android.data.local.entities.RunEntity.toDetectionReviewTarget(
+    gatePosition: Float
+): DetectionReviewTarget {
+    val isSolo = numberOfPhones <= 1
+    return DetectionReviewTarget(
+        sessionId = sessionId,
+        runId = id,
+        runNumber = runNumber,
+        numberOfPhones = numberOfPhones,
+        gateLabel = if (isSolo) "Crossing" else "Finish",
+        target = if (isSolo) "crossing" else "finish",
+        mode = if (isSolo) "solo" else "multi",
+        distanceMeters = distance,
+        startType = startType,
+        displayedTimeSeconds = timeSeconds,
+        originalGatePosition = (finishGatePosition ?: this.gatePosition).toFloat(),
+        crossingDirection = finishCrossingDirection ?: startCrossingDirection,
+        detectorX = gatePosition,
+        detectorY = finishDetectorY?.toFloat(),
+        crossingVelocityPxPerSec = finishCrossingVelocity ?: crossingVelocity,
+        workWidth = finishWorkResolutionWidth ?: workResolutionWidth,
+        interpolationAlpha = finishInterpolationAlpha,
+        framePick = finishFramePick,
+        s0 = finishS0,
+        s1 = finishS1,
+        isFrontCamera = finishIsFrontCamera,
+        detectorTriggerFramePts = finishDetectorTriggerFramePts,
+        chosenThumbnailFramePts = finishChosenThumbnailFramePts,
+        savedThumbnailFramePts = finishSavedThumbnailFramePts
+    )
 }
 
 @Composable
@@ -629,9 +943,7 @@ private fun InfoCard(
 
             InfoRow(
                 label = stringResource(R.string.run_detail_start_type_label),
-                value = startType.replaceFirstChar {
-                    if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                }
+                value = StartType.fromRawValue(startType).displayName
             )
 
             InfoRow(

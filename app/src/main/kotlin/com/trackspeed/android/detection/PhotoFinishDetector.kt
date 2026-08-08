@@ -11,6 +11,15 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
+ * @deprecated Replaced by [DetectionEngine] (port of iOS DetectionEngine.swift,
+ * commits 4fdf2b4a + c46bbac4). This class is no longer instantiated by
+ * [GateEngine] — its public [State] enum is still referenced by UI code as
+ * a stable type for `detectionState` flows, which is the only reason this
+ * file remains. Do not add new call sites; remove the State enum and this
+ * file once the UI flows migrate to a dedicated state type.
+ *
+ * Original docs (kept for archaeology):
+ *
  * Photo Finish Mode detector - exact replication of iOS Photo Finish app behavior.
  *
  * Architecture (per-frame processing order):
@@ -24,8 +33,10 @@ import kotlin.math.sqrt
  * 8. Crossing check + interpolation + rolling shutter compensation
  * 9. Update trackers + rearm hysteresis
  *
- * Ported from iOS PhotoFinishDetector.swift.
+ * Ported from iOS PhotoFinishDetector.swift (the iOS file no longer exists
+ * — see DetectionEngine.swift for the current iOS source of truth).
  */
+@Deprecated("Replaced by DetectionEngine; kept only for the State enum the UI references.")
 class PhotoFinishDetector(context: Context) : SensorEventListener {
 
     companion object {

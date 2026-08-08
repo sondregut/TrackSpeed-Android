@@ -28,10 +28,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import com.trackspeed.android.ui.theme.AccentNavy
 import com.trackspeed.android.ui.theme.SurfaceDark
 import com.trackspeed.android.ui.theme.TextPrimary
 import com.trackspeed.android.ui.theme.TextSecondary
+import com.trackspeed.android.R
 
 /**
  * A reusable dialog shown when a user tries to access a Pro-only feature.
@@ -73,7 +75,7 @@ fun ProFeatureGateDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "PRO",
+                        text = stringResource(R.string.common_pro_badge),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 9.sp,
@@ -105,7 +107,7 @@ fun ProFeatureGateDialog(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = "Upgrade to Pro",
+                    text = stringResource(R.string.settings_upgrade_to_pro),
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -113,7 +115,7 @@ fun ProFeatureGateDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(
-                    text = "Cancel",
+                    text = stringResource(R.string.common_cancel),
                     color = TextSecondary
                 )
             }

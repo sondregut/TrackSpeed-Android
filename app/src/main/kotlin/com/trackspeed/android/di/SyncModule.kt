@@ -3,6 +3,8 @@ package com.trackspeed.android.di
 import android.content.Context
 import com.trackspeed.android.sync.BleClockSyncService
 import com.trackspeed.android.sync.ClockSyncManager
+import com.trackspeed.android.sync.CloudTimingRelay
+import com.trackspeed.android.cloud.DeviceIdProvider
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -17,9 +19,11 @@ object SyncModule {
     @Provides
     @Singleton
     fun provideBleClockSyncService(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        cloudTimingRelay: CloudTimingRelay,
+        deviceIdProvider: DeviceIdProvider
     ): BleClockSyncService {
-        return BleClockSyncService(context)
+        return BleClockSyncService(context, cloudTimingRelay, deviceIdProvider)
     }
 
     @Provides

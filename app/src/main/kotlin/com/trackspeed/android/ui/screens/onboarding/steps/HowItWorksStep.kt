@@ -1,47 +1,49 @@
 package com.trackspeed.android.ui.screens.onboarding.steps
 
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.CallSplit
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.PersonOff
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material.icons.filled.WifiTethering
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.screens.onboarding.OnboardingPainPoint
 import com.trackspeed.android.ui.theme.*
-import kotlinx.coroutines.launch
 
-private data class HowItWorksPage(
-    val imageRes: Int,
-    val stepRes: Int,
-    val titleRes: Int,
-    val descriptionRes: Int
-)
-
-private val pages = listOf(
-    HowItWorksPage(R.drawable.onboarding_connect, R.string.onboarding_howitworks_step1_label, R.string.onboarding_howitworks_step1_title, R.string.onboarding_howitworks_step1_description),
-    HowItWorksPage(R.drawable.onboarding_countdownstart, R.string.onboarding_howitworks_step2_label, R.string.onboarding_howitworks_step2_title, R.string.onboarding_howitworks_step2_description),
-    HowItWorksPage(R.drawable.onboarding_setup, R.string.onboarding_howitworks_step3_label, R.string.onboarding_howitworks_step3_title, R.string.onboarding_howitworks_step3_description),
-    HowItWorksPage(R.drawable.onboarding_tracksetup, R.string.onboarding_howitworks_step4_label, R.string.onboarding_howitworks_step4_title, R.string.onboarding_howitworks_step4_description),
-)
+private const val MIN_CARD_COUNT = 3
 
 @Composable
-fun HowItWorksStep(onContinue: () -> Unit) {
-    val pagerState = rememberPagerState(pageCount = { pages.size })
-    val scope = rememberCoroutineScope()
+fun HowItWorksStep(
+    selectedPainPoints: Set<OnboardingPainPoint>,
+    onContinue: () -> Unit
+) {
+    val orderedPairs = rememberPainFixPairs(selectedPainPoints)
 
     Column(
         modifier = Modifier
@@ -49,99 +51,150 @@ fun HowItWorksStep(onContinue: () -> Unit) {
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(32.dp))
+
         Text(
             text = stringResource(R.string.onboarding_howitworks_title),
-            fontSize = 28.sp,
+            style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = TextPrimary,
             textAlign = TextAlign.Center
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.onboarding_howitworks_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary,
+            textAlign = TextAlign.Center
+        )
 
-        HorizontalPager(
-            state = pagerState,
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Column(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth()
-        ) { pageIndex ->
-            val page = pages[pageIndex]
-            val title = stringResource(page.titleRes)
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Image(
-                    painter = painterResource(page.imageRes),
-                    contentDescription = title,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(20.dp)),
-                    contentScale = ContentScale.Fit
-                )
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    text = stringResource(page.stepRes),
-                    fontSize = 14.sp,
-                    color = AccentNavy,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = title,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(page.descriptionRes),
-                    fontSize = 15.sp,
-                    color = TextSecondary,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // Page indicator dots
-        Row(
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            repeat(pages.size) { index ->
-                val isSelected = pagerState.currentPage == index
-                Surface(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .size(if (isSelected) 10.dp else 8.dp),
-                    shape = CircleShape,
-                    color = if (isSelected) AccentNavy else BorderSubtle
-                ) {}
+            orderedPairs.forEach { pain ->
+                PainFixRow(pain = pain)
             }
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         Button(
-            onClick = {
-                if (pagerState.currentPage < pages.size - 1) {
-                    scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                } else {
-                    onContinue()
-                }
-            },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentNavy)
+            onClick = onContinue,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
         ) {
             Text(
-                if (pagerState.currentPage < pages.size - 1) stringResource(R.string.common_next) else stringResource(R.string.common_continue),
+                text = stringResource(R.string.common_continue),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold
             )
         }
-        Spacer(Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+private fun rememberPainFixPairs(
+    selectedPainPoints: Set<OnboardingPainPoint>
+): List<OnboardingPainPoint> {
+    val ordered = OnboardingPainPoint.entries.filter { selectedPainPoints.contains(it) }.toMutableList()
+    if (ordered.size < MIN_CARD_COUNT) {
+        for (pain in OnboardingPainPoint.defaultOrder) {
+            if (!ordered.contains(pain)) {
+                ordered += pain
+            }
+            if (ordered.size >= MIN_CARD_COUNT) break
+        }
+    }
+    return ordered
+}
+
+@Composable
+private fun PainFixRow(pain: OnboardingPainPoint) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(CardBackground, RoundedCornerShape(18.dp))
+            .border(1.dp, DividerColor, RoundedCornerShape(18.dp))
+            .padding(16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .background(accentForPain(pain), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = fixIconForPain(pain),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = null,
+                    tint = TextMuted,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = stringResource(pain.painRes),
+                    style = MaterialTheme.typography.bodySmall.copy(textDecoration = TextDecoration.LineThrough),
+                    color = TextMuted
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = AccentGreen,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = stringResource(pain.fixRes),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+            }
+        }
+    }
+}
+
+private fun fixIconForPain(pain: OnboardingPainPoint): ImageVector {
+    return when (pain) {
+        OnboardingPainPoint.PROGRESS_BLIND -> Icons.Default.ShowChart
+        OnboardingPainPoint.STOPWATCH_INACCURATE -> Icons.Default.Timer
+        OnboardingPainPoint.HARDWARE_EXPENSIVE -> Icons.Default.AttachMoney
+        OnboardingPainPoint.NO_COACH -> Icons.Default.WifiTethering
+        OnboardingPainPoint.WASTED_SESSIONS -> Icons.Default.ViewList
+        OnboardingPainPoint.SPLITS_BLACK_BOX -> Icons.Default.CallSplit
+    }
+}
+
+private fun accentForPain(pain: OnboardingPainPoint): Color {
+    return when (pain) {
+        OnboardingPainPoint.PROGRESS_BLIND -> Color(0xFF4CAF50)
+        OnboardingPainPoint.STOPWATCH_INACCURATE -> Color(0xFF5C8DB8)
+        OnboardingPainPoint.HARDWARE_EXPENSIVE -> Color(0xFFF59E0B)
+        OnboardingPainPoint.NO_COACH -> Color(0xFF9A6BD4)
+        OnboardingPainPoint.WASTED_SESSIONS -> Color(0xFF38A6A5)
+        OnboardingPainPoint.SPLITS_BLACK_BOX -> Color(0xFFD94D6A)
     }
 }

@@ -13,7 +13,8 @@ import kotlin.math.abs
  * Reference: docs/protocols/CLOCK_SYNC_DETAILS.md
  */
 class ClockSyncCalculator(
-    private val isFullSync: Boolean = true
+    private val isFullSync: Boolean = true,
+    private val baselineOffsetNanos: Long? = null
 ) {
     private val samples = mutableListOf<SyncSample>()
 
@@ -73,7 +74,7 @@ class ClockSyncCalculator(
         /**
          * Check if sync quality is acceptable for timing.
          */
-        fun isAcceptable(): Boolean = quality >= SyncQuality.FAIR
+        fun isAcceptable(): Boolean = quality != SyncQuality.BAD
 
         /**
          * Check if sync passes validation gate for precision mode.
@@ -82,7 +83,7 @@ class ClockSyncCalculator(
         fun isPrecisionModeValid(): Boolean {
             return minRttMs < ClockSyncConfig.PRECISION_MODE_MIN_RTT_MS &&
                    jitterMs < ClockSyncConfig.PRECISION_MODE_MAX_JITTER_MS &&
-                   quality >= ClockSyncConfig.PRECISION_MODE_MIN_QUALITY
+                   quality.isAtLeast(ClockSyncConfig.PRECISION_MODE_MIN_QUALITY)
         }
     }
 
@@ -90,6 +91,7 @@ class ClockSyncCalculator(
      * Add a sample to the calculator.
      * Samples with RTT above threshold are rejected.
      */
+    @Synchronized
     fun addSample(sample: SyncSample): Boolean {
         val maxRttMs = if (isFullSync) {
             ClockSyncConfig.FULL_SYNC_MAX_RTT_MS
@@ -100,6 +102,17 @@ class ClockSyncCalculator(
         val rttMs = sample.rtt / 1_000_000.0
         if (rttMs > maxRttMs || rttMs < 0) {
             return false  // Reject high-latency or invalid sample
+        }
+
+        val processingLatency = sample.t3 - sample.t2
+        if (processingLatency < 0 || processingLatency > ClockSyncConfig.MAX_PROCESSING_LATENCY_NANOS) {
+            return false
+        }
+
+        if (baselineOffsetNanos != null &&
+            abs(sample.offset - baselineOffsetNanos) > ClockSyncConfig.MAX_OFFSET_JUMP_NANOS
+        ) {
+            return false
         }
 
         samples.add(sample)
@@ -122,31 +135,71 @@ class ClockSyncCalculator(
      * 2. Keep lowest 15-20% RTT samples
      * 3. Calculate median offset from filtered samples
      */
+    @Synchronized
     fun calculateOffset(): SyncResult? {
-        val minSamples = ClockSyncConfig.FULL_SYNC_MIN_VALID_SAMPLES
+        val minSamples = if (isFullSync) {
+            ClockSyncConfig.FULL_SYNC_MIN_VALID_SAMPLES
+        } else {
+            ClockSyncConfig.MINI_SYNC_MIN_VALID_SAMPLES
+        }
         if (samples.size < minSamples) {
             return null
         }
 
-        // Sort by RTT (lowest first)
+        // Match the current iOS estimator: adaptive min-RTT filtering, BLE
+        // outlier removal, then the lowest 15% RTT samples.
         val sortedByRtt = samples.sortedBy { it.rtt }
+        val minimumRtt = sortedByRtt.first().rtt
+        val adaptiveThreshold = maxOf(minimumRtt * 2L, 5_000_000L)
+        var workingSamples = samples.filter { it.rtt <= adaptiveThreshold }
 
-        // Keep lowest 15-20% RTT samples
+        if (workingSamples.size >= 10) {
+            val rtts = workingSamples.map { it.rtt.toDouble() }
+            val sortedRtts = rtts.sorted()
+            val medianRtt = sortedRtts[sortedRtts.size / 2]
+            val mean = rtts.average()
+            val variance = rtts.sumOf { value ->
+                val delta = value - mean
+                delta * delta
+            } / rtts.size
+            val standardDeviation = kotlin.math.sqrt(variance)
+            val outlierThreshold = medianRtt + (2.0 * standardDeviation)
+            workingSamples = workingSamples.filter { it.rtt.toDouble() <= outlierThreshold }
+        }
+
+        if (workingSamples.size < 3) {
+            workingSamples = sortedByRtt.take(ClockSyncConfig.FULL_SYNC_MIN_VALID_SAMPLES)
+            if (workingSamples.size < 3) return null
+        }
+
+        val sortedWorking = workingSamples.sortedBy { it.rtt }
+
         val filterPercentile = if (isFullSync) {
             ClockSyncConfig.FULL_SYNC_RTT_FILTER_PERCENTILE
         } else {
-            ClockSyncConfig.FULL_SYNC_RTT_FILTER_PERCENTILE
+            ClockSyncConfig.MINI_SYNC_RTT_FILTER_PERCENTILE
         }
 
-        val filterCount = (samples.size * filterPercentile).toInt()
-            .coerceAtLeast(minSamples)
-            .coerceAtMost(samples.size)
+        val filterCount = (sortedWorking.size * filterPercentile).toInt()
+            .coerceAtLeast(3)
+            .coerceAtMost(sortedWorking.size)
+        val filtered = sortedWorking.take(filterCount)
 
-        val filtered = sortedByRtt.take(filterCount)
-
-        // Calculate median offset (robust to outliers)
-        val offsets = filtered.map { it.offset }.sorted()
-        val medianOffset = offsets[offsets.size / 2]
+        val minRttSample = filtered.first()
+        val minRttOffset = minRttSample.offset
+        var weightedSum = 0.0
+        var totalWeight = 0.0
+        filtered.forEach { sample ->
+            val weight = 1.0 / maxOf(sample.rtt, 1L).toDouble()
+            weightedSum += sample.offset.toDouble() * weight
+            totalWeight += weight
+        }
+        val weightedOffset = (weightedSum / totalWeight).toLong()
+        val finalOffset = if (abs(minRttOffset - weightedOffset) > minRttSample.rtt / 2L) {
+            weightedOffset
+        } else {
+            minRttOffset
+        }
 
         // Calculate RTT statistics from ALL samples (not just filtered)
         // This gives us true jitter across the connection
@@ -159,30 +212,42 @@ class ClockSyncCalculator(
         val p95Index = (allRtts.size * 0.95).toInt().coerceAtMost(allRtts.size - 1)
         val p95Rtt = allRtts[p95Index]
 
-        // Median RTT from filtered samples (used for offset)
-        val filteredRtts = filtered.map { it.rtt / 1_000_000.0 }.sorted()
-        val medianRtt = filteredRtts[filteredRtts.size / 2]
-
-        // Uncertainty is max half-RTT from filtered samples
-        val maxUncertainty = filtered.maxOf { it.uncertaintyMs }
+        val filteredRttsNanos = filtered.map { it.rtt }.sorted()
+        val medianRttNanos = medianOfLongs(filteredRttsNanos)
+        val absoluteOffsetDeviations = filtered
+            .map { abs(it.offset - finalOffset) }
+            .sorted()
+        val medianAbsoluteDeviation = medianOfLongs(absoluteOffsetDeviations)
+        val uncertaintyMs =
+            (minRttSample.rtt / 2L + medianAbsoluteDeviation) / 1_000_000.0
 
         return SyncResult(
-            offsetNanos = medianOffset,
-            uncertaintyMs = maxUncertainty,
+            offsetNanos = finalOffset,
+            uncertaintyMs = uncertaintyMs,
             samplesUsed = filtered.size,
             totalSamples = samples.size,
-            quality = SyncQuality.fromUncertainty(maxUncertainty),
+            quality = SyncQuality.fromUncertaintyAndRtt(uncertaintyMs, minRtt),
             minRttMs = minRtt,
             maxRttMs = maxRtt,
-            medianRttMs = medianRtt,
+            medianRttMs = medianRttNanos / 1_000_000.0,
             p50RttMs = p50Rtt,
             p95RttMs = p95Rtt
         )
     }
 
+    private fun medianOfLongs(sortedValues: List<Long>): Long {
+        val middle = sortedValues.size / 2
+        return if (sortedValues.size % 2 == 0) {
+            (sortedValues[middle - 1] + sortedValues[middle]) / 2L
+        } else {
+            sortedValues[middle]
+        }
+    }
+
     /**
      * Reset calculator for new sync session.
      */
+    @Synchronized
     fun reset() {
         samples.clear()
     }
@@ -190,11 +255,13 @@ class ClockSyncCalculator(
     /**
      * Get current sample count.
      */
+    @Synchronized
     fun getSampleCount(): Int = samples.size
 
     /**
      * Get progress (0.0 - 1.0) for full sync.
      */
+    @Synchronized
     fun getProgress(): Float {
         val target = if (isFullSync) {
             ClockSyncConfig.FULL_SYNC_SAMPLES
@@ -221,6 +288,7 @@ class DriftTracker {
     /**
      * Add a new offset measurement.
      */
+    @Synchronized
     fun addMeasurement(localTime: Long, offset: Long) {
         // Prune old samples
         val cutoff = localTime - maxHistoryDurationNanos
@@ -234,6 +302,7 @@ class DriftTracker {
      * Positive = remote getting further ahead.
      * Requires at least 30 seconds of data.
      */
+    @Synchronized
     fun calculateDriftRate(): Double? {
         if (history.size < 2) return null
 
@@ -259,8 +328,15 @@ class DriftTracker {
     /**
      * Predict offset at a future time, accounting for drift.
      */
+    @Synchronized
     fun predictOffset(atTime: Long): Long {
-        val lastSample = history.lastOrNull() ?: return 0
+        return predictOffsetOrNull(atTime) ?: 0L
+    }
+
+    /** Returns null when no accepted sync measurement exists yet. */
+    @Synchronized
+    fun predictOffsetOrNull(atTime: Long): Long? {
+        val lastSample = history.lastOrNull() ?: return null
         val driftRate = calculateDriftRate() ?: return lastSample.offset
 
         val elapsed = atTime - lastSample.timestamp
@@ -273,11 +349,13 @@ class DriftTracker {
      * Get drift rate in parts per million (ppm).
      * Typical values: 1-50 ppm for modern devices.
      */
+    @Synchronized
     fun getDriftPpm(): Double? {
         val rate = calculateDriftRate() ?: return null
         return rate / 1000.0  // nanos/sec / 1000 = ppm
     }
 
+    @Synchronized
     fun reset() {
         history.clear()
     }

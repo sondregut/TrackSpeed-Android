@@ -16,16 +16,22 @@ val localProperties = Properties().also { props ->
 }
 fun localProp(key: String): String = localProperties.getProperty(key) ?: ""
 
+val releaseStoreFilePath = localProp("TRACKSPEED_RELEASE_STORE_FILE")
+val hasReleaseSigning = releaseStoreFilePath.isNotBlank() &&
+    localProp("TRACKSPEED_RELEASE_STORE_PASSWORD").isNotBlank() &&
+    localProp("TRACKSPEED_RELEASE_KEY_ALIAS").isNotBlank() &&
+    localProp("TRACKSPEED_RELEASE_KEY_PASSWORD").isNotBlank()
+
 android {
     namespace = "com.trackspeed.android"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.trackspeed.android"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 36
+        versionCode = 11
+        versionName = "1.0.10"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -36,11 +42,30 @@ android {
         // RevenueCat API key - loaded from local.properties
         buildConfigField("String", "REVENUECAT_API_KEY", "\"${localProp("REVENUECAT_API_KEY")}\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProp("GOOGLE_WEB_CLIENT_ID")}\"")
+        buildConfigField("String", "POSTHOG_API_KEY", "\"phc_p86OOiNE9o0I8AlDXwRBd7bmcpG4wz7SFt1RSjFey0r\"")
+        buildConfigField("String", "POSTHOG_HOST", "\"https://eu.i.posthog.com\"")
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFilePath)
+                storePassword = localProp("TRACKSPEED_RELEASE_STORE_PASSWORD")
+                keyAlias = localProp("TRACKSPEED_RELEASE_KEY_ALIAS")
+                keyPassword = localProp("TRACKSPEED_RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -124,9 +149,19 @@ dependencies {
     // Camera (Camera2 only - no CameraX needed for Photo Finish mode)
     implementation(libs.camera.camera2)
 
+    // Video overlay export (matches iOS VideoOverlayFlow)
+    implementation(libs.media3.common)
+    implementation(libs.media3.effect)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.transformer)
+    implementation(libs.media3.ui)
+
     // RevenueCat (subscriptions)
     implementation(libs.revenuecat.purchases)
     implementation(libs.revenuecat.purchases.ui)
+
+    // PostHog (analytics + crash diagnostics)
+    implementation(libs.posthog.android)
 
     // Google Play In-App Review
     implementation("com.google.android.play:review:2.0.2")

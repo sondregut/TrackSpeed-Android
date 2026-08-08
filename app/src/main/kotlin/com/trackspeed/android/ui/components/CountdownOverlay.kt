@@ -1,9 +1,6 @@
 package com.trackspeed.android.ui.components
 
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.os.Build
-import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -60,6 +57,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.audio.AudioStartTiming
+import com.trackspeed.android.audio.StartSoundPlayer
+import com.trackspeed.android.model.StartSoundType
 import com.trackspeed.android.ui.theme.AccentNavy
 import kotlinx.coroutines.delay
 import kotlin.random.Random
@@ -89,6 +89,7 @@ fun CountdownOverlay(
     countdownFrom: Int = 3,
     preStartDelayMin: Double = 3.0,
     preStartDelayMax: Double = 5.0,
+    startSoundType: StartSoundType = StartSoundType.BEEP,
     onCountdownComplete: (Long) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -98,14 +99,7 @@ fun CountdownOverlay(
     var countdownValue by remember { mutableIntStateOf(0) }
     var isRunning by remember { mutableStateOf(false) }
 
-    // Tone generator for beep on GO
-    val toneGenerator = remember {
-        try {
-            ToneGenerator(AudioManager.STREAM_MUSIC, ToneGenerator.MAX_VOLUME)
-        } catch (e: Exception) {
-            null
-        }
-    }
+    val startSoundPlayer = remember { StartSoundPlayer(context) }
 
     // Vibrator for haptic
     val vibrator = remember {
@@ -125,10 +119,9 @@ fun CountdownOverlay(
     // Scale animation for numbers
     val scale = remember { Animatable(1f) }
 
-    // Cleanup tone generator
     DisposableEffect(Unit) {
         onDispose {
-            toneGenerator?.release()
+            startSoundPlayer.release()
         }
     }
 
@@ -173,8 +166,8 @@ fun CountdownOverlay(
             delay(1000L)
         }
 
-        // GO! - capture precise timestamp BEFORE playing sound
-        val startTimestamp = SystemClock.elapsedRealtimeNanos()
+        // GO! - capture the timestamp as the estimated moment the audible cue reaches the athlete.
+        val startTimestamp = AudioStartTiming.monotonicNanosAudioCompensated(context)
 
         countdownValue = -1
 
@@ -188,10 +181,10 @@ fun CountdownOverlay(
             }
         }
 
-        // Play beep
-        toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 200)
+        // Play start sound
+        startSoundPlayer.play(startSoundType)
 
-        Log.i("CountdownOverlay", "Countdown complete! Timer started at $startTimestamp")
+        Log.i("CountdownOverlay", "Countdown complete! Timer started at $startTimestamp (audio-compensated)")
         onCountdownComplete(startTimestamp)
     }
 

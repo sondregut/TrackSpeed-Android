@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import com.trackspeed.android.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,13 +25,27 @@ import javax.inject.Singleton
 object NotificationIds {
     const val TRY_PRO_REMINDER = "com.trackspeed.tryProReminder"
     const val TRAINING_REMINDER = "com.trackspeed.trainingReminder"
+    const val BILLING_ISSUE_REMINDER = "com.trackspeed.billingIssue"
+    const val PROMO_OFFER_REMINDER = "com.trackspeed.promoOffer"
+    const val FIRST_SESSION_NUDGE = "com.trackspeed.firstSessionNudge"
+    const val MILESTONE_NUDGE = "com.trackspeed.milestoneNudge"
+    const val DAY_14_FOLLOW_UP = "com.trackspeed.day14FollowUp"
+    const val DAY_30_FINAL_NUDGE = "com.trackspeed.day30FinalNudge"
+    const val TRIAL_ENDING_REMINDER = "com.trackspeed.trialEnding"
     const val RATING_PROMPT = "com.trackspeed.ratingPrompt"
     const val TEST_NOTIFICATION = "com.trackspeed.testNotification"
 
     // Request codes for PendingIntent (must be unique ints)
     const val TRY_PRO_REQUEST_CODE = 1001
     const val TRAINING_REMINDER_REQUEST_CODE = 1002
-    const val RATING_PROMPT_REQUEST_CODE = 1003
+    const val BILLING_ISSUE_REQUEST_CODE = 1003
+    const val PROMO_OFFER_REQUEST_CODE = 1004
+    const val FIRST_SESSION_NUDGE_REQUEST_CODE = 1005
+    const val MILESTONE_NUDGE_REQUEST_CODE = 1006
+    const val DAY_14_FOLLOW_UP_REQUEST_CODE = 1007
+    const val DAY_30_FINAL_NUDGE_REQUEST_CODE = 1008
+    const val TRIAL_ENDING_REQUEST_CODE = 1009
+    const val RATING_PROMPT_REQUEST_CODE = 1010
     const val TEST_REQUEST_CODE = 1099
 }
 
@@ -38,14 +53,17 @@ object NotificationIds {
  * Notification timing constants matching iOS behavior.
  */
 object NotificationTiming {
-    /** Days after install before showing Try Pro reminder */
-    const val TRY_PRO_DELAY_DAYS = 14
+    /** Days after signup before showing the value-first Try Pro reminder */
+    const val TRY_PRO_DELAY_DAYS = 3
 
     /** Days of inactivity before sending training reminder */
     const val INACTIVITY_THRESHOLD_DAYS = 7
 
+    /** Days after install before the promotional offer reminder */
+    const val PROMO_OFFER_DELAY_DAYS = 7
+
     /** Number of completed sessions before showing rating prompt */
-    const val RATING_PROMPT_SESSION_COUNT = 5
+    const val RATING_PROMPT_SESSION_COUNT = 3
 
     /** Delay in seconds for test notification */
     const val TEST_DELAY_SECONDS = 5L
@@ -112,9 +130,8 @@ class NotificationService @Inject constructor(
     // ------------------------------------------------------------------
 
     /**
-     * Schedule "Try Pro" reminder 14 days after install for non-subscribers.
-     * Title: "Ready to unlock your full potential?"
-     * Body: "Try TrackSpeed Pro free for 7 days - precision timing, 2-phone sync, and more."
+     * Schedule the value-first "Try Pro" reminder 3 days after signup.
+     * Copy matches iOS LocalNotificationService.
      */
     suspend fun scheduleTryProReminder() {
         val enabled = settingsRepository.tryProReminderEnabled.first()
@@ -130,8 +147,8 @@ class NotificationService @Inject constructor(
 
         val intent = createAlarmIntent(
             notificationType = NotificationIds.TRY_PRO_REMINDER,
-            title = "Ready to unlock your full potential?",
-            body = "Try TrackSpeed Pro free for 7 days - precision timing, 2-phone sync, and more."
+            title = "Time your next sprint",
+            body = "Set the phone chest-high, ~2.5 metres from the line. Press start and sprint through."
         )
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -161,7 +178,7 @@ class NotificationService @Inject constructor(
      * Schedule training reminder that fires after 7 days of inactivity.
      * Should be rescheduled on each session completion to push the reminder forward.
      * Title: "Ready to Train?"
-     * Body: "It's been a while! Time to hit the track?"
+     * Body: "It's been a while - start a new timing session!"
      */
     suspend fun scheduleTrainingReminder() {
         val enabled = settingsRepository.trainingReminderEnabled.first()
@@ -178,7 +195,7 @@ class NotificationService @Inject constructor(
         val intent = createAlarmIntent(
             notificationType = NotificationIds.TRAINING_REMINDER,
             title = "Ready to Train?",
-            body = "It's been a while! Time to hit the track?"
+            body = "It's been a while - start a new timing session!"
         )
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -202,19 +219,242 @@ class NotificationService @Inject constructor(
     }
 
     // ------------------------------------------------------------------
+    // Billing Issue Reminder
+    // ------------------------------------------------------------------
+
+    suspend fun scheduleBillingIssueReminder(gracePeriodExpiresAtMillis: Long) {
+        val enabled = settingsRepository.billingIssueReminderEnabled.first()
+        if (!enabled) {
+            Log.d(TAG, "Billing issue reminder disabled in settings")
+            return
+        }
+
+        val fireAtMillis = gracePeriodExpiresAtMillis - TimeUnit.DAYS.toMillis(2)
+        if (fireAtMillis <= System.currentTimeMillis()) {
+            Log.d(TAG, "Grace period expires too soon, not scheduling billing reminder")
+            return
+        }
+
+        scheduleNotificationAtWallClock(
+            requestCode = NotificationIds.BILLING_ISSUE_REQUEST_CODE,
+            notificationType = NotificationIds.BILLING_ISSUE_REMINDER,
+            title = "Payment Issue",
+            body = "Please update your payment method to keep Pro access",
+            fireAtMillis = fireAtMillis
+        )
+    }
+
+    fun cancelBillingIssueReminder() {
+        cancelAlarm(NotificationIds.BILLING_ISSUE_REQUEST_CODE)
+        Log.d(TAG, "Cancelled billing issue reminder")
+    }
+
+    // ------------------------------------------------------------------
+    // Trial-End Reminder
+    // ------------------------------------------------------------------
+
+    fun scheduleTrialEndReminder(trialEndsAtMillis: Long) {
+        val fireAtMillis = trialEndsAtMillis - TimeUnit.DAYS.toMillis(2)
+        if (fireAtMillis <= System.currentTimeMillis()) {
+            Log.d(TAG, "Trial ends too soon, not scheduling trial-end reminder")
+            return
+        }
+
+        scheduleNotificationAtWallClock(
+            requestCode = NotificationIds.TRIAL_ENDING_REQUEST_CODE,
+            notificationType = NotificationIds.TRIAL_ENDING_REMINDER,
+            title = "Your free trial ends soon",
+            body = "Your TrackSpeed trial ends in 2 days. Keep training, or cancel anytime in Settings - no charge if you cancel before it ends.",
+            fireAtMillis = fireAtMillis
+        )
+    }
+
+    fun cancelTrialEndReminder() {
+        cancelAlarm(NotificationIds.TRIAL_ENDING_REQUEST_CODE)
+        Log.d(TAG, "Cancelled trial-end reminder")
+    }
+
+    // ------------------------------------------------------------------
+    // Promotional Offer Reminder
+    // ------------------------------------------------------------------
+
+    suspend fun schedulePromoOfferReminder() {
+        val enabled = settingsRepository.promoOfferReminderEnabled.first()
+        if (!enabled) {
+            Log.d(TAG, "Promo offer reminder disabled in settings")
+            return
+        }
+
+        scheduleNotificationAfter(
+            requestCode = NotificationIds.PROMO_OFFER_REQUEST_CODE,
+            notificationType = NotificationIds.PROMO_OFFER_REMINDER,
+            title = "Your discount is live",
+            body = "Save on your first year of TrackSpeed Pro - offer good for 48 hours after you open it.",
+            delayMillis = TimeUnit.DAYS.toMillis(NotificationTiming.PROMO_OFFER_DELAY_DAYS.toLong())
+        )
+    }
+
+    fun cancelPromoOfferReminder() {
+        cancelAlarm(NotificationIds.PROMO_OFFER_REQUEST_CODE)
+        Log.d(TAG, "Cancelled promo offer reminder")
+    }
+
+    // ------------------------------------------------------------------
+    // Conversion Nudges
+    // ------------------------------------------------------------------
+
+    suspend fun scheduleFirstSessionNudge() {
+        val enabled = settingsRepository.tryProReminderEnabled.first()
+        if (!enabled) {
+            Log.d(TAG, "First session nudge disabled")
+            return
+        }
+
+        scheduleNotificationAfter(
+            requestCode = NotificationIds.FIRST_SESSION_NUDGE_REQUEST_CODE,
+            notificationType = NotificationIds.FIRST_SESSION_NUDGE,
+            title = "See Your Finish Frame-by-Frame",
+            body = "Pro shows exactly where you crossed the line. Try it free for 7 days.",
+            delayMillis = TimeUnit.HOURS.toMillis(2)
+        )
+    }
+
+    fun cancelFirstSessionNudge() {
+        cancelAlarm(NotificationIds.FIRST_SESSION_NUDGE_REQUEST_CODE)
+        Log.d(TAG, "Cancelled first session nudge")
+    }
+
+    suspend fun scheduleMilestoneNudge() {
+        val enabled = settingsRepository.tryProReminderEnabled.first()
+        if (!enabled) {
+            Log.d(TAG, "Milestone nudge disabled")
+            return
+        }
+
+        scheduleNotificationAfter(
+            requestCode = NotificationIds.MILESTONE_NUDGE_REQUEST_CODE,
+            notificationType = NotificationIds.MILESTONE_NUDGE,
+            title = "You're Getting Faster",
+            body = "3 sessions done. Track your improvement over time with Pro.",
+            delayMillis = TimeUnit.DAYS.toMillis(1)
+        )
+    }
+
+    fun cancelMilestoneNudge() {
+        cancelAlarm(NotificationIds.MILESTONE_NUDGE_REQUEST_CODE)
+        Log.d(TAG, "Cancelled milestone nudge")
+    }
+
+    suspend fun scheduleDay14FollowUp() {
+        val enabled = settingsRepository.promoOfferReminderEnabled.first()
+        if (!enabled) {
+            Log.d(TAG, "Day 14 follow-up disabled")
+            return
+        }
+
+        val fireAtMillis = installTimeMillis() + TimeUnit.DAYS.toMillis(14)
+        if (fireAtMillis <= System.currentTimeMillis()) {
+            Log.d(TAG, "Day 14 already passed, skipping follow-up")
+            return
+        }
+
+        scheduleNotificationAtWallClock(
+            requestCode = NotificationIds.DAY_14_FOLLOW_UP_REQUEST_CODE,
+            notificationType = NotificationIds.DAY_14_FOLLOW_UP,
+            title = "Unlock All Start Types & Presets",
+            body = "Solo mode is just the start. Try 2-phone sync and precision timing free.",
+            fireAtMillis = fireAtMillis
+        )
+    }
+
+    fun cancelDay14FollowUp() {
+        cancelAlarm(NotificationIds.DAY_14_FOLLOW_UP_REQUEST_CODE)
+        Log.d(TAG, "Cancelled day 14 follow-up")
+    }
+
+    suspend fun scheduleDay30FinalNudge() {
+        val enabled = settingsRepository.promoOfferReminderEnabled.first()
+        if (!enabled) {
+            Log.d(TAG, "Day 30 final nudge disabled")
+            return
+        }
+
+        val fireAtMillis = installTimeMillis() + TimeUnit.DAYS.toMillis(30)
+        if (fireAtMillis <= System.currentTimeMillis()) {
+            Log.d(TAG, "Day 30 already passed, skipping final nudge")
+            return
+        }
+
+        scheduleNotificationAtWallClock(
+            requestCode = NotificationIds.DAY_30_FINAL_NUDGE_REQUEST_CODE,
+            notificationType = NotificationIds.DAY_30_FINAL_NUDGE,
+            title = "Still Timing Solo?",
+            body = "Unlock 2-phone sync, all presets, and unlimited history. Start your free trial.",
+            fireAtMillis = fireAtMillis
+        )
+    }
+
+    fun cancelDay30FinalNudge() {
+        cancelAlarm(NotificationIds.DAY_30_FINAL_NUDGE_REQUEST_CODE)
+        Log.d(TAG, "Cancelled day 30 final nudge")
+    }
+
+    suspend fun scheduleStartupReminders(
+        isProUser: Boolean,
+        completedSessionCount: Int
+    ) {
+        if (isProUser) {
+            cancelConversionNotifications()
+            return
+        }
+
+        if (!hasPendingAlarm(NotificationIds.TRY_PRO_REQUEST_CODE)) {
+            scheduleTryProReminder()
+        }
+
+        scheduleTrainingReminder()
+
+        if (!hasPendingAlarm(NotificationIds.PROMO_OFFER_REQUEST_CODE)) {
+            schedulePromoOfferReminder()
+        }
+
+        if (completedSessionCount >= 1 &&
+            !hasPendingAlarm(NotificationIds.DAY_14_FOLLOW_UP_REQUEST_CODE)
+        ) {
+            scheduleDay14FollowUp()
+        }
+
+        // iOS intentionally does not schedule the day-30 final nudge on startup.
+        cancelDay30FinalNudge()
+    }
+
+    fun cancelConversionNotifications() {
+        cancelTryProReminder()
+        cancelPromoOfferReminder()
+        cancelFirstSessionNudge()
+        cancelMilestoneNudge()
+        cancelDay14FollowUp()
+        cancelDay30FinalNudge()
+    }
+
+    // ------------------------------------------------------------------
     // Rating Prompt
     // ------------------------------------------------------------------
 
     /**
-     * Schedule a rating prompt notification after the 5th completed session.
+     * Schedule a rating prompt notification after the 3rd completed session.
      * This fires 2 hours after the qualifying session to avoid interrupting the user.
      * Title: "Enjoying TrackSpeed?"
-     * Body: "You've completed 5 sessions! Take a moment to rate the app."
+     * Body: "You've completed 3 sessions! Take a moment to rate the app."
      */
     suspend fun scheduleRatingPrompt() {
         val enabled = settingsRepository.ratingPromptEnabled.first()
         if (!enabled) {
             Log.d(TAG, "Rating prompt disabled in settings")
+            return
+        }
+        if (settingsRepository.hasBeenAskedForReview.first()) {
+            Log.d(TAG, "Rating prompt already shown")
             return
         }
 
@@ -227,7 +467,7 @@ class NotificationService @Inject constructor(
         val intent = createAlarmIntent(
             notificationType = NotificationIds.RATING_PROMPT,
             title = "Enjoying TrackSpeed?",
-            body = "You've completed 5 sessions! Take a moment to rate the app."
+            body = "You've completed 3 sessions! Take a moment to rate the app."
         )
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -290,6 +530,13 @@ class NotificationService @Inject constructor(
     fun cancelAllNotifications() {
         cancelTryProReminder()
         cancelTrainingReminder()
+        cancelBillingIssueReminder()
+        cancelPromoOfferReminder()
+        cancelFirstSessionNudge()
+        cancelMilestoneNudge()
+        cancelDay14FollowUp()
+        cancelDay30FinalNudge()
+        cancelTrialEndReminder()
         cancelRatingPrompt()
         cancelAlarm(NotificationIds.TEST_REQUEST_CODE)
         notificationManager.cancelAll()
@@ -311,6 +558,37 @@ class NotificationService @Inject constructor(
             putExtra(NotificationReceiver.EXTRA_TITLE, title)
             putExtra(NotificationReceiver.EXTRA_BODY, body)
         }
+    }
+
+    private fun scheduleNotificationAfter(
+        requestCode: Int,
+        notificationType: String,
+        title: String,
+        body: String,
+        delayMillis: Long
+    ) {
+        cancelAlarm(requestCode)
+        val triggerAtMillis = SystemClock.elapsedRealtime() + delayMillis
+        val intent = createAlarmIntent(notificationType, title, body)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        scheduleAlarm(triggerAtMillis, pendingIntent)
+        Log.d(TAG, "Scheduled $notificationType in ${delayMillis / 1000}s")
+    }
+
+    private fun scheduleNotificationAtWallClock(
+        requestCode: Int,
+        notificationType: String,
+        title: String,
+        body: String,
+        fireAtMillis: Long
+    ) {
+        val delayMillis = (fireAtMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+        scheduleNotificationAfter(requestCode, notificationType, title, body, delayMillis)
     }
 
     private fun scheduleAlarm(triggerAtMillis: Long, pendingIntent: PendingIntent) {
@@ -335,18 +613,32 @@ class NotificationService @Inject constructor(
     }
 
     private fun cancelAlarm(requestCode: Int) {
+        val pendingIntent = existingAlarm(requestCode)
+        pendingIntent?.let {
+            alarmManager.cancel(it)
+            it.cancel()
+        }
+    }
+
+    private fun hasPendingAlarm(requestCode: Int): Boolean {
+        return existingAlarm(requestCode) != null
+    }
+
+    private fun existingAlarm(requestCode: Int): PendingIntent? {
         val intent = Intent(context, NotificationReceiver::class.java).apply {
             action = NotificationReceiver.ACTION_SHOW_NOTIFICATION
         }
-        val pendingIntent = PendingIntent.getBroadcast(
+        return PendingIntent.getBroadcast(
             context,
             requestCode,
             intent,
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         )
-        pendingIntent?.let {
-            alarmManager.cancel(it)
-            it.cancel()
-        }
+    }
+
+    private fun installTimeMillis(): Long {
+        return runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).firstInstallTime
+        }.getOrDefault(System.currentTimeMillis())
     }
 }

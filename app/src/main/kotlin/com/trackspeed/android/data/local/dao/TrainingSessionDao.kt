@@ -47,4 +47,7 @@ interface TrainingSessionDao {
 
     @Query("SELECT DISTINCT startType FROM training_sessions ORDER BY startType ASC")
     fun getDistinctStartTypes(): Flow<List<String>>
+
+    @Query("DELETE FROM training_sessions")
+    suspend fun deleteAll()
 }

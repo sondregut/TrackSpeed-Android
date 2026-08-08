@@ -1,6 +1,11 @@
 package com.trackspeed.android.ui.screens.timing
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -10,40 +15,57 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trackspeed.android.BuildConfig
 import com.trackspeed.android.R
+import com.trackspeed.android.audio.AudioStartTiming
 import com.trackspeed.android.camera.CameraManager
+import com.trackspeed.android.data.local.entities.AthleteEntity
 import com.trackspeed.android.detection.PhotoFinishDetector
+import com.trackspeed.android.model.StartSoundType
+import com.trackspeed.android.model.StartType
 import com.trackspeed.android.ui.components.CameraPreview
 import com.trackspeed.android.ui.components.CameraPreviewPlaceholder
 import com.trackspeed.android.ui.components.CountdownOverlay
@@ -55,9 +77,16 @@ import com.trackspeed.android.ui.components.StartOverlaySelector
 import com.trackspeed.android.ui.components.ThumbnailViewerDialog
 import com.trackspeed.android.ui.components.TouchStartOverlay
 import com.trackspeed.android.ui.components.VoiceStartOverlay
+import com.trackspeed.android.ui.components.VoiceStartOverlaySettings
+import com.trackspeed.android.ui.components.VoiceStartOverlaySettingsActions
+import com.trackspeed.android.ui.screens.settings.applyLanguage
 import com.trackspeed.android.ui.util.formatDistance
 import com.trackspeed.android.ui.util.formatTime
+import com.trackspeed.android.ui.util.parseAthleteColor
 import com.trackspeed.android.ui.theme.*
+import com.google.android.play.core.review.ReviewManagerFactory
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // Color constants - keep camera area dark for contrast, update accent/text colors
 private val ScreenBackground = Color(0xFF000000) // Keep dark for camera contrast
@@ -67,7 +96,7 @@ fun BasicTimingScreen(
     onNavigateBack: () -> Unit,
     onPaywallClick: () -> Unit = {},
     distance: Double = 60.0,
-    startType: String = "standing",
+    startType: String = "flying",
     viewModel: BasicTimingViewModel = hiltViewModel()
 ) {
     // Pass distance and startType to ViewModel on first composition
@@ -77,15 +106,29 @@ fun BasicTimingScreen(
 
     val uiState by viewModel.uiState.collectAsState()
     val isProUser by viewModel.isProUser.collectAsState()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var expandedThumbnail by remember { mutableStateOf<ExpandedThumbnail?>(null) }
     var selectedTab by remember { mutableIntStateOf(0) }
     var showFullscreenCamera by remember { mutableStateOf(false) }
+    var showSessionSettings by remember { mutableStateOf(false) }
+    var detectionLogBusy by remember { mutableStateOf(false) }
 
-    // Start mode state
-    var currentStartMode by remember { mutableStateOf(StartMode.FLYING) }
+    fun showDetectionLogError(error: Throwable) {
+        Toast.makeText(
+            context,
+            error.message ?: "Detection log action failed",
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+    // Start mode state — initialize from the startType navigation parameter
+    var currentStartMode by remember { mutableStateOf(StartMode.fromString(startType)) }
     var activeStartOverlay by remember { mutableStateOf<StartMode?>(null) }
     var showStartModeSelector by remember { mutableStateOf(false) }
+    var showBluetoothAudioWarning by remember(currentStartMode) { mutableStateOf(false) }
+    val hasAudibleStartCue = currentStartMode == StartMode.COUNTDOWN || currentStartMode == StartMode.VOICE
 
     // Pro feature gate dialog state
     var proGateDialogMode by remember { mutableStateOf<StartMode?>(null) }
@@ -95,6 +138,74 @@ fun BasicTimingScreen(
         thumbnail = expandedThumbnail,
         onDismiss = { expandedThumbnail = null }
     )
+
+    LaunchedEffect(uiState.startType) {
+        currentStartMode = StartMode.fromString(uiState.startType)
+    }
+
+    LaunchedEffect(context, hasAudibleStartCue) {
+        showBluetoothAudioWarning = hasAudibleStartCue &&
+            AudioStartTiming.hasBluetoothAudioOutput(context)
+    }
+
+    if (showSessionSettings) {
+        SessionSettingsSheet(
+            distance = uiState.distance,
+            startType = currentStartMode.rawValue,
+            detectionDiagnosticsEnabled = uiState.detectionDiagnosticsEnabled,
+            detectionReviewAutoUploadEnabled = uiState.detectionReviewAutoUploadEnabled,
+            showSpeedInResults = uiState.showSpeedInResults,
+            startSoundType = uiState.startSoundType,
+            cameraPerformanceDiagnosticsEnabled = uiState.cameraPerformanceDiagnosticsEnabled,
+            athletes = uiState.athletes,
+            selectedAthleteIds = uiState.selectedAthleteIds,
+            detectionLogBusy = detectionLogBusy,
+            onDismiss = { showSessionSettings = false },
+            onSave = { newDistance, newStartType, startSoundType, diagnosticsEnabled, autoUploadReviewLogs, cameraPerformanceDiagnosticsEnabled, showSpeedInResults, selectedAthleteIds ->
+                val nextStartMode = StartMode.fromString(newStartType)
+                if (!viewModel.canUseStartMode(nextStartMode.rawValue)) {
+                    proGateDialogMode = nextStartMode
+                    return@SessionSettingsSheet
+                }
+
+                currentStartMode = nextStartMode
+                viewModel.setSessionConfig(newDistance, nextStartMode.rawValue)
+                viewModel.setStartSoundType(startSoundType)
+                viewModel.setDetectionDiagnosticsEnabled(diagnosticsEnabled)
+                viewModel.setDetectionReviewAutoUploadEnabled(autoUploadReviewLogs)
+                viewModel.setCameraPerformanceDiagnosticsEnabled(cameraPerformanceDiagnosticsEnabled)
+                viewModel.setShowSpeedInResults(showSpeedInResults)
+                viewModel.setSelectedAthletes(selectedAthleteIds)
+                showSessionSettings = false
+            },
+            onDetectionLogExport = {
+                if (!detectionLogBusy) {
+                    coroutineScope.launch {
+                        detectionLogBusy = true
+                        runCatching { viewModel.exportDetectionReviewLog() }
+                            .onSuccess { shareDetectionLogFile(context, it) }
+                            .onFailure { showDetectionLogError(it) }
+                        detectionLogBusy = false
+                    }
+                }
+            },
+            onDetectionLogUpload = {
+                if (!detectionLogBusy) {
+                    coroutineScope.launch {
+                        detectionLogBusy = true
+                        runCatching { viewModel.uploadDetectionReviewLog() }
+                            .onSuccess { shareDetectionLogUrl(context, it) }
+                            .onFailure { showDetectionLogError(it) }
+                        detectionLogBusy = false
+                    }
+                }
+            },
+            onEndSession = {
+                showSessionSettings = false
+                onNavigateBack()
+            }
+        )
+    }
 
     // Pro feature gate dialog for start modes
     proGateDialogMode?.let { mode ->
@@ -131,8 +242,9 @@ fun BasicTimingScreen(
         StartOverlaySelector(
             currentMode = currentStartMode,
             onModeSelected = { mode ->
-                if (viewModel.canUseStartMode(mode.name)) {
+                if (viewModel.canUseStartMode(mode.rawValue)) {
                     currentStartMode = mode
+                    viewModel.setSessionConfig(uiState.distance, mode.rawValue)
                 } else {
                     proGateDialogMode = mode
                 }
@@ -149,6 +261,22 @@ fun BasicTimingScreen(
         if (uiState.sessionSaved) {
             snackbarHostState.showSnackbar(sessionSavedMessage)
             viewModel.onSessionSavedConsumed()
+        }
+    }
+
+    LaunchedEffect(uiState.reviewPromptRequested) {
+        if (uiState.reviewPromptRequested) {
+            viewModel.onReviewPromptRequestedConsumed()
+            delay(1500)
+            val activity = context as? Activity ?: return@LaunchedEffect
+            runCatching {
+                val reviewManager = ReviewManagerFactory.create(context)
+                reviewManager.requestReviewFlow().addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        reviewManager.launchReviewFlow(activity, task.result)
+                    }
+                }
+            }
         }
     }
 
@@ -268,9 +396,15 @@ fun BasicTimingScreen(
                 TopBar(
                     distance = uiState.distance,
                     startType = uiState.startType,
-                    onSettingsClick = { /* TODO: settings */ },
+                    onSettingsClick = { showSessionSettings = true },
                     onEndClick = onNavigateBack
                 )
+
+                if (showBluetoothAudioWarning) {
+                    BluetoothAudioWarningBanner(
+                        onDismiss = { showBluetoothAudioWarning = false }
+                    )
+                }
 
                 // 2. Tab Row
                 TimingTabRow(
@@ -332,6 +466,9 @@ fun BasicTimingScreen(
                 onCancel = { activeStartOverlay = null }
             )
             StartMode.COUNTDOWN -> CountdownOverlay(
+                preStartDelayMin = uiState.preStartDelayMin.toDouble(),
+                preStartDelayMax = uiState.preStartDelayMax.toDouble(),
+                startSoundType = StartSoundType.fromRawValue(uiState.startSoundType),
                 onCountdownComplete = { timestamp ->
                     viewModel.handleExternalStart(timestamp)
                     activeStartOverlay = null
@@ -340,6 +477,31 @@ fun BasicTimingScreen(
             )
             StartMode.VOICE -> VoiceStartOverlay(
                 voiceStartService = viewModel.voiceStartService,
+                settings = VoiceStartOverlaySettings(
+                    voiceProvider = uiState.voiceProvider,
+                    elevenLabsVoice = uiState.elevenLabsVoice,
+                    voiceGender = uiState.voiceGender,
+                    appLanguage = uiState.appLanguage,
+                    startSoundType = uiState.startSoundType,
+                    preStartDelayMin = uiState.preStartDelayMin,
+                    marksSetDelayMin = uiState.marksSetDelayMin,
+                    setGoHoldMin = uiState.setGoHoldMin,
+                    includeReadyCommand = uiState.includeReadyCommand
+                ),
+                settingsActions = VoiceStartOverlaySettingsActions(
+                    onVoiceProviderChanged = viewModel::setVoiceProvider,
+                    onElevenLabsVoiceChanged = viewModel::setElevenLabsVoice,
+                    onVoiceGenderChanged = viewModel::setVoiceGender,
+                    onAppLanguageChanged = { tag ->
+                        viewModel.setAppLanguage(tag)
+                        applyLanguage(tag)
+                    },
+                    onStartSoundTypeChanged = viewModel::setStartSoundType,
+                    onPreStartDelayChanged = viewModel::setPreStartDelayMin,
+                    onMarksSetDelayChanged = viewModel::setMarksSetDelayMin,
+                    onSetGoHoldChanged = viewModel::setSetGoHoldMin,
+                    onIncludeReadyCommandChanged = viewModel::setIncludeReadyCommand
+                ),
                 onStart = { timestamp ->
                     viewModel.handleExternalStart(timestamp)
                     activeStartOverlay = null
@@ -358,6 +520,607 @@ fun BasicTimingScreen(
                 // Flying mode doesn't use an overlay
                 activeStartOverlay = null
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SessionSettingsSheet(
+    distance: Double,
+    startType: String,
+    detectionDiagnosticsEnabled: Boolean,
+    detectionReviewAutoUploadEnabled: Boolean,
+    showSpeedInResults: Boolean,
+    startSoundType: String,
+    cameraPerformanceDiagnosticsEnabled: Boolean,
+    athletes: List<AthleteEntity>,
+    selectedAthleteIds: Set<String>,
+    detectionLogBusy: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (
+        distance: Double,
+        startType: String,
+        startSoundType: String,
+        detectionDiagnosticsEnabled: Boolean,
+        detectionReviewAutoUploadEnabled: Boolean,
+        cameraPerformanceDiagnosticsEnabled: Boolean,
+        showSpeedInResults: Boolean,
+        selectedAthleteIds: Set<String>
+    ) -> Unit,
+    onDetectionLogExport: () -> Unit,
+    onDetectionLogUpload: () -> Unit,
+    onEndSession: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var pendingDistanceText by remember(distance) { mutableStateOf(formatDistanceInput(distance)) }
+    var pendingStartType by remember(startType) { mutableStateOf(StartType.fromRawValue(startType).rawValue) }
+    var pendingDiagnosticsEnabled by remember(detectionDiagnosticsEnabled) {
+        mutableStateOf(detectionDiagnosticsEnabled)
+    }
+    var pendingReviewAutoUploadEnabled by remember(detectionReviewAutoUploadEnabled) {
+        mutableStateOf(detectionReviewAutoUploadEnabled)
+    }
+    var pendingCameraPerformanceDiagnosticsEnabled by remember(cameraPerformanceDiagnosticsEnabled) {
+        mutableStateOf(cameraPerformanceDiagnosticsEnabled)
+    }
+    var pendingShowSpeedInResults by remember(showSpeedInResults) { mutableStateOf(showSpeedInResults) }
+    var pendingStartSoundType by remember(startSoundType) {
+        mutableStateOf(StartSoundType.fromRawValue(startSoundType).rawValue)
+    }
+    var pendingAthleteIds by remember(selectedAthleteIds) { mutableStateOf(selectedAthleteIds) }
+    val pendingDistance = pendingDistanceText.toDoubleOrNull()?.takeIf { it > 0.0 }
+    val hasChanges = pendingDistance != null &&
+        (pendingDistance != distance ||
+            pendingStartType != StartType.fromRawValue(startType).rawValue ||
+            pendingStartSoundType != StartSoundType.fromRawValue(startSoundType).rawValue ||
+            pendingDiagnosticsEnabled != detectionDiagnosticsEnabled ||
+            pendingReviewAutoUploadEnabled != detectionReviewAutoUploadEnabled ||
+            pendingCameraPerformanceDiagnosticsEnabled != cameraPerformanceDiagnosticsEnabled ||
+            pendingShowSpeedInResults != showSpeedInResults ||
+            pendingAthleteIds != selectedAthleteIds)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = SurfaceDark,
+        dragHandle = {
+            Box(
+                modifier = Modifier.padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(44.dp)
+                        .height(4.dp)
+                        .background(TextTertiary, RoundedCornerShape(2.dp))
+                )
+            }
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Session Settings",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = TextPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.common_cancel), color = TextSecondary)
+                }
+            }
+
+            SessionSheetSection(title = "Test Type") {
+                StartType.entries.chunked(2).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        row.forEach { type ->
+                            SessionSettingsChip(
+                                title = type.shortName,
+                                subtitle = if (type.isPro) "PRO" else null,
+                                selected = pendingStartType == type.rawValue,
+                                onClick = { pendingStartType = type.rawValue },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (row.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+
+            SessionSheetSection(title = "Distance") {
+                val distancePresets = listOf(5, 10, 20, 30, 40, 50, 60, 100)
+                distancePresets.chunked(4).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        row.forEach { preset ->
+                            SessionSettingsChip(
+                                title = "${preset}m",
+                                selected = pendingDistance == preset.toDouble(),
+                                onClick = { pendingDistanceText = preset.toString() },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = pendingDistanceText,
+                    onValueChange = { newValue ->
+                        val filtered = filterDistanceInput(newValue)
+                        pendingDistanceText = filtered
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Custom distance", color = TextSecondary) },
+                    suffix = { Text("m", color = TextSecondary) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = DividerColor,
+                        cursorColor = AccentBlue
+                    )
+                )
+            }
+
+            SessionSheetSection(
+                title = "Active Athlete",
+                trailing = if (pendingAthleteIds.isNotEmpty()) "${pendingAthleteIds.size} selected" else null
+            ) {
+                if (athletes.isEmpty()) {
+                    Text(
+                        text = "No athletes added yet",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextMuted,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    athletes.forEach { athlete ->
+                        SessionAthleteRow(
+                            athlete = athlete,
+                            selected = athlete.id in pendingAthleteIds,
+                            onClick = {
+                                pendingAthleteIds = if (athlete.id in pendingAthleteIds) {
+                                    pendingAthleteIds - athlete.id
+                                } else {
+                                    pendingAthleteIds + athlete.id
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            SessionSheetSection(title = "Performance") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.VolumeUp,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Start Sound",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = TextPrimary
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    StartSoundType.selectable.forEach { soundType ->
+                        SessionSettingsChip(
+                            title = soundType.displayName,
+                            selected = pendingStartSoundType == soundType.rawValue,
+                            onClick = { pendingStartSoundType = soundType.rawValue },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Text(
+                    text = StartSoundType.fromRawValue(pendingStartSoundType).subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
+                )
+
+                HorizontalDivider(color = DividerColor)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Show Speed",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "Display speed in live timing and run results.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted
+                        )
+                    }
+                    Switch(
+                        checked = pendingShowSpeedInResults,
+                        onCheckedChange = { pendingShowSpeedInResults = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = AccentBlue,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = TextTertiary
+                        )
+                    )
+                }
+            }
+
+            if (BuildConfig.DEBUG) {
+                SessionSheetSection(title = "Detection Debug") {
+                    SessionSettingsToggleRow(
+                        title = "Detection Review Logging",
+                        subtitle = "Show review controls and keep detector diagnostics active.",
+                        checked = pendingDiagnosticsEnabled,
+                        onCheckedChange = { pendingDiagnosticsEnabled = it }
+                    )
+
+                    HorizontalDivider(color = DividerColor)
+
+                    SessionSettingsToggleRow(
+                        title = "Auto Upload Logs",
+                        subtitle = "Upload a backend snapshot after timing ends and after manual markers.",
+                        checked = pendingReviewAutoUploadEnabled,
+                        onCheckedChange = { pendingReviewAutoUploadEnabled = it }
+                    )
+
+                    HorizontalDivider(color = DividerColor)
+
+                    SessionSettingsToggleRow(
+                        title = "Camera Timing Summaries",
+                        subtitle = "Log frame callback timing summaries while timing.",
+                        checked = pendingCameraPerformanceDiagnosticsEnabled,
+                        onCheckedChange = { pendingCameraPerformanceDiagnosticsEnabled = it }
+                    )
+
+                    HorizontalDivider(color = DividerColor)
+
+                    SessionSettingsActionRow(
+                        icon = Icons.Filled.CheckCircle,
+                        title = if (detectionLogBusy) "Working..." else "Save Detection Log File",
+                        subtitle = "Share the current per-session detection log from this phone.",
+                        enabled = !detectionLogBusy,
+                        onClick = onDetectionLogExport
+                    )
+
+                    HorizontalDivider(color = DividerColor)
+
+                    SessionSettingsActionRow(
+                        icon = Icons.Filled.Sync,
+                        title = if (detectionLogBusy) "Working..." else "Upload Detection Log",
+                        subtitle = "Upload the current log and share a temporary backend link.",
+                        enabled = !detectionLogBusy,
+                        onClick = onDetectionLogUpload
+                    )
+                }
+            }
+
+            Button(
+                onClick = {
+                    val value = pendingDistance ?: return@Button
+                    onSave(
+                        value,
+                        pendingStartType,
+                        pendingStartSoundType,
+                        pendingDiagnosticsEnabled,
+                        pendingReviewAutoUploadEnabled,
+                        pendingCameraPerformanceDiagnosticsEnabled,
+                        pendingShowSpeedInResults,
+                        pendingAthleteIds
+                    )
+                },
+                enabled = hasChanges,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AccentBlue,
+                    disabledContainerColor = BorderSubtle,
+                    contentColor = Color.White,
+                    disabledContentColor = TextMuted
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("Save Changes", fontWeight = FontWeight.Bold)
+            }
+
+            TextButton(
+                onClick = onEndSession,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("End Session", color = StatusRed, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionSheetSection(
+    title: String,
+    trailing: String? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title.uppercase(),
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                ),
+                color = TextSecondary
+            )
+            if (trailing != null) {
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = trailing,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
+                )
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(CardBackground, RoundedCornerShape(16.dp))
+                .border(1.dp, DividerColor, RoundedCornerShape(16.dp))
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            content = content
+        )
+    }
+}
+
+@Composable
+private fun SessionSettingsToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = TextPrimary
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = AccentBlue,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = TextTertiary
+            )
+        )
+    }
+}
+
+@Composable
+private fun SessionSettingsActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = BorderSubtle,
+            contentColor = TextPrimary,
+            disabledContainerColor = BorderSubtle.copy(alpha = 0.45f),
+            disabledContentColor = TextMuted
+        ),
+        shape = RoundedCornerShape(14.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (enabled) AccentBlue else TextMuted,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = if (enabled) TextPrimary else TextMuted
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted
+            )
+        }
+    }
+}
+
+@Composable
+private fun SessionAthleteRow(
+    athlete: AthleteEntity,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val athleteColor = parseAthleteColor(athlete.color)
+    val shape = RoundedCornerShape(14.dp)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(if (selected) athleteColor.copy(alpha = 0.12f) else BorderSubtle)
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) athleteColor else DividerColor,
+                shape = shape
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(athleteColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = athlete.name.take(1).uppercase(),
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                color = TextPrimary
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = athlete.name,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = TextPrimary,
+                maxLines = 1
+            )
+            if (!athlete.nickname.isNullOrBlank()) {
+                Text(
+                    text = athlete.nickname,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted,
+                    maxLines = 1
+                )
+            }
+        }
+
+        Icon(
+            imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+            contentDescription = if (selected) "Selected" else "Not selected",
+            tint = if (selected) athleteColor else TextMuted,
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+
+@Composable
+private fun SessionSettingsChip(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null
+) {
+    Box(
+        modifier = modifier
+            .height(52.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) AccentBlue.copy(alpha = 0.18f) else BorderSubtle)
+            .border(
+                width = 1.dp,
+                color = if (selected) AccentBlue else DividerColor,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = if (selected) AccentBlue else TextPrimary,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (selected) AccentBlue else TextMuted,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+private fun formatDistanceInput(distance: Double): String {
+    return if (distance % 1.0 == 0.0) {
+        distance.toInt().toString()
+    } else {
+        String.format(java.util.Locale.US, "%.1f", distance)
+    }
+}
+
+private fun filterDistanceInput(input: String): String {
+    var seenDecimal = false
+    return input.filter { char ->
+        when {
+            char.isDigit() -> true
+            char == '.' && !seenDecimal -> {
+                seenDecimal = true
+                true
+            }
+            else -> false
         }
     }
 }
@@ -541,6 +1304,18 @@ private fun RecordTabContent(
         // 3. Status Banner (full width)
         StatusBanner(uiState = uiState)
 
+        ActiveAthleteChipBar(
+            athletes = uiState.athletes.filter { it.id in uiState.selectedAthleteIds },
+            activeAthleteId = uiState.activeAthleteId,
+            runCounts = remember(uiState.laps) {
+                uiState.laps
+                    .filter { it.lapNumber > 0 && !it.athleteId.isNullOrBlank() }
+                    .groupingBy { it.athleteId.orEmpty() }
+                    .eachCount()
+            },
+            onAthleteSelected = viewModel::setActiveAthlete
+        )
+
         // 4. Timer + Camera Row
         TimerCameraRow(
             uiState = uiState,
@@ -560,6 +1335,7 @@ private fun RecordTabContent(
         LapsList(
             laps = uiState.laps,
             speedUnit = uiState.speedUnit,
+            showSpeedInResults = uiState.showSpeedInResults,
             onThumbnailClick = onThumbnailClick,
             modifier = Modifier
                 .weight(1f)
@@ -600,6 +1376,126 @@ private fun StatusBanner(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActiveAthleteChipBar(
+    athletes: List<AthleteEntity>,
+    activeAthleteId: String?,
+    runCounts: Map<String, Int>,
+    onAthleteSelected: (String) -> Unit
+) {
+    if (athletes.isEmpty()) return
+
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.04f)),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        items(
+            items = athletes,
+            key = { it.id }
+        ) { athlete ->
+            ActiveAthleteChip(
+                athlete = athlete,
+                isSelected = athlete.id == activeAthleteId,
+                runCount = runCounts[athlete.id] ?: 0,
+                onClick = { onAthleteSelected(athlete.id) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActiveAthleteChip(
+    athlete: AthleteEntity,
+    isSelected: Boolean,
+    runCount: Int,
+    onClick: () -> Unit
+) {
+    val athleteColor = parseAthleteColor(athlete.color)
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(if (isSelected) CardBackground else CardBackground.copy(alpha = 0.35f))
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) athleteColor else Color.Transparent,
+                shape = RoundedCornerShape(24.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(athleteColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = athlete.name.take(1).uppercase(),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = Color.White
+            )
+        }
+
+        Column {
+            Text(
+                text = athlete.displayName,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = if (isSelected) TextPrimary else TextSecondary,
+                maxLines = 1
+            )
+            Text(
+                text = "$runCount run${if (runCount == 1) "" else "s"}",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isSelected) TextSecondary else TextMuted,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun BluetoothAudioWarningBanner(onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(StatusRed.copy(alpha = 0.16f))
+            .border(1.dp, StatusRed.copy(alpha = 0.35f))
+            .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Bluetooth,
+            contentDescription = null,
+            tint = StatusRed,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = stringResource(R.string.race_bluetooth_audio_warning),
+            color = StatusRed,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(
+            onClick = onDismiss,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = stringResource(R.string.race_dismiss_bluetooth_audio_warning),
+                tint = StatusRed.copy(alpha = 0.75f),
+                modifier = Modifier.size(16.dp)
             )
         }
     }
@@ -683,26 +1579,28 @@ private fun TimerCameraRow(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Speed row
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.timing_label_speed),
-                    color = TextTertiary,
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = formatSpeed(uiState.currentSpeedMs, uiState.speedUnit),
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Medium
+            if (uiState.showSpeedInResults) {
+                // Speed row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.timing_label_speed),
+                        color = TextTertiary,
+                        style = MaterialTheme.typography.bodySmall
                     )
-                )
-            }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = formatSpeed(uiState.currentSpeedMs, uiState.speedUnit),
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+            }
 
             // Distance row
             Row(
@@ -865,6 +1763,7 @@ private fun PracticeSectionHeader(
 private fun LapsList(
     laps: List<SoloLapResult>,
     speedUnit: String,
+    showSpeedInResults: Boolean,
     onThumbnailClick: (ExpandedThumbnail) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -926,6 +1825,7 @@ private fun LapsList(
                 LapCard(
                     lap = lap,
                     speedUnit = speedUnit,
+                    showSpeedInResults = showSpeedInResults,
                     onThumbnailClick = onThumbnailClick
                 )
             }
@@ -939,6 +1839,7 @@ private fun LapsList(
 private fun LapCard(
     lap: SoloLapResult,
     speedUnit: String,
+    showSpeedInResults: Boolean,
     onThumbnailClick: (ExpandedThumbnail) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1040,7 +1941,14 @@ private fun LapCard(
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodySmall
             )
-            if (!isStart && lap.speedMs > 0.0) {
+            if (!isStart && !lap.athleteName.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(3.dp))
+                AthleteRunLabel(
+                    athleteName = lap.athleteName,
+                    athleteColor = lap.athleteColor
+                )
+            }
+            if (showSpeedInResults && !isStart && lap.speedMs > 0.0) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = formatSpeed(lap.speedMs, speedUnit),
@@ -1129,7 +2037,8 @@ private fun ResultsTabContent(
                     totalTime = totalTime,
                     lapCount = lapCount,
                     bestSpeed = bestSpeed,
-                    distance = distance
+                    distance = distance,
+                    showSpeedInResults = uiState.showSpeedInResults
                 )
             }
 
@@ -1154,7 +2063,8 @@ private fun ResultsTabContent(
                     lap = lap,
                     bestLapTime = bestLapTime,
                     maxLapTime = maxLapTime,
-                    distance = distance
+                    distance = distance,
+                    showSpeedInResults = uiState.showSpeedInResults
                 )
             }
         }
@@ -1169,6 +2079,7 @@ private fun ResultsSummaryCard(
     lapCount: Int,
     bestSpeed: Double?,
     distance: Double,
+    showSpeedInResults: Boolean,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -1231,7 +2142,7 @@ private fun ResultsSummaryCard(
         }
 
         // Best speed row (if distance is known)
-        if (bestSpeed != null && distance > 0) {
+        if (showSpeedInResults && bestSpeed != null && distance > 0) {
             HorizontalDivider(
                 color = TextTertiary.copy(alpha = 0.3f),
                 thickness = 0.5.dp
@@ -1290,6 +2201,7 @@ private fun LapComparisonRow(
     bestLapTime: Double,
     maxLapTime: Double,
     distance: Double,
+    showSpeedInResults: Boolean,
     modifier: Modifier = Modifier
 ) {
     val isBest = lap.lapTimeSeconds == bestLapTime
@@ -1363,20 +2275,31 @@ private fun LapComparisonRow(
                 )
             }
 
+            if (!lap.athleteName.isNullOrBlank()) {
+                AthleteRunLabel(
+                    athleteName = lap.athleteName,
+                    athleteColor = lap.athleteColor
+                )
+            }
+
             // Speed + delta row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = if (speed != null) {
-                        stringResource(R.string.timing_speed_ms_format, speed)
-                    } else {
-                        stringResource(R.string.timing_no_speed_ms)
-                    },
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.labelSmall
-                )
+                if (showSpeedInResults) {
+                    Text(
+                        text = if (speed != null) {
+                            stringResource(R.string.timing_speed_ms_format, speed)
+                        } else {
+                            stringResource(R.string.timing_no_speed_ms)
+                        },
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
                 if (!isBest) {
                     Text(
                         text = stringResource(R.string.timing_delta_format, delta),
@@ -1405,6 +2328,31 @@ private fun LapComparisonRow(
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold
             )
+        )
+    }
+}
+
+@Composable
+private fun AthleteRunLabel(
+    athleteName: String,
+    athleteColor: String?
+) {
+    val color = parseAthleteColor(athleteColor ?: "blue")
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Text(
+            text = athleteName,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+            color = TextMuted,
+            maxLines = 1
         )
     }
 }
@@ -1560,4 +2508,21 @@ private fun formatSpeed(speedMs: Double, speedUnit: String): String {
     }
 
     return String.format(java.util.Locale.US, "%.2f %s", convertedSpeed, speedUnit)
+}
+
+private fun shareDetectionLogFile(context: Context, uri: Uri) {
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(shareIntent, "Save Detection Log"))
+}
+
+private fun shareDetectionLogUrl(context: Context, signedUrl: String) {
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, signedUrl)
+    }
+    context.startActivity(Intent.createChooser(shareIntent, "Share Detection Log URL"))
 }

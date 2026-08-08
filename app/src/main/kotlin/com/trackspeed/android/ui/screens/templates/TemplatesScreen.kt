@@ -21,209 +21,88 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ElectricBolt
-import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.NorthEast
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.RocketLaunch
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.trackspeed.android.R
+import com.trackspeed.android.model.TestPreset
+import com.trackspeed.android.model.TestPresetCategory
 import com.trackspeed.android.ui.theme.*
 
 private val AccentGreen = Color(0xFF30D158)
 private val AccentOrange = Color(0xFFFF9500)
 private val AccentPurple = Color(0xFFAF52DE)
 
-private enum class TemplateCategory(val displayName: String) {
-    ACCELERATION("ACCELERATION"),
-    SPEED("MAX SPEED"),
-    AGILITY("AGILITY"),
-    COMBINE("COMBINE")
-}
-
-private data class WorkoutTemplate(
-    val name: String,
-    val distance: Double,
-    val startType: String,
-    val description: String,
-    val icon: ImageVector,
-    val category: TemplateCategory,
-    val minPhones: Int = 1
-)
-
-private val builtInTemplates = listOf(
-    // --- Acceleration (Green) ---
-    WorkoutTemplate(
-        name = "10m Acceleration",
-        distance = 10.0,
-        startType = "standing",
-        description = "Short acceleration test",
-        icon = Icons.Outlined.RocketLaunch,
-        category = TemplateCategory.ACCELERATION,
-        minPhones = 2
-    ),
-    WorkoutTemplate(
-        name = "20m Sprint",
-        distance = 20.0,
-        startType = "standing",
-        description = "Acceleration phase evaluation",
-        icon = Icons.Outlined.RocketLaunch,
-        category = TemplateCategory.ACCELERATION,
-        minPhones = 2
-    ),
-    WorkoutTemplate(
-        name = "30m Sprint",
-        distance = 30.0,
-        startType = "standing",
-        description = "Block start acceleration test",
-        icon = Icons.Outlined.RocketLaunch,
-        category = TemplateCategory.ACCELERATION,
-        minPhones = 2
-    ),
-    WorkoutTemplate(
-        name = "40yd Dash",
-        distance = 36.576,
-        startType = "standing",
-        description = "40-yard dash from standing start",
-        icon = Icons.Outlined.RocketLaunch,
-        category = TemplateCategory.ACCELERATION,
-        minPhones = 2
-    ),
-
-    // --- Max Speed (Blue) ---
-    WorkoutTemplate(
-        name = "Flying 10m",
-        distance = 10.0,
-        startType = "flying",
-        description = "Peak velocity over 10m",
-        icon = Icons.Outlined.ElectricBolt,
-        category = TemplateCategory.SPEED,
-        minPhones = 2
-    ),
-    WorkoutTemplate(
-        name = "Flying 20m",
-        distance = 20.0,
-        startType = "flying",
-        description = "Maximum velocity test",
-        icon = Icons.Outlined.ElectricBolt,
-        category = TemplateCategory.SPEED,
-        minPhones = 2
-    ),
-    WorkoutTemplate(
-        name = "Flying 30m",
-        distance = 30.0,
-        startType = "flying",
-        description = "Extended max velocity test",
-        icon = Icons.Outlined.ElectricBolt,
-        category = TemplateCategory.SPEED,
-        minPhones = 2
-    ),
-    WorkoutTemplate(
-        name = "60m Sprint",
-        distance = 60.0,
-        startType = "standing",
-        description = "Standard 60m sprint",
-        icon = Icons.AutoMirrored.Filled.DirectionsRun,
-        category = TemplateCategory.SPEED,
-        minPhones = 2
-    ),
-    WorkoutTemplate(
-        name = "100m Dash",
-        distance = 100.0,
-        startType = "standing",
-        description = "Full 100m with reaction time",
-        icon = Icons.Outlined.Timer,
-        category = TemplateCategory.SPEED,
-        minPhones = 2
-    ),
-    WorkoutTemplate(
-        name = "200m Sprint",
-        distance = 200.0,
-        startType = "standing",
-        description = "Half-lap speed endurance",
-        icon = Icons.Outlined.Timer,
-        category = TemplateCategory.SPEED,
-        minPhones = 2
-    ),
-
-    // --- Agility (Orange) — single-phone in-frame start ---
-    WorkoutTemplate(
-        name = "Pro Agility (5-10-5)",
-        distance = 36.576,
-        startType = "standing",
-        description = "Short shuttle agility drill",
-        icon = Icons.Outlined.SwapHoriz,
-        category = TemplateCategory.AGILITY
-    ),
-    WorkoutTemplate(
-        name = "L-Drill",
-        distance = 30.0,
-        startType = "standing",
-        description = "Three-cone agility drill",
-        icon = Icons.Outlined.SwapHoriz,
-        category = TemplateCategory.AGILITY
-    ),
-
-    // --- Combine (Purple) ---
-    WorkoutTemplate(
-        name = "NFL 40yd",
-        distance = 36.576,
-        startType = "standing",
-        description = "NFL Combine 40-yard dash",
-        icon = Icons.Outlined.EmojiEvents,
-        category = TemplateCategory.COMBINE,
-        minPhones = 2
-    )
-)
-
 @Composable
-private fun TemplateCategory.accentColor(): Color = when (this) {
-    TemplateCategory.ACCELERATION -> AccentGreen
-    TemplateCategory.SPEED -> AccentBlue
-    TemplateCategory.AGILITY -> AccentOrange
-    TemplateCategory.COMBINE -> AccentPurple
+private fun TestPresetCategory.accentColor(): Color = when (this) {
+    TestPresetCategory.ACCELERATION -> AccentGreen
+    TestPresetCategory.MAX_SPEED -> AccentBlue
+    TestPresetCategory.AGILITY -> AccentOrange
+    TestPresetCategory.COMBINE -> AccentPurple
 }
 
-private fun formatDistance(distance: Double): String {
-    return if (distance == 36.576) {
-        "40 yd"
-    } else if (distance == distance.toLong().toDouble()) {
-        "${distance.toLong()}m"
-    } else {
-        "${distance}m"
-    }
-}
-
-private fun formatStartType(startType: String): String {
-    return startType.replaceFirstChar { it.uppercase() }
+private fun TestPreset.icon(): ImageVector = when (iconKey) {
+    "bolt" -> Icons.Outlined.ElectricBolt
+    "pole-vault" -> Icons.Outlined.NorthEast
+    "sportscourt" -> Icons.Outlined.EmojiEvents
+    "swap", "triangle" -> Icons.Outlined.SwapHoriz
+    "repeat" -> Icons.Outlined.Timer
+    "figure.run" -> Icons.AutoMirrored.Filled.DirectionsRun
+    else -> Icons.Outlined.RocketLaunch
 }
 
 @Composable
 fun TemplatesScreen(
-    onTemplateClick: (distance: Double, startType: String, minPhones: Int) -> Unit = { _, _, _ -> }
+    onTemplateClick: (distance: Double, startType: String, minPhones: Int, presetId: String?) -> Unit = { _, _, _, _ -> },
+    modifier: Modifier = Modifier
 ) {
-    val templatesByCategory = builtInTemplates.groupBy { it.category }
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredTemplates = remember(searchQuery) {
+        val query = searchQuery.trim()
+        if (query.isBlank()) {
+            TestPreset.all
+        } else {
+            TestPreset.all.filter { preset ->
+                preset.name.contains(query, ignoreCase = true) ||
+                    preset.shortName.contains(query, ignoreCase = true) ||
+                    preset.category.displayName.contains(query, ignoreCase = true)
+            }
+        }
+    }
+    val templatesByCategory = filteredTemplates.groupBy { it.category }
 
     LazyColumn(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .gradientBackground()
             .padding(horizontal = 20.dp),
@@ -233,7 +112,7 @@ fun TemplatesScreen(
         item {
             Spacer(modifier = Modifier.height(48.dp))
             Text(
-                text = "Templates",
+                text = stringResource(R.string.templates_title),
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 32.sp
@@ -242,19 +121,25 @@ fun TemplatesScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Pre-configured workout setups",
+                text = stringResource(R.string.templates_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = TextSecondary
             )
             Spacer(modifier = Modifier.height(32.dp))
+            TemplateSearchField(
+                query = searchQuery,
+                onQueryChanged = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(24.dp))
         }
 
         // Category sections in defined order
         val categoryOrder = listOf(
-            TemplateCategory.ACCELERATION,
-            TemplateCategory.SPEED,
-            TemplateCategory.AGILITY,
-            TemplateCategory.COMBINE
+            TestPresetCategory.ACCELERATION,
+            TestPresetCategory.MAX_SPEED,
+            TestPresetCategory.AGILITY,
+            TestPresetCategory.COMBINE
         )
 
         for (category in categoryOrder) {
@@ -267,11 +152,18 @@ fun TemplatesScreen(
 
             items(
                 items = templates,
-                key = { it.name }
+                key = { it.id }
             ) { template ->
                 TemplateCard(
                     template = template,
-                    onClick = { onTemplateClick(template.distance, template.startType, template.minPhones) }
+                    onClick = {
+                        onTemplateClick(
+                            template.distance,
+                            template.defaultStartType.rawValue,
+                            template.minPhones,
+                            template.id
+                        )
+                    }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -281,14 +173,72 @@ fun TemplatesScreen(
             }
         }
 
-        // Custom templates section
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-            SectionHeader(title = "CUSTOM TEMPLATES")
-            Spacer(modifier = Modifier.height(12.dp))
-            AddTemplateCard()
+        if (filteredTemplates.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 56.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.templates_no_results),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun TemplateSearchField(
+    query: String,
+    onQueryChanged: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TextField(
+        value = query,
+        onValueChange = onQueryChanged,
+        modifier = modifier,
+        placeholder = {
+            Text(
+                text = stringResource(R.string.templates_search_placeholder),
+                color = TextSecondary
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = stringResource(R.string.templates_search_cd),
+                tint = TextSecondary
+            )
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChanged("") }) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.templates_clear_search_cd),
+                        tint = TextSecondary
+                    )
+                }
+            }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(14.dp),
+        colors = TextFieldDefaults.colors(
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary,
+            focusedContainerColor = SurfaceDark,
+            unfocusedContainerColor = SurfaceDark,
+            disabledContainerColor = SurfaceDark,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            cursorColor = AccentBlue
+        )
+    )
 }
 
 @Composable
@@ -316,7 +266,7 @@ private fun SectionHeader(title: String, color: Color = TextSecondary) {
 
 @Composable
 private fun TemplateCard(
-    template: WorkoutTemplate,
+    template: TestPreset,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -343,7 +293,7 @@ private fun TemplateCard(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = template.icon,
+                    imageVector = template.icon(),
                     contentDescription = null,
                     tint = accentColor,
                     modifier = Modifier.size(24.dp)
@@ -368,18 +318,20 @@ private fun TemplateCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    DistanceBadge(
-                        text = formatDistance(template.distance),
-                        color = accentColor
-                    )
-                    PhoneCountBadge(count = template.minPhones)
+                    if (template.distance > 0.0) {
+                        DistanceBadge(
+                            text = template.shortDistance,
+                            color = accentColor
+                        )
+                    }
+                    PhoneCountBadge(minPhones = template.minPhones, maxPhones = template.maxPhones)
                     StartTypeBadge(
-                        text = formatStartType(template.startType)
+                        text = template.defaultStartType.shortName
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = template.description,
+                    text = template.tips.firstOrNull().orEmpty(),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     maxLines = 1,
@@ -425,7 +377,8 @@ private fun DistanceBadge(
 
 @Composable
 private fun PhoneCountBadge(
-    count: Int,
+    minPhones: Int,
+    maxPhones: Int,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -439,13 +392,13 @@ private fun PhoneCountBadge(
             horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Icon(
-                imageVector = Icons.Outlined.Smartphone,
+                imageVector = Icons.Outlined.PhoneAndroid,
                 contentDescription = null,
                 tint = TextSecondary,
                 modifier = Modifier.size(11.dp)
             )
             Text(
-                text = "$count",
+                text = if (minPhones == maxPhones) "$minPhones" else "$minPhones-$maxPhones",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontSize = 11.sp
                 ),
@@ -473,74 +426,6 @@ private fun StartTypeBadge(
             color = TextSecondary,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
         )
-    }
-}
-
-@Composable
-private fun AddTemplateCard(
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .gunmetalCard()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Plus icon
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(AccentPurple.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null,
-                    tint = AccentPurple,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Add Template",
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = TextPrimary
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Create a custom workout template",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-            }
-
-            // Coming soon badge
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = AccentPurple.copy(alpha = 0.15f)
-            ) {
-                Text(
-                    text = "Soon",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 11.sp
-                    ),
-                    color = AccentPurple,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                )
-            }
-        }
     }
 }
 

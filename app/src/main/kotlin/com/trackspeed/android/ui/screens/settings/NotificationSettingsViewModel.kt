@@ -27,6 +27,8 @@ import javax.inject.Inject
 data class NotificationSettingsUiState(
     val tryProReminderEnabled: Boolean = SettingsRepository.Defaults.TRY_PRO_REMINDER_ENABLED,
     val trainingReminderEnabled: Boolean = SettingsRepository.Defaults.TRAINING_REMINDER_ENABLED,
+    val billingIssueReminderEnabled: Boolean = SettingsRepository.Defaults.BILLING_ISSUE_REMINDER_ENABLED,
+    val promoOfferReminderEnabled: Boolean = SettingsRepository.Defaults.PROMO_OFFER_REMINDER_ENABLED,
     val ratingPromptEnabled: Boolean = SettingsRepository.Defaults.RATING_PROMPT_ENABLED,
     val hasNotificationPermission: Boolean = false,
     val testNotificationScheduled: Boolean = false
@@ -44,15 +46,19 @@ class NotificationSettingsViewModel @Inject constructor(
     val uiState: StateFlow<NotificationSettingsUiState> = combine(
         settingsRepository.tryProReminderEnabled,
         settingsRepository.trainingReminderEnabled,
+        settingsRepository.billingIssueReminderEnabled,
+        settingsRepository.promoOfferReminderEnabled,
         settingsRepository.ratingPromptEnabled,
         _testNotificationScheduled
-    ) { tryPro, training, rating, testScheduled ->
+    ) { values ->
         NotificationSettingsUiState(
-            tryProReminderEnabled = tryPro,
-            trainingReminderEnabled = training,
-            ratingPromptEnabled = rating,
+            tryProReminderEnabled = values[0],
+            trainingReminderEnabled = values[1],
+            billingIssueReminderEnabled = values[2],
+            promoOfferReminderEnabled = values[3],
+            ratingPromptEnabled = values[4],
             hasNotificationPermission = checkNotificationPermission(),
-            testNotificationScheduled = testScheduled
+            testNotificationScheduled = values[5]
         )
     }.stateIn(
         scope = viewModelScope,
@@ -88,6 +94,26 @@ class NotificationSettingsViewModel @Inject constructor(
                 notificationService.scheduleTrainingReminder()
             } else {
                 notificationService.cancelTrainingReminder()
+            }
+        }
+    }
+
+    fun setBillingIssueReminderEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setBillingIssueReminderEnabled(enabled)
+            if (!enabled) {
+                notificationService.cancelBillingIssueReminder()
+            }
+        }
+    }
+
+    fun setPromoOfferReminderEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setPromoOfferReminderEnabled(enabled)
+            if (!enabled) {
+                notificationService.cancelPromoOfferReminder()
+                notificationService.cancelDay14FollowUp()
+                notificationService.cancelDay30FinalNudge()
             }
         }
     }

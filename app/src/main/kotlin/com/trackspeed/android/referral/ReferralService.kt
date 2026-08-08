@@ -5,15 +5,24 @@ import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.trackspeed.android.billing.PromoCodeService
+import com.trackspeed.android.cloud.DeviceIdProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 import java.security.MessageDigest
-import java.util.UUID
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,7 +31,8 @@ import javax.inject.Singleton
  */
 data class ReferralStats(
     val friendsJoined: Int = 0,
-    val freeMonthsEarned: Int = 0
+    val freeMonthsEarned: Int = 0,
+    val bonusPassDaysRemaining: Int = 0
 )
 
 /**
@@ -35,8 +45,17 @@ data class ReferralStats(
 class ReferralService @Inject constructor(
     @ApplicationContext private val context: Context,
     private val dataStore: DataStore<Preferences>,
-    private val promoCodeService: PromoCodeService
+    private val promoCodeService: PromoCodeService,
+    private val deviceIdProvider: DeviceIdProvider
 ) {
+    private val preferences: Flow<Preferences> = dataStore.data.catch { error ->
+        if (error is IOException) {
+            emit(emptyPreferences())
+        } else {
+            throw error
+        }
+    }
+
     companion object {
         private const val TAG = "ReferralService"
         private const val REFERRAL_BASE_URL = "https://mytrackspeed.com/invite/"
@@ -45,6 +64,8 @@ class ReferralService @Inject constructor(
         private const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.trackspeed.android"
         private const val PREFS_NAME = "trackspeed"
         private const val KEY_PENDING_REFERRAL_CODE = "pendingReferralCode"
+        private const val KEY_WAS_REFERRED = "wasReferred"
+        private val HOME_INVITE_CARD_COOLDOWN_MS = TimeUnit.DAYS.toMillis(30)
 
         fun getPendingReferralCode(context: Context): String? {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -66,19 +87,31 @@ class ReferralService @Inject constructor(
         val REFERRAL_CODE = stringPreferencesKey("referral_code")
         val FRIENDS_JOINED = intPreferencesKey("referral_friends_joined")
         val FREE_MONTHS_EARNED = intPreferencesKey("referral_free_months_earned")
+        val BONUS_PASS_DAYS_REMAINING = intPreferencesKey("referral_bonus_pass_days_remaining")
+        val LAST_SEEN_BONUS_DAYS = intPreferencesKey("lastSeenReferralBonusDays")
+        val HOME_INVITE_DISMISSED_AT_MS = longPreferencesKey("homeInviteCardDismissedAt")
     }
 
+    private val _newlyEarnedBonusDays = MutableStateFlow(0)
+    val newlyEarnedBonusDays: StateFlow<Int> = _newlyEarnedBonusDays.asStateFlow()
+
     /** Flow of the current referral code. */
-    val referralCode: Flow<String> = dataStore.data.map { prefs ->
+    val referralCode: Flow<String> = preferences.map { prefs ->
         prefs[Keys.REFERRAL_CODE] ?: ""
     }
 
     /** Flow of referral stats. */
-    val stats: Flow<ReferralStats> = dataStore.data.map { prefs ->
+    val stats: Flow<ReferralStats> = preferences.map { prefs ->
         ReferralStats(
             friendsJoined = prefs[Keys.FRIENDS_JOINED] ?: 0,
-            freeMonthsEarned = prefs[Keys.FREE_MONTHS_EARNED] ?: 0
+            freeMonthsEarned = prefs[Keys.FREE_MONTHS_EARNED] ?: 0,
+            bonusPassDaysRemaining = prefs[Keys.BONUS_PASS_DAYS_REMAINING] ?: 0
         )
+    }
+
+    val shouldShowHomeInviteCard: Flow<Boolean> = preferences.map { prefs ->
+        val dismissedAt = prefs[Keys.HOME_INVITE_DISMISSED_AT_MS] ?: 0L
+        dismissedAt <= 0L || System.currentTimeMillis() - dismissedAt >= HOME_INVITE_CARD_COOLDOWN_MS
     }
 
     /**
@@ -87,7 +120,7 @@ class ReferralService @Inject constructor(
      */
     suspend fun getOrCreateReferralCode(): String {
         // Check local cache first
-        val existing = dataStore.data.first()[Keys.REFERRAL_CODE]
+        val existing = preferences.first()[Keys.REFERRAL_CODE]
         if (!existing.isNullOrEmpty()) {
             return existing
         }
@@ -135,23 +168,95 @@ class ReferralService @Inject constructor(
      * Track a referral signup in Supabase (when a referred user enters a referrer's code).
      */
     suspend fun trackReferralSignup(referrerCode: String): Boolean {
-        return promoCodeService.trackReferralSignup(referrerCode)
+        val normalizedCode = referrerCode.trim().uppercase(Locale.US)
+        if (normalizedCode.isEmpty()) {
+            clearPendingReferralCode(context)
+            return false
+        }
+
+        val ownCode = preferences.first()[Keys.REFERRAL_CODE]?.uppercase(Locale.US)
+        if (!ownCode.isNullOrEmpty() && ownCode == normalizedCode) {
+            Log.w(TAG, "Attempted self-referral with code: $normalizedCode")
+            setWasReferred(false)
+            clearPendingReferralCode(context)
+            return false
+        }
+
+        if (!promoCodeService.validateReferralCode(normalizedCode)) {
+            Log.w(TAG, "Invalid referral code: $normalizedCode")
+            clearPendingReferralCode(context)
+            return false
+        }
+
+        val success = promoCodeService.trackReferralSignup(normalizedCode)
+        if (success) {
+            setWasReferred(true)
+            clearPendingReferralCode(context)
+        }
+        return success
     }
 
     /**
      * Refresh referral stats from Supabase and update local cache.
      */
     suspend fun refreshStats() {
-        val code = dataStore.data.first()[Keys.REFERRAL_CODE] ?: return
+        val code = preferences.first()[Keys.REFERRAL_CODE] ?: return
 
         val stats = promoCodeService.getReferralStats(code)
         if (stats != null) {
+            val currentPrefs = preferences.first()
+            val previousBonusDays = currentPrefs[Keys.LAST_SEEN_BONUS_DAYS] ?: 0
+            val bonusDaysRemaining = stats.bonusPassDaysRemaining
+            val newlyEarnedDays = (bonusDaysRemaining - previousBonusDays).coerceAtLeast(0).coerceAtMost(30)
+
             dataStore.edit { prefs ->
-                prefs[Keys.FRIENDS_JOINED] = stats.successfulReferrals
+                prefs[Keys.FRIENDS_JOINED] = stats.friendsJoinedCount
                 prefs[Keys.FREE_MONTHS_EARNED] = stats.freeMonthsEarned
+                prefs[Keys.BONUS_PASS_DAYS_REMAINING] = bonusDaysRemaining
+                prefs[Keys.LAST_SEEN_BONUS_DAYS] = bonusDaysRemaining
             }
-            Log.i(TAG, "Refreshed referral stats: ${stats.successfulReferrals} friends, ${stats.freeMonthsEarned} months")
+
+            if (newlyEarnedDays > 0) {
+                _newlyEarnedBonusDays.value = newlyEarnedDays
+            }
+
+            Log.i(TAG, "Refreshed referral stats: ${stats.friendsJoinedCount} friends, ${stats.freeMonthsEarned} months, $bonusDaysRemaining bonus days")
         }
+    }
+
+    suspend fun dismissHomeInviteCard() {
+        dataStore.edit { prefs ->
+            prefs[Keys.HOME_INVITE_DISMISSED_AT_MS] = System.currentTimeMillis()
+        }
+    }
+
+    fun acknowledgeBonusCelebration() {
+        _newlyEarnedBonusDays.value = 0
+    }
+
+    /**
+     * Drop the locally cached referral code and stats. Call on sign-out so the
+     * next account that signs in starts clean and re-fetches its own code from
+     * Supabase (mirrors iOS `ReferralService.clearCache`).
+     */
+    suspend fun clearCache() {
+        dataStore.edit { prefs ->
+            prefs.remove(Keys.REFERRAL_CODE)
+            prefs.remove(Keys.FRIENDS_JOINED)
+            prefs.remove(Keys.FREE_MONTHS_EARNED)
+            prefs.remove(Keys.BONUS_PASS_DAYS_REMAINING)
+            prefs.remove(Keys.LAST_SEEN_BONUS_DAYS)
+        }
+        acknowledgeBonusCelebration()
+        clearPendingReferralCode(context)
+        setWasReferred(false)
+    }
+
+    private fun setWasReferred(wasReferred: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_WAS_REFERRED, wasReferred)
+            .apply()
     }
 
     /**
@@ -174,11 +279,6 @@ class ReferralService @Inject constructor(
      * Get or create a persistent device ID.
      */
     private fun getDeviceId(): String {
-        val prefs = context.getSharedPreferences("trackspeed", Context.MODE_PRIVATE)
-        return prefs.getString("device_id", null) ?: run {
-            val newId = UUID.randomUUID().toString()
-            prefs.edit().putString("device_id", newId).apply()
-            newId
-        }
+        return deviceIdProvider.deviceId
     }
 }

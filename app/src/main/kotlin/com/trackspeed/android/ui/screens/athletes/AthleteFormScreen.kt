@@ -1,6 +1,12 @@
 package com.trackspeed.android.ui.screens.athletes
 
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,18 +49,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trackspeed.android.model.StartType
 import com.trackspeed.android.ui.theme.*
+import java.util.Locale
+import com.trackspeed.android.R
 
 private val DeleteRed = Color(0xFFFF453A)
 
@@ -66,7 +81,7 @@ private val presetColors = listOf(
     "blue" to Color(0xFF2196F3),
     "purple" to Color(0xFF9C27B0),
     "pink" to Color(0xFFE91E63),
-    "teal" to Color(0xFF009688)
+    "gray" to Color(0xFF8E8E93)
 )
 
 @Composable
@@ -75,12 +90,21 @@ fun AthleteFormScreen(
     viewModel: AthleteFormViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val photoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let(viewModel::onPhotoSelected)
+    }
 
     AthleteFormContent(
         uiState = uiState,
         onNameChanged = viewModel::onNameChanged,
         onNicknameChanged = viewModel::onNicknameChanged,
         onColorSelected = viewModel::onColorSelected,
+        onPickPhoto = { photoLauncher.launch("image/*") },
+        onRemovePhoto = viewModel::removePhoto,
+        onBirthdateChanged = viewModel::onBirthdateChanged,
+        onGenderSelected = viewModel::onGenderSelected,
         onSave = { viewModel.save(onNavigateBack) },
         onDelete = { viewModel.delete(onNavigateBack) },
         onCancel = onNavigateBack
@@ -88,12 +112,17 @@ fun AthleteFormScreen(
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 private fun AthleteFormContent(
     uiState: AthleteFormUiState,
     onNameChanged: (String) -> Unit,
     onNicknameChanged: (String) -> Unit,
     onColorSelected: (String) -> Unit,
+    onPickPhoto: () -> Unit,
+    onRemovePhoto: () -> Unit,
+    onBirthdateChanged: (String) -> Unit,
+    onGenderSelected: (String?) -> Unit,
     onSave: () -> Unit,
     onDelete: () -> Unit,
     onCancel: () -> Unit
@@ -115,7 +144,7 @@ private fun AthleteFormContent(
             },
             navigationIcon = {
                 TextButton(onClick = onCancel) {
-                    Text("Cancel", color = AccentBlue)
+                    Text(stringResource(R.string.common_cancel), color = AccentBlue)
                 }
             },
             actions = {
@@ -124,7 +153,7 @@ private fun AthleteFormContent(
                     enabled = uiState.name.isNotBlank()
                 ) {
                     Text(
-                        "Save",
+                        stringResource(R.string.run_detail_save),
                         color = if (uiState.name.isNotBlank()) AccentBlue else TextSecondary
                     )
                 }
@@ -150,29 +179,68 @@ private fun AthleteFormContent(
             ) {
                 val selectedColor = presetColors.find { it.first == uiState.selectedColor }?.second
                     ?: presetColors[4].second
-
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(CircleShape)
-                        .background(selectedColor),
-                    contentAlignment = Alignment.Center
+                val avatarBitmap by produceState<Bitmap?>(
+                    initialValue = null,
+                    key1 = uiState.photoPath
                 ) {
-                    if (uiState.name.isBlank()) {
-                        Icon(
-                            imageVector = Icons.Outlined.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(44.dp),
-                            tint = Color.White.copy(alpha = 0.8f)
-                        )
-                    } else {
-                        Text(
-                            text = uiState.name.take(1).uppercase(),
-                            style = MaterialTheme.typography.headlineLarge.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = Color.White
-                        )
+                    val loadedBitmap = withContext(Dispatchers.IO) {
+                        uiState.photoPath?.let { path ->
+                            try { BitmapFactory.decodeFile(path) } catch (_: Exception) { null }
+                        }
+                    }
+                    value = loadedBitmap
+                }
+
+                val currentAvatarBitmap = avatarBitmap
+                if (currentAvatarBitmap != null) {
+                    Image(
+                        bitmap = currentAvatarBitmap.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .border(3.dp, selectedColor, CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .background(selectedColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (uiState.name.isBlank()) {
+                            Icon(
+                                imageVector = Icons.Outlined.Person,
+                                contentDescription = null,
+                                modifier = Modifier.size(44.dp),
+                                tint = Color.White.copy(alpha = 0.8f)
+                            )
+                        } else {
+                            Text(
+                                text = uiState.name.take(1).uppercase(),
+                                style = MaterialTheme.typography.headlineLarge.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextButton(onClick = onPickPhoto) {
+                    Text(
+                        text = if (uiState.photoPath == null) "Add Photo" else "Change Photo",
+                        color = AccentBlue
+                    )
+                }
+
+                if (uiState.photoPath != null) {
+                    TextButton(onClick = onRemovePhoto) {
+                        Text(stringResource(R.string.profile_photo_remove), color = DeleteRed)
                     }
                 }
             }
@@ -194,7 +262,7 @@ private fun AthleteFormContent(
                         value = uiState.name,
                         onValueChange = onNameChanged,
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Full Name", color = TextSecondary) },
+                        placeholder = { Text(stringResource(R.string.onboarding_profile_name_label), color = TextSecondary) },
                         singleLine = true,
                         colors = textFieldColors()
                     )
@@ -216,6 +284,54 @@ private fun AthleteFormContent(
                         colors = textFieldColors()
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Profile section
+            SectionLabel("PROFILE")
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = CardBackground)
+            ) {
+                Column {
+                    TextField(
+                        value = uiState.birthdateText,
+                        onValueChange = onBirthdateChanged,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Birthdate (YYYY-MM-DD)", color = TextSecondary) },
+                        singleLine = true,
+                        isError = uiState.errorMessage != null,
+                        colors = textFieldColors()
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .height(1.dp)
+                            .background(BorderSubtle)
+                    )
+
+                    GenderPicker(
+                        selectedGender = uiState.gender,
+                        onGenderSelected = onGenderSelected
+                    )
+                }
+            }
+
+            if (uiState.errorMessage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = uiState.errorMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DeleteRed,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -265,6 +381,16 @@ private fun AthleteFormContent(
                         }
                     }
                 }
+            }
+
+            if (uiState.isEditMode) {
+                Spacer(modifier = Modifier.height(28.dp))
+
+                SectionLabel("PERSONAL BESTS")
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                PersonalBestsCard(personalBests = uiState.personalBests)
             }
 
             // Delete button (edit mode only)
@@ -319,18 +445,137 @@ private fun AthleteFormContent(
                         onDelete()
                     }
                 ) {
-                    Text("Delete", color = DeleteRed)
+                    Text(stringResource(R.string.run_detail_delete_confirm), color = DeleteRed)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel", color = AccentBlue)
+                    Text(stringResource(R.string.common_cancel), color = AccentBlue)
                 }
             },
             containerColor = CardBackground,
             titleContentColor = TextPrimary,
             textContentColor = TextSecondary
         )
+    }
+}
+
+@Composable
+private fun PersonalBestsCard(personalBests: Map<String, Double>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBackground)
+    ) {
+        if (personalBests.isEmpty()) {
+            Text(
+                text = stringResource(R.string.profile_no_personal_bests),
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                modifier = Modifier.padding(16.dp)
+            )
+            return@Card
+        }
+
+        Column(modifier = Modifier.padding(16.dp)) {
+            groupedPersonalBests(personalBests).forEachIndexed { groupIndex, group ->
+                if (groupIndex > 0) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+
+                Text(
+                    text = group.startType.displayName,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = TextSecondary
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                group.entries.forEach { entry ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = entry.distanceLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = String.format(Locale.US, "%.3fs", entry.timeSeconds),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = AccentGreen
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GenderPicker(
+    selectedGender: String?,
+    onGenderSelected: (String?) -> Unit
+) {
+    val options = listOf(
+        "male" to "Male",
+        "female" to "Female",
+        "other" to "Other"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Gender",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            options.forEach { (value, label) ->
+                val selected = selectedGender == value
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (selected) AccentBlue.copy(alpha = 0.16f) else BorderSubtle)
+                        .border(
+                            width = 1.dp,
+                            color = if (selected) AccentBlue else Color.Transparent,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .clickable {
+                            onGenderSelected(if (selected) null else value)
+                        }
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = if (selected) AccentBlue else TextSecondary
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -345,6 +590,48 @@ private fun SectionLabel(text: String) {
         color = TextSecondary,
         modifier = Modifier.padding(start = 4.dp)
     )
+}
+
+private data class PersonalBestGroup(
+    val startType: StartType,
+    val entries: List<PersonalBestEntry>
+)
+
+private data class PersonalBestEntry(
+    val distanceLabel: String,
+    val timeSeconds: Double
+)
+
+private fun groupedPersonalBests(personalBests: Map<String, Double>): List<PersonalBestGroup> {
+    return personalBests
+        .mapNotNull { (key, time) ->
+            parsePersonalBestKey(key)?.let { (startType, distanceLabel) ->
+                startType to PersonalBestEntry(distanceLabel, time)
+            }
+        }
+        .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+        .map { (startType, entries) ->
+            PersonalBestGroup(
+                startType = startType,
+                entries = entries.sortedBy { numericDistance(it.distanceLabel) }
+            )
+        }
+        .sortedBy { it.startType.rawValue }
+}
+
+private fun parsePersonalBestKey(key: String): Pair<StartType, String>? {
+    val parts = key.split("_", limit = 2)
+    return if (parts.size == 2) {
+        StartType.fromRawValue(parts[0]) to parts[1]
+    } else if (key.endsWith("m")) {
+        StartType.FLYING to key
+    } else {
+        null
+    }
+}
+
+private fun numericDistance(label: String): Double {
+    return label.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: Double.MAX_VALUE
 }
 
 @Composable
@@ -373,6 +660,10 @@ private fun AthleteFormAddPreview() {
             onNameChanged = {},
             onNicknameChanged = {},
             onColorSelected = {},
+            onPickPhoto = {},
+            onRemovePhoto = {},
+            onBirthdateChanged = {},
+            onGenderSelected = {},
             onSave = {},
             onDelete = {},
             onCancel = {}
@@ -394,12 +685,18 @@ private fun AthleteFormEditPreview() {
                 name = "John Smith",
                 nickname = "Flash",
                 selectedColor = "red",
+                birthdateText = "1998-04-12",
+                gender = "male",
                 isEditMode = true,
                 isLoaded = true
             ),
             onNameChanged = {},
             onNicknameChanged = {},
             onColorSelected = {},
+            onPickPhoto = {},
+            onRemovePhoto = {},
+            onBirthdateChanged = {},
+            onGenderSelected = {},
             onSave = {},
             onDelete = {},
             onCancel = {}

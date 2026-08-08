@@ -139,7 +139,8 @@ fun ProfileScreen(
         onConfirmSignOut = viewModel::confirmSignOut,
         onDismissSignOut = viewModel::dismissSignOutDialog,
         onConfirmDeleteAccount = viewModel::confirmDeleteAccount,
-        onDismissDeleteAccount = viewModel::dismissDeleteAccountDialog
+        onDismissDeleteAccount = viewModel::dismissDeleteAccountDialog,
+        onDismissAccountActionError = viewModel::dismissAccountActionError
     )
 
     // Photo source selection dialog
@@ -179,6 +180,7 @@ fun ProfileScreen(
     }
 }
 
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 private fun ProfileScreenContent(
     uiState: ProfileUiState,
@@ -195,7 +197,8 @@ private fun ProfileScreenContent(
     onConfirmSignOut: () -> Unit = {},
     onDismissSignOut: () -> Unit = {},
     onConfirmDeleteAccount: () -> Unit = {},
-    onDismissDeleteAccount: () -> Unit = {}
+    onDismissDeleteAccount: () -> Unit = {},
+    onDismissAccountActionError: () -> Unit = {}
 ) {
     val focusManager = LocalFocusManager.current
 
@@ -236,7 +239,7 @@ private fun ProfileScreenContent(
                 contentAlignment = Alignment.Center
             ) {
                 val avatarBitmap by produceState<Bitmap?>(null, uiState.avatarPhotoPath) {
-                    value = withContext(Dispatchers.IO) {
+                    val loadedBitmap = withContext(Dispatchers.IO) {
                         uiState.avatarPhotoPath?.let { path ->
                             try {
                                 BitmapFactory.decodeFile(path)
@@ -245,6 +248,7 @@ private fun ProfileScreenContent(
                             }
                         }
                     }
+                    value = loadedBitmap
                 }
 
                 val currentAvatarBitmap = avatarBitmap
@@ -351,7 +355,11 @@ private fun ProfileScreenContent(
 
             // Account type + sprint counter
             Text(
-                text = stringResource(R.string.profile_account_type_guest),
+                text = if (uiState.isSignedIn) {
+                    uiState.userEmail ?: stringResource(R.string.profile_account_type_signed_in)
+                } else {
+                    stringResource(R.string.profile_account_type_guest)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
@@ -866,6 +874,21 @@ private fun ProfileScreenContent(
             }
         )
     }
+
+    val accountActionError = uiState.accountActionError
+    if (accountActionError != null) {
+        AlertDialog(
+            onDismissRequest = onDismissAccountActionError,
+            title = { Text(stringResource(R.string.profile_account_action_error_title), color = TextPrimary) },
+            text = { Text(accountActionError, color = TextSecondary) },
+            containerColor = SurfaceDark,
+            confirmButton = {
+                TextButton(onClick = onDismissAccountActionError) {
+                    Text(stringResource(R.string.common_ok), color = AccentNavy)
+                }
+            }
+        )
+    }
 }
 
 // -- Components --
@@ -1027,11 +1050,11 @@ private fun SectionHeader(title: String) {
 
 private fun formatTime(seconds: Double): String {
     return when {
-        seconds < 60.0 -> String.format("%.2fs", seconds)
+        seconds < 60.0 -> String.format(java.util.Locale.getDefault(), "%.2fs", seconds)
         else -> {
             val min = (seconds / 60).toInt()
             val sec = seconds % 60
-            String.format("%d:%05.2f", min, sec)
+            String.format(java.util.Locale.getDefault(), "%d:%05.2f", min, sec)
         }
     }
 }

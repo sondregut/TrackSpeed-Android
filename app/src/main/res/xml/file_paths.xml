@@ -3,4 +3,7 @@
     <cache-path
         name="exports"
         path="exports/" />
+    <cache-path
+        name="video_overlay"
+        path="video_overlay/" />
 </paths>
