@@ -18,26 +18,21 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 import javax.inject.Inject
 
-enum class TestType(
-    val displayName: String,
-    val shortName: String
-) {
-    FLYING_10M("Flying 10m", "F10"),
-    FLYING_20M("Flying 20m", "F20"),
-    FLYING_30M("Flying 30m", "F30"),
-    SPRINT_10M("10m Sprint", "10m"),
-    SPRINT_20M("20m Sprint", "20m"),
-    SPRINT_30M("30m Sprint", "30m"),
-    SPRINT_60M("60m Sprint", "60m"),
-    SPRINT_100M("100m Sprint", "100m"),
-    FORTY_YARD_DASH("40 Yard Dash", "40yd"),
-    PRO_AGILITY("Pro Agility", "5-10-5"),
-    L_DRILL("L-Drill", "3-Cone"),
-    TAKE_OFF_VELOCITY("TOV 5m", "TOV"),
-    PRACTICE("Practice", "Laps"),
-    OTHER("Other", "Other");
-
-    val label: String get() = shortName
+enum class TestType {
+    FLYING_10M,
+    FLYING_20M,
+    FLYING_30M,
+    SPRINT_10M,
+    SPRINT_20M,
+    SPRINT_30M,
+    SPRINT_60M,
+    SPRINT_100M,
+    FORTY_YARD_DASH,
+    PRO_AGILITY,
+    L_DRILL,
+    TAKE_OFF_VELOCITY,
+    PRACTICE,
+    OTHER
 }
 
 object TestTypeClassifier {
@@ -113,34 +108,10 @@ data class ProgressPoint(
     val bestTime: Double
 )
 
-enum class StatsTimeRange(
-    val displayName: String,
-    val daysBack: Long?
-) {
-    RECENT("Recent", null),
-    DAYS_90("90d", 90),
-    DAYS_30("30d", 30);
-
-    fun contextText(sessionCount: Int): String {
-        return when (this) {
-            RECENT -> "Latest $sessionCount sessions"
-            DAYS_90 -> "$sessionCount sessions in the last 90 days"
-            DAYS_30 -> "$sessionCount sessions in the last 30 days"
-        }
-    }
-
-    val emptyStateTitle: String
-        get() = when (this) {
-            RECENT -> "No Data Yet"
-            DAYS_90, DAYS_30 -> "No Data in Range"
-        }
-
-    val emptyStateMessage: String
-        get() = when (this) {
-            RECENT -> "Complete some sessions to see your progress"
-            DAYS_90 -> "No matching sessions in the last 90 days"
-            DAYS_30 -> "No matching sessions in the last 30 days"
-        }
+enum class StatsTimeRange(val daysBack: Long?) {
+    RECENT(null),
+    DAYS_90(90),
+    DAYS_30(30)
 }
 
 data class AthleteFilter(
@@ -153,7 +124,7 @@ data class AthleteFilter(
 data class StatsUiState(
     val timeRanges: List<StatsTimeRange> = StatsTimeRange.entries,
     val selectedTimeRange: StatsTimeRange = StatsTimeRange.RECENT,
-    val rangeContextText: String = "",
+    val rangeSessionCount: Int = 0,
     val testTypes: List<TestType> = emptyList(),
     val selectedTestType: TestType? = null,
     val athleteFilters: List<AthleteFilter> = emptyList(),
@@ -171,8 +142,6 @@ data class StatsUiState(
     val totalSessions: Int = 0,
     val speedUnit: String = "m/s",
     val progressPoints: List<ProgressPoint> = emptyList(),
-    val emptyStateTitle: String = "No Data Yet",
-    val emptyStateMessage: String = "Complete some sessions to see your progress",
     val isLoading: Boolean = true
 )
 
@@ -232,12 +201,10 @@ class StatsViewModel @Inject constructor(
         if (effectiveSelected == null) {
             return@combine StatsUiState(
                 selectedTimeRange = selectedRange,
-                rangeContextText = selectedRange.contextText(scopedSessions.size),
+                rangeSessionCount = scopedSessions.size,
                 testTypes = emptyList(),
                 selectedTestType = null,
                 speedUnit = speedUnit,
-                emptyStateTitle = selectedRange.emptyStateTitle,
-                emptyStateMessage = selectedRange.emptyStateMessage,
                 isLoading = false
             )
         }
@@ -253,7 +220,7 @@ class StatsViewModel @Inject constructor(
                 val first = runs.first()
                 AthleteFilter(
                     id = athleteId,
-                    name = first.athleteName ?: "Unknown",
+                    name = first.athleteName.orEmpty(),
                     color = first.athleteColor,
                     runCount = runs.size
                 )
@@ -318,7 +285,7 @@ class StatsViewModel @Inject constructor(
 
         StatsUiState(
             selectedTimeRange = selectedRange,
-            rangeContextText = selectedRange.contextText(scopedSessions.size),
+            rangeSessionCount = scopedSessions.size,
             testTypes = testTypes,
             selectedTestType = effectiveSelected,
             athleteFilters = athleteFilters,
@@ -336,8 +303,6 @@ class StatsViewModel @Inject constructor(
             totalSessions = totalSessions,
             speedUnit = speedUnit,
             progressPoints = progressPoints,
-            emptyStateTitle = selectedRange.emptyStateTitle,
-            emptyStateMessage = selectedRange.emptyStateMessage,
             isLoading = false
         )
     }.stateIn(

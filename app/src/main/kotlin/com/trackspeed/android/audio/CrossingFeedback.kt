@@ -89,9 +89,7 @@ class CrossingFeedback @Inject constructor(
 
         scope.launch {
             try {
-                val languageCode = cachedAppLanguage.let {
-                    if (it == "system") "en" else it
-                }
+                val languageCode = cachedAppLanguage
                 val voiceProvider = VoiceProvider.fromString(cachedVoiceProvider)
                 if (voiceProvider == VoiceProvider.ELEVEN_LABS) {
                     val voiceId = ElevenLabsVoiceId.fromString(cachedElevenLabsVoice)
@@ -109,7 +107,7 @@ class CrossingFeedback @Inject constructor(
         val engine = tts ?: return
         if (!ttsReady) return
 
-        val commands = VoiceCommandPhrases.forLanguage(languageCode)
+        val commands = VoiceCommandPhrases.forLanguage(context, languageCode)
         engine.language = commands.ttsLocale
 
         val text = elevenLabsService.formatTimeForSpeech(seconds, languageCode)

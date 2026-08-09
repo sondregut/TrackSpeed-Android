@@ -85,9 +85,9 @@ import com.trackspeed.android.protocol.SegmentSplit
 import com.trackspeed.android.ui.components.ExpandedThumbnail
 import com.trackspeed.android.ui.components.ThumbnailViewerDialog
 import com.trackspeed.android.ui.util.formatDistance
-import com.trackspeed.android.ui.util.formatSegmentLabel
 import com.trackspeed.android.ui.util.formatSplitDuration
 import com.trackspeed.android.ui.util.formatTime
+import com.trackspeed.android.ui.util.localizedDisplayName
 import com.trackspeed.android.ui.util.parseSegmentSplits
 import com.trackspeed.android.ui.util.parseAthleteColor
 import java.io.File
@@ -215,7 +215,7 @@ fun RunDetailScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Video Overlay", color = TextPrimary) },
+                                text = { Text(stringResource(R.string.video_overlay_title), color = TextPrimary) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.Videocam,
@@ -230,7 +230,7 @@ fun RunDetailScreen(
                             )
                             if (uiState.run?.hasFrameScrubberPayload() == true) {
                                 DropdownMenuItem(
-                                    text = { Text("Frame Scrubber", color = TextPrimary) },
+                                    text = { Text(stringResource(R.string.frame_scrubber_title), color = TextPrimary) },
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Default.PhotoLibrary,
@@ -586,12 +586,12 @@ private fun VideoOverlayActionCard(onClick: () -> Unit) {
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Video Overlay",
+                    text = stringResource(R.string.video_overlay_title),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = TextPrimary
                 )
                 Text(
-                    text = "Import a clip, mark the start frame, and export a TrackSpeed timer overlay.",
+                    text = stringResource(R.string.video_overlay_action_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
@@ -632,12 +632,12 @@ private fun FrameScrubberActionCard(onClick: () -> Unit) {
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Frame Scrubber",
+                    text = stringResource(R.string.frame_scrubber_title),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = TextPrimary
                 )
                 Text(
-                    text = "Review saved gate frames and detector overlays for this run.",
+                    text = stringResource(R.string.frame_scrubber_action_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
@@ -684,7 +684,7 @@ private fun SplitBreakdownCard(segments: List<SegmentSplit>) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Splits",
+                text = stringResource(R.string.race_splits),
                 style = MaterialTheme.typography.titleSmall.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
@@ -702,7 +702,11 @@ private fun SplitBreakdownCard(segments: List<SegmentSplit>) {
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            text = formatSegmentLabel(segment),
+                            text = stringResource(
+                                R.string.race_gate_number_range,
+                                segment.fromGateIndex,
+                                segment.toGateIndex
+                            ),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
@@ -717,7 +721,10 @@ private fun SplitBreakdownCard(segments: List<SegmentSplit>) {
 
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            text = "${formatSplitDuration(segment.splitNanos)}s",
+                            text = stringResource(
+                                R.string.common_seconds_value,
+                                formatSplitDuration(segment.splitNanos)
+                            ),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
@@ -725,7 +732,13 @@ private fun SplitBreakdownCard(segments: List<SegmentSplit>) {
                             color = AccentBlue
                         )
                         Text(
-                            text = "${formatSplitDuration(segment.cumulativeSplitNanos)}s cumulative",
+                            text = stringResource(
+                                R.string.race_cumulative_time,
+                                stringResource(
+                                    R.string.common_seconds_value,
+                                    formatSplitDuration(segment.cumulativeSplitNanos)
+                                )
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = TextMuted
                         )
@@ -748,6 +761,11 @@ private fun GateImagesGallery(
     onReviewSubmitted: (com.trackspeed.android.ui.components.DetectionReviewSubmission) -> Unit,
     onThumbnailClick: (ExpandedThumbnail) -> Unit
 ) {
+    val detectionGateLabel = if (run.numberOfPhones <= 1) {
+        stringResource(R.string.run_detail_crossing_label)
+    } else {
+        stringResource(R.string.device_role_finish)
+    }
     val bitmap by produceState<Bitmap?>(null, thumbnailPath) {
         val loadedBitmap = withContext(Dispatchers.IO) {
             try {
@@ -823,7 +841,10 @@ private fun GateImagesGallery(
                                             bitmap = currentBitmap,
                                             gatePosition = gatePosition,
                                             reviewTarget = if (detectionReviewEnabled) {
-                                                run.toDetectionReviewTarget(gatePosition)
+                                                run.toDetectionReviewTarget(
+                                                    gatePosition = gatePosition,
+                                                    gateLabel = detectionGateLabel
+                                                )
                                             } else {
                                                 null
                                             },
@@ -875,7 +896,8 @@ private fun GateImagesGallery(
 }
 
 private fun com.trackspeed.android.data.local.entities.RunEntity.toDetectionReviewTarget(
-    gatePosition: Float
+    gatePosition: Float,
+    gateLabel: String
 ): DetectionReviewTarget {
     val isSolo = numberOfPhones <= 1
     return DetectionReviewTarget(
@@ -883,7 +905,7 @@ private fun com.trackspeed.android.data.local.entities.RunEntity.toDetectionRevi
         runId = id,
         runNumber = runNumber,
         numberOfPhones = numberOfPhones,
-        gateLabel = if (isSolo) "Crossing" else "Finish",
+        gateLabel = gateLabel,
         target = if (isSolo) "crossing" else "finish",
         mode = if (isSolo) "solo" else "multi",
         distanceMeters = distance,
@@ -943,7 +965,7 @@ private fun InfoCard(
 
             InfoRow(
                 label = stringResource(R.string.run_detail_start_type_label),
-                value = StartType.fromRawValue(startType).displayName
+                value = StartType.fromRawValue(startType).localizedDisplayName()
             )
 
             InfoRow(

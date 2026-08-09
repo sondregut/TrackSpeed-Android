@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -79,9 +80,10 @@ import com.trackspeed.android.ui.components.VoiceStartOverlaySettingsActions
 import com.trackspeed.android.ui.screens.settings.applyLanguage
 import com.trackspeed.android.ui.theme.*
 import com.trackspeed.android.ui.util.formatDistance
-import com.trackspeed.android.ui.util.formatSegmentLabel
 import com.trackspeed.android.ui.util.formatSpeed
 import com.trackspeed.android.ui.util.formatSplitDuration
+import com.trackspeed.android.ui.util.localizedDisplayName
+import com.trackspeed.android.ui.util.localizedShortName
 import com.trackspeed.android.ui.util.parseSegmentSplits
 import com.trackspeed.android.ui.util.parseAthleteColor
 import kotlinx.coroutines.Dispatchers
@@ -336,7 +338,11 @@ private fun RaceTopBar(
                     .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "$connectedDeviceCount connected",
+                    text = pluralStringResource(
+                        R.plurals.race_connected_count,
+                        connectedDeviceCount,
+                        connectedDeviceCount
+                    ),
                     color = AccentGreen,
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.SemiBold
@@ -501,13 +507,13 @@ private fun PairingContent(
 
         Text(
             text = if (hasRequiredDevices) {
-                "Ready to time"
+                stringResource(R.string.race_pairing_ready_to_time)
             } else if (hasRequiredConnections) {
-                "Synchronizing phones"
+                stringResource(R.string.race_pairing_synchronizing_phones)
             } else if (isJoinMode) {
-                "Join Session"
+                stringResource(R.string.race_join_session)
             } else if (isHostingSession) {
-                "Create Session"
+                stringResource(R.string.race_pairing_create_session)
             } else {
                 stringResource(R.string.race_pairing_searching)
             },
@@ -520,11 +526,19 @@ private fun PairingContent(
 
         Text(
             text = if (hasRequiredDevices) {
-                "$displayedConnectedDeviceCount phones connected — tap Start Timing when ready"
+                pluralStringResource(
+                    R.plurals.race_pairing_connected_ready,
+                    displayedConnectedDeviceCount,
+                    displayedConnectedDeviceCount
+                )
             } else if (hasRequiredConnections) {
-                "${syncedDeviceCount.coerceAtMost(requiredDeviceCount)} of $requiredDeviceCount phones synchronized"
+                stringResource(
+                    R.string.race_pairing_synchronized_fraction,
+                    syncedDeviceCount.coerceAtMost(requiredDeviceCount),
+                    requiredDeviceCount
+                )
             } else if (isJoinMode) {
-                "Open Create Session on the host phone and keep it on the connect screen."
+                stringResource(R.string.race_pairing_open_host)
             } else if (isHostingSession) {
                 val neededPhones = if (isControlOnlyHost) {
                     numberOfGates.coerceAtLeast(2)
@@ -532,16 +546,20 @@ private fun PairingContent(
                     (numberOfGates - 1).coerceAtLeast(1)
                 }
                 if (neededPhones == 1) {
-                    "On the other phone, tap Join Session. No account or subscription needed."
+                    stringResource(R.string.race_pairing_join_other_no_account)
                 } else if (isControlOnlyHost) {
-                    "On each timing phone, open TrackSpeed and tap Join Session."
+                    stringResource(R.string.race_pairing_join_each_timing)
                 } else {
-                    "On each timing phone, open TrackSpeed and tap Join Session."
+                    stringResource(R.string.race_pairing_join_each_timing)
                 }
             } else if (connectedDeviceCount > 0) {
-                "$connectedDeviceCount of $requiredDeviceCount phones connected"
+                stringResource(
+                    R.string.race_pairing_connected_fraction,
+                    connectedDeviceCount,
+                    requiredDeviceCount
+                )
             } else {
-                "Open race mode on all $requiredDeviceCount phones — they will auto-discover via Bluetooth"
+                stringResource(R.string.race_pairing_auto_discover, requiredDeviceCount)
             },
             style = MaterialTheme.typography.bodyMedium,
             color = if (displayedConnectedDeviceCount > 0) AccentGreen else TextSecondary,
@@ -589,7 +607,7 @@ private fun PairingContent(
         // Start timing button appears when the configured gate count is connected.
         if (hasRequiredDevices) {
             PillButton(
-                text = "Start Timing",
+                text = stringResource(R.string.race_start_timing),
                 backgroundColor = AccentGreen,
                 onClick = onConfirm
             )
@@ -607,16 +625,18 @@ private fun PairingContent(
 @Composable
 private fun JoinSessionStatusCard(pairingStatus: String) {
     val isSearching = pairingStatus.isNotBlank()
-    val title = if (isSearching) "Scanning with Bluetooth" else "Ready to connect"
+    val title = stringResource(
+        if (isSearching) R.string.race_join_scanning_title else R.string.race_join_ready_title
+    )
     val detail = if (isSearching) {
-        "The host must stay on Create Session with Bluetooth enabled."
+        stringResource(R.string.race_join_scanning_detail)
     } else {
-        "Find a host phone over Bluetooth."
+        stringResource(R.string.race_join_ready_detail)
     }
     val hostDetail = if (isSearching) {
-        "Create Session must stay open while this phone searches."
+        stringResource(R.string.race_join_host_scanning_detail)
     } else {
-        "Open Create Session and stay on the connect screen."
+        stringResource(R.string.race_join_host_ready_detail)
     }
 
     Card(
@@ -656,7 +676,9 @@ private fun JoinSessionStatusCard(pairingStatus: String) {
                     verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Text(
-                        text = if (isSearching) "SEARCHING" else "JOIN SESSION",
+                        text = stringResource(
+                            if (isSearching) R.string.race_join_searching else R.string.race_join_session_upper
+                        ),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = AccentOrange
                     )
@@ -675,13 +697,17 @@ private fun JoinSessionStatusCard(pairingStatus: String) {
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = if (isSearching) "Waiting" else "Bluetooth",
+                        text = stringResource(
+                            if (isSearching) R.string.race_waiting else R.string.race_bluetooth
+                        ),
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         color = TextPrimary,
                         maxLines = 1
                     )
                     Text(
-                        text = if (isSearching) "STATUS" else "MODE",
+                        text = stringResource(
+                            if (isSearching) R.string.race_status_upper else R.string.race_mode_upper
+                        ),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                         color = TextTertiary
                     )
@@ -703,13 +729,13 @@ private fun JoinSessionStatusCard(pairingStatus: String) {
                 rows = listOf(
                     JoinSessionInfo(
                         icon = Icons.Outlined.PhoneAndroid,
-                        title = "Host phone",
+                        title = stringResource(R.string.race_host_phone),
                         detail = hostDetail
                     ),
                     JoinSessionInfo(
                         icon = Icons.Filled.Bluetooth,
-                        title = "This phone",
-                        detail = "Bluetooth must be enabled on both phones."
+                        title = stringResource(R.string.race_this_phone),
+                        detail = stringResource(R.string.race_bluetooth_both_phones)
                     )
                 )
             )
@@ -788,16 +814,19 @@ private fun PairingStatusCard(
     val isReady = missingJoiners == 0
     val accent = if (isReady) AccentGreen else AccentBlue
     val title = when {
-        missingJoiners == 1 -> "Waiting for 1 more phone"
-        missingJoiners > 1 -> "Waiting for $missingJoiners more phones"
-        else -> "Phones connected"
+        missingJoiners > 0 -> pluralStringResource(
+            R.plurals.race_pairing_waiting_more,
+            missingJoiners,
+            missingJoiners
+        )
+        else -> stringResource(R.string.race_pairing_phones_connected)
     }
     val detail = if (isReady) {
-        "Roles are assigned automatically. Continue when the lineup looks right."
+        stringResource(R.string.race_pairing_roles_assigned)
     } else if (hostRole == TimingRole.CONTROL_ONLY) {
-        "On each timing phone, open TrackSpeed and tap Join Session."
+        stringResource(R.string.race_pairing_join_each_timing)
     } else {
-        "On the other phone, open TrackSpeed and tap Join Session."
+        stringResource(R.string.race_pairing_join_other)
     }
     val progress = connectedJoiners.toFloat() / requiredJoiners.toFloat()
 
@@ -833,7 +862,9 @@ private fun PairingStatusCard(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = if (isReady) "Ready" else "Connect",
+                            text = stringResource(
+                                if (isReady) R.string.race_ready else R.string.race_connect
+                            ),
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = accent
                         )
@@ -853,12 +884,18 @@ private fun PairingStatusCard(
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = if (isReady) "Ready" else "$connectedJoiners/$requiredJoiners",
+                        text = if (isReady) {
+                            stringResource(R.string.race_ready)
+                        } else {
+                            stringResource(R.string.race_ready_fraction, connectedJoiners, requiredJoiners)
+                        },
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = accent
                     )
                     Text(
-                        text = if (isReady) "STATUS" else "PHONES",
+                        text = stringResource(
+                            if (isReady) R.string.race_status_upper else R.string.race_phones_upper
+                        ),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                         color = TextTertiary
                     )
@@ -878,7 +915,11 @@ private fun PairingStatusCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PairingMetricChip(
                     icon = Icons.Outlined.PhoneAndroid,
-                    text = "$displayedConnectedDeviceCount/$requiredDeviceCount phones",
+                    text = stringResource(
+                        R.string.race_phone_fraction,
+                        displayedConnectedDeviceCount,
+                        requiredDeviceCount
+                    ),
                     color = if (displayedConnectedDeviceCount >= requiredDeviceCount) AccentGreen else TextSecondary
                 )
                 PairingMetricChip(
@@ -947,7 +988,7 @@ private fun GateLineupCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "GATE LINEUP",
+                    text = stringResource(R.string.race_gate_lineup),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.5.sp
@@ -955,7 +996,11 @@ private fun GateLineupCard(
                     color = TextTertiary
                 )
                 Text(
-                    text = "$connectedDeviceCount/$requiredDeviceCount phones",
+                    text = stringResource(
+                        R.string.race_phone_fraction,
+                        connectedDeviceCount,
+                        requiredDeviceCount
+                    ),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (connectedDeviceCount >= requiredDeviceCount) AccentGreen else TextSecondary
                 )
@@ -963,8 +1008,8 @@ private fun GateLineupCard(
 
             GateLineupRow(
                 role = hostDeviceRole,
-                deviceName = "This phone",
-                status = "Ready",
+                deviceName = stringResource(R.string.race_this_phone),
+                status = stringResource(R.string.race_ready),
                 isWaiting = false,
                 isHost = true
             )
@@ -972,8 +1017,12 @@ private fun GateLineupCard(
             repeat(connectedJoiners) { index ->
                 GateLineupRow(
                     role = roleForTimingPhone(index, requiredJoiners, hostRole),
-                    deviceName = if (connectedJoiners == 1) "Timing phone" else "Timing phone ${index + 1}",
-                    status = "Connected",
+                    deviceName = if (connectedJoiners == 1) {
+                        stringResource(R.string.race_timing_phone)
+                    } else {
+                        stringResource(R.string.race_timing_phone_number, index + 1)
+                    },
+                    status = stringResource(R.string.race_connected),
                     isWaiting = false,
                     isHost = false
                 )
@@ -984,7 +1033,7 @@ private fun GateLineupCard(
                 GateLineupRow(
                     role = roleForTimingPhone(index, requiredJoiners, hostRole),
                     deviceName = null,
-                    status = "Waiting",
+                    status = stringResource(R.string.race_waiting),
                     isWaiting = true,
                     isHost = false
                 )
@@ -1038,7 +1087,7 @@ private fun GateLineupRow(
                 color = if (isWaiting) TextSecondary else TextPrimary
             )
             Text(
-                text = deviceName ?: "Open TrackSpeed and tap Join Session",
+                text = deviceName ?: stringResource(R.string.race_open_join_instruction),
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
                 maxLines = 1
@@ -1046,7 +1095,7 @@ private fun GateLineupRow(
         }
 
         Text(
-            text = if (isHost) "Host" else status,
+            text = if (isHost) stringResource(R.string.race_host) else status,
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
             color = when {
                 isWaiting -> TextTertiary
@@ -1080,9 +1129,9 @@ private fun colorForLineupRole(role: DeviceRole): Color = when (role) {
 @Composable
 private fun roleLabel(role: DeviceRole): String = when (role) {
     DeviceRole.START -> stringResource(R.string.race_role_start)
-    DeviceRole.LAP -> "Split"
+    DeviceRole.LAP -> stringResource(R.string.device_role_split)
     DeviceRole.FINISH -> stringResource(R.string.race_role_finish)
-    DeviceRole.CONTROL -> "Control"
+    DeviceRole.CONTROL -> stringResource(R.string.setup_control)
 }
 
 @Composable
@@ -1165,9 +1214,9 @@ private fun ScanningAnimation() {
 private fun RoleBadge(role: DeviceRole?) {
     val (label, color) = when (role) {
         DeviceRole.START -> stringResource(R.string.race_role_start) to AccentGreen
-        DeviceRole.LAP -> "Split" to AccentOrange
+        DeviceRole.LAP -> stringResource(R.string.device_role_split) to AccentOrange
         DeviceRole.FINISH -> stringResource(R.string.race_role_finish) to AccentRed
-        DeviceRole.CONTROL -> "Control" to AccentBlue
+        DeviceRole.CONTROL -> stringResource(R.string.setup_control) to AccentBlue
         null -> stringResource(R.string.race_role_unknown) to TextSecondary
     }
 
@@ -1389,15 +1438,15 @@ private fun RaceReadyContent(
 
         Text(
             text = if (uiState.role == DeviceRole.CONTROL) {
-                "Keep this phone with the coach. Other phones time the gates."
+                stringResource(R.string.race_control_position_instruction)
             } else {
                 stringResource(
                     R.string.race_position_instruction,
                     when (uiState.role) {
                         DeviceRole.START -> stringResource(R.string.race_role_start).lowercase()
-                        DeviceRole.LAP -> "split gate"
+                        DeviceRole.LAP -> stringResource(R.string.race_split_gate)
                         DeviceRole.FINISH -> stringResource(R.string.race_role_finish).lowercase()
-                        DeviceRole.CONTROL -> "control"
+                        DeviceRole.CONTROL -> stringResource(R.string.race_control_role_short)
                         null -> stringResource(R.string.race_position_instruction_gate)
                     }
                 )
@@ -1427,7 +1476,7 @@ private fun RaceReadyContent(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Waiting for host to start",
+                    text = stringResource(R.string.race_waiting_host_start),
                     color = TextSecondary,
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
@@ -1455,7 +1504,7 @@ private fun ActiveAthleteChipBar(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "ACTIVE ATHLETE",
+            text = stringResource(R.string.race_active_athlete),
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
             color = TextTertiary,
             modifier = Modifier.padding(horizontal = 4.dp)
@@ -1565,19 +1614,25 @@ private fun GateReadinessCard(uiState: RaceModeUiState) {
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "GATE READINESS",
+                        text = stringResource(R.string.race_gate_readiness),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = TextTertiary
                     )
                     Text(
-                        text = if (allReady) "All gates armed" else "Waiting for armed gates",
+                        text = stringResource(
+                            if (allReady) R.string.race_all_gates_armed else R.string.race_waiting_armed_gates
+                        ),
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         color = TextPrimary
                     )
                 }
 
                 Text(
-                    text = "$readyRemoteGates/$requiredRemoteGates",
+                    text = stringResource(
+                        R.string.race_ready_fraction,
+                        readyRemoteGates,
+                        requiredRemoteGates
+                    ),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = accent
                 )
@@ -1596,12 +1651,18 @@ private fun GateReadinessCard(uiState: RaceModeUiState) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PairingMetricChip(
                     icon = if (localReady) Icons.Outlined.CheckCircle else Icons.Outlined.Tune,
-                    text = if (localReady) "This phone ready" else "Calibrate this phone",
+                    text = stringResource(
+                        if (localReady) R.string.race_this_phone_ready else R.string.race_calibrate_this_phone
+                    ),
                     color = if (localReady) AccentGreen else TextSecondary
                 )
                 PairingMetricChip(
                     icon = Icons.Outlined.PhoneAndroid,
-                    text = "$readyRemoteGates joined ready",
+                    text = pluralStringResource(
+                        R.plurals.race_joined_ready,
+                        readyRemoteGates,
+                        readyRemoteGates
+                    ),
                     color = if (readyRemoteGates >= requiredRemoteGates) AccentGreen else TextSecondary
                 )
             }
@@ -1629,12 +1690,12 @@ private fun GateAlignmentCard() {
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = "ALIGNMENT",
+                    text = stringResource(R.string.race_alignment),
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = TextTertiary
                 )
                 Text(
-                    text = "Set the track direction, then rotate this phone perpendicular.",
+                    text = stringResource(R.string.race_alignment_instruction),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     lineHeight = 18.sp
@@ -1662,20 +1723,20 @@ private fun GateCalibrationCard(
         else -> AccentRed
     }
     val roleLabel = when (role) {
-        DeviceRole.START -> "start"
-        DeviceRole.LAP -> "split"
-        DeviceRole.FINISH -> "finish"
-        else -> "gate"
+        DeviceRole.START -> stringResource(R.string.race_calibration_role_start)
+        DeviceRole.LAP -> stringResource(R.string.race_calibration_role_split)
+        DeviceRole.FINISH -> stringResource(R.string.race_calibration_role_finish)
+        else -> stringResource(R.string.race_calibration_role_gate)
     }
     val title = when {
-        isCalibrated -> "Calibrated"
-        isCalibrating -> "Calibrating..."
-        else -> "Position Gate Line"
+        isCalibrated -> stringResource(R.string.race_calibration_calibrated)
+        isCalibrating -> stringResource(R.string.race_calibration_calibrating)
+        else -> stringResource(R.string.race_calibration_position_line)
     }
     val detail = when {
-        isCalibrated -> "Gate line is set. Keep the phone steady until timing starts."
-        isCalibrating -> "Hold the phone steady while the camera settles."
-        else -> "Drag the red line to the $roleLabel position, then calibrate."
+        isCalibrated -> stringResource(R.string.race_calibration_set_detail)
+        isCalibrating -> stringResource(R.string.race_calibration_hold_detail)
+        else -> stringResource(R.string.race_calibration_drag_detail, roleLabel)
     }
 
     Card(
@@ -1747,7 +1808,11 @@ private fun GateCalibrationCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (isCalibrating) "Calibrating..." else "Calibrate",
+                        text = if (isCalibrating) {
+                            stringResource(R.string.race_calibration_calibrating)
+                        } else {
+                            stringResource(R.string.race_calibration_action)
+                        },
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         color = if (isCalibrating) TextSecondary else Color.White
                     )
@@ -1762,8 +1827,8 @@ private fun JoinReadyStatusCard(uiState: RaceModeUiState) {
     val isSynced = uiState.syncQuality != null || uiState.syncProgress >= 1f
     val accent = if (isSynced) AccentGreen else AccentBlue
     val hostName = uiState.connectedDeviceName
-        .takeUnless { it.isBlank() || it == "Other Device" }
-        ?: "host phone"
+        .takeUnless { it.isBlank() }
+        ?: stringResource(R.string.race_default_host_phone)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1802,17 +1867,17 @@ private fun JoinReadyStatusCard(uiState: RaceModeUiState) {
                     verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Text(
-                        text = "CONNECTED",
+                        text = stringResource(R.string.race_connected_upper),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = accent
                     )
                     Text(
-                        text = "Waiting for host",
+                        text = stringResource(R.string.race_waiting_for_host),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = TextPrimary
                     )
                     Text(
-                        text = "Connected to $hostName. Stay on this screen until timing starts.",
+                        text = stringResource(R.string.race_connected_to_host, hostName),
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
                         lineHeight = 18.sp
@@ -1826,7 +1891,7 @@ private fun JoinReadyStatusCard(uiState: RaceModeUiState) {
                         color = accent
                     )
                     Text(
-                        text = "SYNC",
+                        text = stringResource(R.string.race_sync_upper),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                         color = TextTertiary
                     )
@@ -1855,7 +1920,11 @@ private fun JoinReadyRoleSummaryCard(
     val roleName = joinReadyRoleName(uiState.role, startType)
     val roleDetail = joinReadyRoleDetail(uiState.role, startType)
     val roleColor = joinReadyRoleColor(uiState.role)
-    val sessionSummary = "${formatDistance(uiState.distanceMeters)} / ${startMode.displayName}"
+    val sessionSummary = stringResource(
+        R.string.race_session_summary_format,
+        formatDistance(uiState.distanceMeters),
+        stringResource(startMode.displayNameRes)
+    )
     val gateSummary = joinReadyGateSummary(uiState)
 
     Card(
@@ -1899,7 +1968,7 @@ private fun JoinReadyRoleSummaryCard(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = "YOUR ROLE",
+                        text = stringResource(R.string.race_your_role),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = TextTertiary
                     )
@@ -1937,37 +2006,60 @@ private fun JoinReadyRoleSummaryCard(
     }
 }
 
+@Composable
 private fun joinReadyRoleName(role: DeviceRole?, startType: StartType): String {
     return when (role) {
-        DeviceRole.START -> if (startType.usesStartTrigger) startType.startTriggerRoleName else "Start Gate"
-        DeviceRole.LAP -> "Split Gate"
-        DeviceRole.FINISH -> "Finish Gate"
-        DeviceRole.CONTROL -> "Control Only"
-        null -> "Assigned Gate"
+        DeviceRole.START -> if (startType.usesStartTrigger) {
+            stringResource(
+                when (startType) {
+                    StartType.TOUCH_RELEASE -> R.string.race_touch_start_role
+                    StartType.COUNTDOWN -> R.string.race_countdown_start_role
+                    StartType.VOICE_COMMAND -> R.string.race_voice_start_role
+                    StartType.FLYING, StartType.IN_FRAME -> R.string.race_start_gate
+                }
+            )
+        } else stringResource(R.string.race_start_gate)
+        DeviceRole.LAP -> stringResource(R.string.race_split_gate_title)
+        DeviceRole.FINISH -> stringResource(R.string.race_finish_gate)
+        DeviceRole.CONTROL -> stringResource(R.string.race_control_only)
+        null -> stringResource(R.string.race_assigned_gate)
     }
 }
 
+@Composable
 private fun joinReadyRoleDetail(role: DeviceRole?, startType: StartType): String {
     return when (role) {
         DeviceRole.START -> if (startType.usesStartTrigger) {
-            startType.startTriggerHint
+            stringResource(
+                when (startType) {
+                    StartType.TOUCH_RELEASE -> R.string.race_touch_start_hint
+                    StartType.COUNTDOWN -> R.string.race_countdown_start_hint
+                    StartType.VOICE_COMMAND -> R.string.race_voice_start_hint
+                    StartType.FLYING, StartType.IN_FRAME -> R.string.race_role_start_line_detail
+                }
+            )
         } else {
-            "Use this phone at the start line."
+            stringResource(R.string.race_role_start_line_detail)
         }
-        DeviceRole.LAP -> "Use this phone at the assigned split point."
-        DeviceRole.FINISH -> "Use this phone at the finish line."
-        DeviceRole.CONTROL -> "This phone controls the session without camera timing."
-        null -> "The host will assign this phone to a timing gate."
+        DeviceRole.LAP -> stringResource(R.string.race_role_split_detail)
+        DeviceRole.FINISH -> stringResource(R.string.race_role_finish_detail)
+        DeviceRole.CONTROL -> stringResource(R.string.race_role_control_detail)
+        null -> stringResource(R.string.race_role_unassigned_detail)
     }
 }
 
+@Composable
 private fun joinReadyGateSummary(uiState: RaceModeUiState): String {
     val gateIndex = uiState.localGateIndex ?: uiState.gateAssignment?.gateIndex
     val gateDistance = uiState.localGateDistanceMeters ?: uiState.gateAssignment?.distanceFromStart
     return if (gateIndex != null && gateDistance != null && gateDistance > 0.0) {
-        "Gate ${gateIndex + 1} at ${formatDistance(gateDistance)}"
+        stringResource(R.string.race_gate_at_distance, gateIndex + 1, formatDistance(gateDistance))
     } else {
-        "${uiState.numberOfGates} gates"
+        pluralStringResource(
+            R.plurals.race_gate_count,
+            uiState.numberOfGates,
+            uiState.numberOfGates
+        )
     }
 }
 
@@ -2102,12 +2194,12 @@ private fun StartTypeConfigCard(
                     color = TextTertiary
                 )
                 Text(
-                    text = startMode.displayName,
+                    text = stringResource(startMode.displayNameRes),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = TextPrimary
                 )
                 Text(
-                    text = startMode.description,
+                    text = stringResource(startMode.descriptionRes),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     maxLines = 2
@@ -2116,7 +2208,7 @@ private fun StartTypeConfigCard(
 
             Icon(
                 imageVector = Icons.Filled.KeyboardArrowDown,
-                contentDescription = "Change start type",
+                contentDescription = stringResource(R.string.race_change_start_type_cd),
                 tint = if (enabled) TextSecondary else TextTertiary
             )
         }
@@ -2208,7 +2300,11 @@ private fun GateDistanceConfigCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "$gateCount ${if (gateCount == 1) "gate" else "gates"} configured",
+                    text = pluralStringResource(
+                        R.plurals.race_gates_configured,
+                        gateCount,
+                        gateCount
+                    ),
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = TextPrimary
                 )
@@ -2265,7 +2361,7 @@ private fun SegmentDistanceRow(
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
-                text = "$fromLabel to $toLabel",
+                text = stringResource(R.string.race_segment_range, fromLabel, toLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
@@ -2283,7 +2379,7 @@ private fun SegmentDistanceRow(
         ) {
             Icon(
                 imageVector = Icons.Filled.Remove,
-                contentDescription = "Decrease segment distance",
+                contentDescription = stringResource(R.string.race_decrease_segment_cd),
                 tint = if (enabled && distanceMeters > 1.0) TextPrimary else TextTertiary
             )
         }
@@ -2295,18 +2391,19 @@ private fun SegmentDistanceRow(
         ) {
             Icon(
                 imageVector = Icons.Filled.Add,
-                contentDescription = "Increase segment distance",
+                contentDescription = stringResource(R.string.race_increase_segment_cd),
                 tint = if (enabled) TextPrimary else TextTertiary
             )
         }
     }
 }
 
+@Composable
 private fun gateLabelForUi(gateIndex: Int, gateCount: Int): String {
     return when (gateIndex) {
-        0 -> "Start"
-        gateCount - 1 -> "Finish"
-        else -> "Gate $gateIndex"
+        0 -> stringResource(R.string.device_role_start)
+        gateCount - 1 -> stringResource(R.string.device_role_finish)
+        else -> stringResource(R.string.race_gate_number, gateIndex)
     }
 }
 
@@ -2661,12 +2758,12 @@ private fun ActiveRaceContent(
                             modifier = Modifier.size(48.dp)
                         )
                         Text(
-                            text = "Control phone",
+                            text = stringResource(R.string.race_control_phone),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = TextPrimary
                         )
                         Text(
-                            text = "This phone starts runs and collects results while the timing phones watch the gates.",
+                            text = stringResource(R.string.race_control_phone_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary,
                             textAlign = TextAlign.Center
@@ -2740,7 +2837,7 @@ private fun ActiveRaceContent(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Tune,
-                                contentDescription = "Session settings",
+                                contentDescription = stringResource(R.string.race_session_settings_cd),
                                 tint = TextSecondary,
                                 modifier = Modifier.size(19.dp)
                             )
@@ -2882,20 +2979,20 @@ private fun SessionSettingsSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Session Settings",
+                    text = stringResource(R.string.session_settings_title),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = TextPrimary
                 )
                 IconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Filled.Close,
-                        contentDescription = "Close session settings",
+                        contentDescription = stringResource(R.string.race_close_session_settings_cd),
                         tint = TextSecondary
                     )
                 }
             }
 
-            SessionSettingsSection(title = "Test Type") {
+            SessionSettingsSection(title = stringResource(R.string.session_settings_test_type)) {
                 StartMode.entries.chunked(2).forEach { rowModes ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2903,7 +3000,7 @@ private fun SessionSettingsSheet(
                     ) {
                         rowModes.forEach { mode ->
                             SessionSettingsChip(
-                                text = mode.displayName,
+                                text = stringResource(mode.displayNameRes),
                                 icon = mode.icon,
                                 selected = pendingStartType == mode.rawValue,
                                 modifier = Modifier.weight(1f)
@@ -2918,7 +3015,7 @@ private fun SessionSettingsSheet(
                 }
             }
 
-            SessionSettingsSection(title = "Distance") {
+            SessionSettingsSection(title = stringResource(R.string.setup_distance)) {
                 val presets = listOf(5.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 100.0)
                 presets.chunked(4).forEach { rowDistances ->
                     Row(
@@ -2959,8 +3056,8 @@ private fun SessionSettingsSheet(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text("Custom distance") },
-                    suffix = { Text("m") },
+                    label = { Text(stringResource(R.string.setup_custom_distance)) },
+                    suffix = { Text(stringResource(R.string.common_meters_abbreviation)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AccentBlue,
@@ -2975,7 +3072,7 @@ private fun SessionSettingsSheet(
             }
 
             if (uiState.numberOfGates > 2) {
-                SessionSettingsSection(title = "Gate Segments") {
+                SessionSettingsSection(title = stringResource(R.string.race_gate_segments)) {
                     val gateCount = uiState.numberOfGates.coerceAtLeast(2)
                     val finishIndex = gateCount - 1
                     for (fromGate in 0 until finishIndex) {
@@ -3019,9 +3116,9 @@ private fun SessionSettingsSheet(
             }
 
             SessionSettingsSection(
-                title = "Athletes",
+                title = stringResource(R.string.setup_athletes),
                 trailing = if (pendingSelectedAthleteIds.isNotEmpty()) {
-                    "${pendingSelectedAthleteIds.size} selected"
+                    stringResource(R.string.common_selected_count, pendingSelectedAthleteIds.size)
                 } else {
                     null
                 }
@@ -3029,7 +3126,7 @@ private fun SessionSettingsSheet(
                 if (uiState.athletes.isEmpty()) {
                     EmptySettingsRow(
                         icon = Icons.Outlined.PersonAdd,
-                        text = "No athletes added yet"
+                        text = stringResource(R.string.session_settings_no_athletes)
                     )
                 } else {
                     Row(
@@ -3064,7 +3161,7 @@ private fun SessionSettingsSheet(
 
             val selectedAthletes = uiState.athletes.filter { it.id in pendingSelectedAthleteIds }
             if (selectedAthletes.size > 1) {
-                SessionSettingsSection(title = "Next Result") {
+                SessionSettingsSection(title = stringResource(R.string.race_next_result)) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -3082,7 +3179,7 @@ private fun SessionSettingsSheet(
                 }
             }
 
-            SessionSettingsSection(title = "Performance") {
+            SessionSettingsSection(title = stringResource(R.string.session_settings_performance)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -3095,7 +3192,7 @@ private fun SessionSettingsSheet(
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        text = "Start Sound",
+                        text = stringResource(R.string.session_settings_start_sound),
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = TextPrimary
                     )
@@ -3107,7 +3204,7 @@ private fun SessionSettingsSheet(
                 ) {
                     StartSoundType.selectable.forEach { soundType ->
                         SessionSettingsChip(
-                            text = soundType.displayName,
+                            text = stringResource(soundType.displayNameRes),
                             selected = pendingStartSoundType == soundType.rawValue,
                             modifier = Modifier.weight(1f)
                         ) {
@@ -3117,7 +3214,9 @@ private fun SessionSettingsSheet(
                 }
 
                 Text(
-                    text = StartSoundType.fromRawValue(pendingStartSoundType).subtitle,
+                    text = stringResource(
+                        StartSoundType.fromRawValue(pendingStartSoundType).subtitleRes
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = TextTertiary
                 )
@@ -3142,12 +3241,12 @@ private fun SessionSettingsSheet(
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Text(
-                            text = "Show Speed",
+                            text = stringResource(R.string.session_settings_show_speed),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = TextPrimary
                         )
                         Text(
-                            text = "Display speed in run results.",
+                            text = stringResource(R.string.session_settings_show_speed_results_desc),
                             style = MaterialTheme.typography.labelSmall,
                             color = TextTertiary
                         )
@@ -3168,13 +3267,23 @@ private fun SessionSettingsSheet(
 
                 SettingsMetricRow(
                     icon = Icons.Outlined.Speed,
-                    label = "Camera FPS",
-                    value = if (uiState.fps > 0) "${uiState.fps} fps" else "Starting"
+                    label = stringResource(R.string.race_camera_fps),
+                    value = if (uiState.fps > 0) {
+                        stringResource(R.string.settings_fps_label, uiState.fps)
+                    } else stringResource(R.string.race_starting)
                 )
                 SettingsMetricRow(
                     icon = Icons.Outlined.Sync,
-                    label = "Clock Sync",
-                    value = uiState.syncQuality?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Syncing"
+                    label = stringResource(R.string.race_clock_sync),
+                    value = uiState.syncQuality?.let { quality ->
+                        when (quality) {
+                            SyncQuality.EXCELLENT -> stringResource(R.string.race_quality_excellent)
+                            SyncQuality.GOOD -> stringResource(R.string.race_quality_good)
+                            SyncQuality.FAIR -> stringResource(R.string.race_quality_fair)
+                            SyncQuality.POOR -> stringResource(R.string.race_quality_poor)
+                            SyncQuality.BAD -> stringResource(R.string.race_quality_bad)
+                        }
+                    } ?: stringResource(R.string.race_syncing)
                 )
             }
 
@@ -3249,7 +3358,7 @@ private fun EndSessionSettingsButton(onClick: () -> Unit) {
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "End Session",
+            text = stringResource(R.string.common_end_session),
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             color = AccentRed
         )
@@ -3479,7 +3588,11 @@ private fun PauseResumeButton(
     onClick: () -> Unit
 ) {
     PillButton(
-        text = if (isPaused) "Resume" else "Pause",
+        text = if (isPaused) {
+            stringResource(R.string.race_resume)
+        } else {
+            stringResource(R.string.timing_btn_pause)
+        },
         backgroundColor = if (isPaused) AccentBlue else BorderSubtle,
         contentColor = if (isPaused) Color.White else TextPrimary,
         onClick = onClick,
@@ -3494,11 +3607,11 @@ private fun StartTriggerButton(
 ) {
     PillButton(
         text = when (startMode) {
-            StartMode.TOUCH -> "Open Touch Start"
-            StartMode.COUNTDOWN -> "Open Countdown"
-            StartMode.VOICE -> "Open Voice Start"
-            StartMode.FLYING -> "Await Gate Crossing"
-            StartMode.INFRAME -> "Await In-Frame Start"
+            StartMode.TOUCH -> stringResource(R.string.race_open_touch_start)
+            StartMode.COUNTDOWN -> stringResource(R.string.race_open_countdown)
+            StartMode.VOICE -> stringResource(R.string.race_open_voice_start)
+            StartMode.FLYING -> stringResource(R.string.race_await_gate_crossing)
+            StartMode.INFRAME -> stringResource(R.string.race_await_inframe_start)
         },
         backgroundColor = AccentBlue,
         onClick = onClick,
@@ -3525,9 +3638,11 @@ private fun ActiveRaceBanner(
                 "waiting" -> stringResource(R.string.race_status_waiting)
                 "started" -> stringResource(R.string.race_status_started)
                 "finished" -> stringResource(R.string.race_status_finished)
-                "collecting_gates" -> "Collecting gate crossings"
-                "waiting_for_result" -> "Waiting for host result"
-                else -> raceStatus
+                "collecting_gates" -> stringResource(R.string.race_collecting_gate_crossings)
+                "waiting_for_result" -> stringResource(R.string.race_waiting_host_result)
+                "waiting_for_start" -> stringResource(R.string.race_status_waiting_start)
+                "paused" -> stringResource(R.string.race_status_paused)
+                else -> stringResource(R.string.race_status_active)
             }
             Triple(statusText.uppercase(), Icons.Filled.FiberManualRecord, AccentGreen)
         }
@@ -3567,7 +3682,11 @@ private fun GateCollectionStatus(
     numberOfGates: Int
 ) {
     Text(
-        text = "$receivedGateCount/$numberOfGates gates reported",
+        text = stringResource(
+            R.string.race_gates_reported,
+            receivedGateCount,
+            numberOfGates
+        ),
         color = TextSecondary,
         style = MaterialTheme.typography.labelMedium.copy(
             fontFamily = FontFamily.Monospace,
@@ -3604,7 +3723,11 @@ private fun TimerDisplay(
 
         Text(
             text = if (isRunning) {
-                "${formatDistance(distanceMeters)} · $numberOfGates ${if (numberOfGates == 1) "gate" else "gates"}"
+                stringResource(
+                    R.string.race_running_summary,
+                    formatDistance(distanceMeters),
+                    pluralStringResource(R.plurals.race_gate_count, numberOfGates, numberOfGates)
+                )
             } else {
                 stringResource(R.string.race_waiting_for_crossing)
             },
@@ -3716,7 +3839,7 @@ private fun ResultContent(
                     )
 
                     ResultDetailRow(
-                        label = "Gates",
+                        label = stringResource(R.string.setup_gates),
                         value = uiState.numberOfGates.toString()
                     )
 
@@ -3739,7 +3862,11 @@ private fun ResultContent(
                         HorizontalDivider(color = BorderSubtle)
                         uiState.resultSegments.forEach { segment ->
                             ResultDetailRow(
-                                label = "Gate ${segment.fromGateIndex}-${segment.toGateIndex}",
+                                label = stringResource(
+                                    R.string.race_gate_number_range,
+                                    segment.fromGateIndex,
+                                    segment.toGateIndex
+                                ),
                                 value = formatRaceTime(segment.splitNanos / 1_000_000_000.0)
                             )
                         }
@@ -3765,9 +3892,9 @@ private fun ResultContent(
                         label = stringResource(R.string.race_result_role),
                         value = when (uiState.role) {
                             DeviceRole.START -> stringResource(R.string.race_role_start)
-                            DeviceRole.LAP -> "Split"
+                            DeviceRole.LAP -> stringResource(R.string.device_role_split)
                             DeviceRole.FINISH -> stringResource(R.string.race_role_finish)
-                            DeviceRole.CONTROL -> "Control"
+                            DeviceRole.CONTROL -> stringResource(R.string.setup_control)
                             null -> stringResource(R.string.race_role_unknown)
                         }
                     )
@@ -3812,7 +3939,7 @@ private fun ResultContent(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Waiting for host to arm next run",
+                    text = stringResource(R.string.race_waiting_host_arm),
                     color = TextSecondary,
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
@@ -3860,25 +3987,29 @@ private fun LiveResultsSummaryStrip(
             verticalAlignment = Alignment.CenterVertically
         ) {
             LiveResultsStat(
-                label = "Runs",
+                label = stringResource(R.string.session_detail_stat_runs),
                 value = runs.size.toString(),
                 color = AccentBlue,
                 modifier = Modifier.weight(1f)
             )
             LiveResultsStat(
-                label = "Best",
-                value = best?.let { "${formatRaceTime(it.timeSeconds)}s" } ?: "--",
+                label = stringResource(R.string.session_detail_stat_best),
+                value = best?.let {
+                    stringResource(R.string.common_seconds_value, formatRaceTime(it.timeSeconds))
+                } ?: "--",
                 color = AccentGreen,
                 modifier = Modifier.weight(1f)
             )
             LiveResultsStat(
-                label = "Avg",
-                value = average?.let { "${formatRaceTime(it)}s" } ?: "--",
+                label = stringResource(R.string.race_metric_average),
+                value = average?.let {
+                    stringResource(R.string.common_seconds_value, formatRaceTime(it))
+                } ?: "--",
                 color = AccentOrange,
                 modifier = Modifier.weight(1f)
             )
             LiveResultsStat(
-                label = "Latest",
+                label = stringResource(R.string.race_metric_latest),
                 value = latest?.let { "#${it.runNumber}" } ?: "--",
                 color = TextPrimary,
                 modifier = Modifier.weight(1f)
@@ -3950,7 +4081,11 @@ private fun ActiveSessionResultsSheet(
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                     )
                     Text(
-                        text = "${StartType.fromRawValue(uiState.startType).displayName} ${formatDistance(uiState.distanceMeters)}",
+                        text = stringResource(
+                            R.string.race_session_summary_format,
+                            StartType.fromRawValue(uiState.startType).localizedDisplayName(),
+                            formatDistance(uiState.distanceMeters)
+                        ),
                         color = TextSecondary,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
@@ -3981,7 +4116,7 @@ private fun ActiveSessionResultsSheet(
                             modifier = Modifier.size(38.dp)
                         )
                         Text(
-                            text = "No runs yet",
+                            text = stringResource(R.string.race_no_runs_yet),
                             color = TextSecondary,
                             style = MaterialTheme.typography.titleSmall
                         )
@@ -4055,12 +4190,12 @@ private fun SessionResultsList(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "Session Runs",
+                        text = stringResource(R.string.race_session_runs),
                         color = TextPrimary,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     Text(
-                        text = "${runs.size} total",
+                        text = pluralStringResource(R.plurals.race_total_runs, runs.size, runs.size),
                         color = TextSecondary,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -4068,7 +4203,10 @@ private fun SessionResultsList(
 
                 bestTime?.let {
                     Text(
-                        text = "Best ${formatRaceTime(it)}s",
+                        text = stringResource(
+                            R.string.race_best_time,
+                            stringResource(R.string.common_seconds_value, formatRaceTime(it))
+                        ),
                         color = AccentGreen,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.SemiBold,
@@ -4159,21 +4297,25 @@ private fun SessionRunResultRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = athleteName ?: "Run #${run.runNumber}",
+                    text = athleteName ?: stringResource(R.string.race_run_number_label, run.runNumber),
                     color = TextPrimary,
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (run.isPersonalBest) {
-                    ResultBadge(label = "PR", color = AccentOrange)
+                    ResultBadge(label = stringResource(R.string.race_badge_personal_best_short), color = AccentOrange)
                 } else if (run.isSeasonBest) {
-                    ResultBadge(label = "SB", color = AccentGreen)
+                    ResultBadge(label = stringResource(R.string.race_badge_season_best_short), color = AccentGreen)
                 }
             }
 
             Text(
-                text = "${StartType.fromRawValue(run.startType).displayName} ${formatDistance(run.distance)}",
+                text = stringResource(
+                    R.string.race_session_summary_format,
+                    StartType.fromRawValue(run.startType).localizedDisplayName(),
+                    formatDistance(run.distance)
+                ),
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
@@ -4186,7 +4328,7 @@ private fun SessionRunResultRow(
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
-                text = "${formatRaceTime(run.timeSeconds)}s",
+                text = stringResource(R.string.common_seconds_value, formatRaceTime(run.timeSeconds)),
                 color = if (isBest) AccentGreen else TextPrimary,
                 style = MaterialTheme.typography.titleSmall.copy(
                     fontWeight = FontWeight.Bold,
@@ -4266,7 +4408,7 @@ private fun ExpandedRunResultDetail(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Splits",
+                    text = stringResource(R.string.race_splits),
                     color = TextSecondary,
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                 )
@@ -4377,7 +4519,9 @@ private fun GateThumbnailCard(
             maxLines = 1
         )
         Text(
-            text = spec.timeSeconds?.let { "${formatRaceTime(it)}s" } ?: "-",
+            text = spec.timeSeconds?.let {
+                stringResource(R.string.common_seconds_value, formatRaceTime(it))
+            } ?: "-",
             color = TextPrimary,
             style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
             maxLines = 1
@@ -4397,6 +4541,22 @@ private fun ExpandedSplitRow(
     showSpeedInResults: Boolean,
     speedUnit: String
 ) {
+    val cumulativeText = stringResource(
+        R.string.race_cumulative_time,
+        stringResource(
+            R.string.common_seconds_value,
+            formatSplitDuration(segment.cumulativeSplitNanos)
+        )
+    )
+    val secondaryText = buildString {
+        append(cumulativeText)
+        if (showSpeedInResults) {
+            val seconds = segment.splitNanos / 1_000_000_000.0
+            append(" · ")
+            append(formatSpeed(segment.distanceMeters, seconds, speedUnit))
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -4407,7 +4567,11 @@ private fun ExpandedSplitRow(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = formatSegmentLabel(segment),
+                text = stringResource(
+                    R.string.race_gate_number_range,
+                    segment.fromGateIndex,
+                    segment.toGateIndex
+                ),
                 color = TextPrimary,
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
             )
@@ -4420,7 +4584,10 @@ private fun ExpandedSplitRow(
 
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = "${formatSplitDuration(segment.splitNanos)}s",
+                text = stringResource(
+                    R.string.common_seconds_value,
+                    formatSplitDuration(segment.splitNanos)
+                ),
                 color = AccentBlue,
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = FontWeight.Bold,
@@ -4428,14 +4595,7 @@ private fun ExpandedSplitRow(
                 )
             )
             Text(
-                text = buildString {
-                    append("${formatSplitDuration(segment.cumulativeSplitNanos)}s cumulative")
-                    if (showSpeedInResults) {
-                        val seconds = segment.splitNanos / 1_000_000_000.0
-                        append(" · ")
-                        append(formatSpeed(segment.distanceMeters, seconds, speedUnit))
-                    }
-                },
+                text = secondaryText,
                 color = TextSecondary,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1
@@ -4475,8 +4635,11 @@ private fun buildGateThumbnailSpecs(
     val finishGatePosition = finishDebug?.linePosition
         ?: (run.finishGatePosition ?: run.gatePosition).toFloat().coerceIn(0f, 1f)
 
+    val startLabel = stringResource(R.string.device_role_start)
+    val finishLabel = stringResource(R.string.device_role_finish)
+
     specs += RaceGateThumbnailSpec(
-        label = "START",
+        label = stringResource(R.string.onboarding_preview_start_text),
         imagePath = run.startImagePath,
         gatePosition = startGatePosition,
         timeSeconds = null,
@@ -4484,7 +4647,7 @@ private fun buildGateThumbnailSpecs(
         speedText = null,
         reviewTarget = if (detectionReviewEnabled) {
             run.toRaceDetectionReviewTarget(
-                gateLabel = "Start",
+                gateLabel = startLabel,
                 target = "start",
                 gatePosition = startGatePosition,
                 displayedTimeSeconds = null,
@@ -4514,8 +4677,9 @@ private fun buildGateThumbnailSpecs(
         val lapGatePosition = lapInfo?.gatePosition
             ?: run.gatePosition.toFloat().coerceIn(0f, 1f)
         val lapTimeSeconds = segment?.cumulativeSplitNanos?.let { it / 1_000_000_000.0 }
+        val lapLabel = stringResource(R.string.race_lap_label, gateIndex)
         specs += RaceGateThumbnailSpec(
-            label = "LAP $gateIndex",
+            label = lapLabel,
             imagePath = lapImages[gateIndex],
             gatePosition = lapGatePosition,
             timeSeconds = lapTimeSeconds,
@@ -4525,7 +4689,7 @@ private fun buildGateThumbnailSpecs(
             },
             reviewTarget = if (detectionReviewEnabled) {
                 run.toRaceDetectionReviewTarget(
-                    gateLabel = "Lap $gateIndex",
+                    gateLabel = lapLabel,
                     target = "lap",
                     gatePosition = lapGatePosition,
                     displayedTimeSeconds = lapTimeSeconds,
@@ -4551,7 +4715,7 @@ private fun buildGateThumbnailSpecs(
     }
 
     specs += RaceGateThumbnailSpec(
-        label = "FINISH",
+        label = stringResource(R.string.onboarding_preview_finish_text),
         imagePath = run.finishImagePath ?: run.thumbnailPath,
         gatePosition = finishGatePosition,
         timeSeconds = run.timeSeconds,
@@ -4563,7 +4727,7 @@ private fun buildGateThumbnailSpecs(
         },
         reviewTarget = if (detectionReviewEnabled) {
             run.toRaceDetectionReviewTarget(
-                gateLabel = "Finish",
+                gateLabel = finishLabel,
                 target = "finish",
                 gatePosition = finishGatePosition,
                 displayedTimeSeconds = run.timeSeconds,
@@ -4829,7 +4993,7 @@ private fun RaceRunDetailSheet(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text(stringResource(R.string.run_detail_delete_confirm_title)) },
-            text = { Text("This run will be permanently removed from the session.") },
+            text = { Text(stringResource(R.string.race_delete_run_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -4880,7 +5044,7 @@ private fun RaceRunDetailSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Run #${run.runNumber}",
+                    text = stringResource(R.string.race_run_number_label, run.runNumber),
                     color = TextPrimary,
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                 )
@@ -4914,7 +5078,7 @@ private fun RaceRunDetailSheet(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     RaceRunStatCard(
-                        title = "Speed",
+                        title = stringResource(R.string.run_detail_speed_label),
                         value = if (showSpeedInResults) {
                             formatSpeed(run.distance, run.timeSeconds, speedUnit)
                         } else {
@@ -4924,7 +5088,7 @@ private fun RaceRunDetailSheet(
                         modifier = Modifier.weight(1f)
                     )
                     RaceRunStatCard(
-                        title = "Distance",
+                        title = stringResource(R.string.run_detail_distance_label),
                         value = formatDistance(run.distance),
                         icon = Icons.Outlined.Straighten,
                         modifier = Modifier.weight(1f)
@@ -4932,13 +5096,13 @@ private fun RaceRunDetailSheet(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     RaceRunStatCard(
-                        title = "Start",
-                        value = StartType.fromRawValue(run.startType).shortName,
+                        title = stringResource(R.string.device_role_start),
+                        value = StartType.fromRawValue(run.startType).localizedShortName(),
                         icon = Icons.AutoMirrored.Filled.DirectionsRun,
                         modifier = Modifier.weight(1f)
                     )
                     RaceRunStatCard(
-                        title = "Recorded",
+                        title = stringResource(R.string.race_recorded_label),
                         value = remember(run.createdAt) {
                             SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(run.createdAt))
                         },
@@ -5040,7 +5204,7 @@ private fun RaceRunPhoto(thumbnailPath: String?) {
         if (currentBitmap != null) {
             Image(
                 bitmap = currentBitmap.asImageBitmap(),
-                contentDescription = "Photo finish",
+                contentDescription = stringResource(R.string.race_photo_finish_cd),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
@@ -5056,7 +5220,7 @@ private fun RaceRunPhoto(thumbnailPath: String?) {
                     modifier = Modifier.size(44.dp)
                 )
                 Text(
-                    text = "No photo available",
+                    text = stringResource(R.string.race_no_photo),
                     color = TextSecondary,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -5162,8 +5326,8 @@ private fun EditRaceRunDistanceSheet(
                 onValueChange = { value ->
                     customInput = value.filter { it.isDigit() || it == '.' }
                 },
-                label = { Text("Custom distance") },
-                suffix = { Text("m") },
+                label = { Text(stringResource(R.string.run_detail_custom_distance)) },
+                suffix = { Text(stringResource(R.string.common_meters_abbreviation)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -5179,7 +5343,7 @@ private fun EditRaceRunDistanceSheet(
             )
 
             PillButton(
-                text = "Save Distance",
+                text = stringResource(R.string.race_save_distance),
                 backgroundColor = AccentBlue,
                 enabled = distanceToSave > 0.0,
                 onClick = { onSave(distanceToSave) }

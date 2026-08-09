@@ -50,6 +50,7 @@ import com.trackspeed.android.R
 import com.trackspeed.android.diagnostics.LogExporter
 import com.trackspeed.android.model.StartType
 import com.trackspeed.android.ui.theme.*
+import com.trackspeed.android.ui.util.displayNameResource
 import kotlinx.coroutines.launch
 
 private val DestructiveRed = Color(0xFFFF3B30)
@@ -89,6 +90,9 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val thumbnailStorageSize by viewModel.thumbnailStorageSize.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val detectionLogFailedMessage = stringResource(R.string.settings_detection_log_failed)
+    val logExportFailedMessage = stringResource(R.string.settings_log_export_failed)
+    val detectionLogsClearedMessage = stringResource(R.string.settings_detection_logs_cleared)
     val coroutineScope = rememberCoroutineScope()
     var detectionLogBusy by remember { mutableStateOf(false) }
     var deviceLogBusy by remember { mutableStateOf(false) }
@@ -96,7 +100,7 @@ fun SettingsScreen(
     fun showDetectionLogError(error: Throwable) {
         Toast.makeText(
             context,
-            error.message ?: "Detection log action failed",
+            detectionLogFailedMessage,
             Toast.LENGTH_LONG
         ).show()
     }
@@ -104,7 +108,7 @@ fun SettingsScreen(
     fun showDeviceLogError(error: Throwable) {
         Toast.makeText(
             context,
-            error.message ?: "Log export failed",
+            logExportFailedMessage,
             Toast.LENGTH_LONG
         ).show()
     }
@@ -160,7 +164,7 @@ fun SettingsScreen(
                     detectionLogBusy = true
                     runCatching { viewModel.clearDetectionReviewLogs() }
                         .onSuccess {
-                            Toast.makeText(context, "Detection logs cleared", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, detectionLogsClearedMessage, Toast.LENGTH_SHORT).show()
                         }
                         .onFailure { showDetectionLogError(it) }
                     detectionLogBusy = false
@@ -338,7 +342,7 @@ private fun SettingsScreenContent(
                     SettingsRow(
                         icon = Icons.Outlined.Timer,
                         label = stringResource(R.string.settings_start_type),
-                        value = state.startTypeLabel,
+                        value = stringResource(StartType.fromRawValue(state.startType).displayNameResource()),
                         onClick = { startTypeDropdownExpanded = true }
                     )
                     DropdownMenu(
@@ -390,7 +394,11 @@ private fun SettingsScreenContent(
                     SettingsRow(
                         icon = Icons.Outlined.RecordVoiceOver,
                         label = stringResource(R.string.settings_start_voice),
-                        value = if (state.voiceProvider == "eleven_labs") "AI Voice (Premium)" else "System Voice",
+                        value = if (state.voiceProvider == "eleven_labs") {
+                            stringResource(R.string.settings_ai_voice_premium)
+                        } else {
+                            stringResource(R.string.settings_system_voice)
+                        },
                         onClick = { voiceProviderExpanded = true }
                     )
                     DropdownMenu(
@@ -430,15 +438,18 @@ private fun SettingsScreenContent(
                     SettingsDivider()
 
                     var voicePickerExpanded by remember { mutableStateOf(false) }
+                    val maleLabel = stringResource(R.string.settings_voice_gender_male)
+                    val femaleLabel = stringResource(R.string.settings_voice_gender_female)
                     val voiceOptions = listOf(
-                        "adam" to "Adam (Male)",
-                        "josh" to "Josh (Male)",
-                        "arnold" to "Arnold (Male)",
-                        "rachel" to "Rachel (Female)",
-                        "bella" to "Bella (Female)",
-                        "elli" to "Elli (Female)"
+                        "adam" to stringResource(R.string.settings_voice_name_gender, "Adam", maleLabel),
+                        "josh" to stringResource(R.string.settings_voice_name_gender, "Josh", maleLabel),
+                        "arnold" to stringResource(R.string.settings_voice_name_gender, "Arnold", maleLabel),
+                        "rachel" to stringResource(R.string.settings_voice_name_gender, "Rachel", femaleLabel),
+                        "bella" to stringResource(R.string.settings_voice_name_gender, "Bella", femaleLabel),
+                        "elli" to stringResource(R.string.settings_voice_name_gender, "Elli", femaleLabel)
                     )
-                    val currentVoiceLabel = voiceOptions.firstOrNull { it.first == state.elevenLabsVoice }?.second ?: "Arnold (Male)"
+                    val currentVoiceLabel = voiceOptions.firstOrNull { it.first == state.elevenLabsVoice }?.second
+                        ?: stringResource(R.string.settings_voice_name_gender, "Arnold", maleLabel)
 
                     Box {
                         SettingsRow(
@@ -470,7 +481,11 @@ private fun SettingsScreenContent(
                 VoiceTimingSliderRow(
                     label = stringResource(R.string.settings_pre_start_delay),
                     value = state.preStartDelayMin,
-                    valueText = "${state.preStartDelayMin.toInt()}-${(state.preStartDelayMin + 2f).toInt()}s",
+                    valueText = stringResource(
+                        R.string.settings_seconds_range_int,
+                        state.preStartDelayMin.toInt(),
+                        (state.preStartDelayMin + 2f).toInt()
+                    ),
                     helper = stringResource(R.string.settings_pre_start_delay_helper),
                     valueRange = 1f..8f,
                     steps = 6,
@@ -482,7 +497,11 @@ private fun SettingsScreenContent(
                 VoiceTimingSliderRow(
                     label = stringResource(R.string.settings_marks_delay),
                     value = state.marksSetDelayMin,
-                    valueText = "${state.marksSetDelayMin.toInt()}-${(state.marksSetDelayMin + 4f).toInt()}s",
+                    valueText = stringResource(
+                        R.string.settings_seconds_range_int,
+                        state.marksSetDelayMin.toInt(),
+                        (state.marksSetDelayMin + 4f).toInt()
+                    ),
                     helper = stringResource(R.string.settings_marks_delay_helper),
                     valueRange = 3f..15f,
                     steps = 11,
@@ -494,7 +513,11 @@ private fun SettingsScreenContent(
                 VoiceTimingSliderRow(
                     label = stringResource(R.string.settings_set_hold_time),
                     value = state.setGoHoldMin,
-                    valueText = String.format(java.util.Locale.getDefault(), "%.1f-%.1fs", state.setGoHoldMin, state.setGoHoldMin + 0.8f),
+                    valueText = stringResource(
+                        R.string.settings_seconds_range_decimal,
+                        state.setGoHoldMin,
+                        state.setGoHoldMin + 0.8f
+                    ),
                     helper = stringResource(R.string.settings_set_hold_time_helper),
                     valueRange = 1f..3f,
                     steps = 19,
@@ -824,7 +847,7 @@ private fun SettingsScreenContent(
                         SettingsRow(
                             icon = Icons.Outlined.Storage,
                             label = stringResource(R.string.settings_export_recent_logs),
-                            value = if (deviceLogBusy) "Exporting..." else null,
+                            value = if (deviceLogBusy) stringResource(R.string.settings_exporting) else null,
                             showChevron = !deviceLogBusy,
                             onClick = if (deviceLogBusy) null else { { showDeviceLogMenu = true } }
                         )
@@ -835,7 +858,7 @@ private fun SettingsScreenContent(
                         ) {
                             LogExporter.TimeWindow.entries.forEach { window ->
                                 DropdownMenuItem(
-                                    text = { Text(window.displayName, color = TextPrimary) },
+                                    text = { Text(window.localizedDisplayName(), color = TextPrimary) },
                                     onClick = {
                                         showDeviceLogMenu = false
                                         onDeviceLogExport(window)
@@ -877,7 +900,7 @@ private fun SettingsScreenContent(
                     SettingsRow(
                         icon = Icons.Outlined.Storage,
                         label = stringResource(R.string.settings_save_detection_log),
-                        value = if (detectionLogBusy) "Working..." else null,
+                        value = if (detectionLogBusy) stringResource(R.string.common_working) else null,
                         showChevron = !detectionLogBusy,
                         onClick = if (detectionLogBusy) null else onDetectionLogExport
                     )
@@ -887,7 +910,7 @@ private fun SettingsScreenContent(
                     SettingsRow(
                         icon = Icons.Outlined.Storage,
                         label = stringResource(R.string.settings_upload_detection_log),
-                        value = if (detectionLogBusy) "Working..." else null,
+                        value = if (detectionLogBusy) stringResource(R.string.common_working) else null,
                         showChevron = !detectionLogBusy,
                         onClick = if (detectionLogBusy) null else onDetectionLogUpload
                     )
@@ -955,13 +978,13 @@ private fun SettingsScreenContent(
             onDismissRequest = { showClearDetectionLogDialog = false },
             title = {
                 Text(
-                    "Clear detection logs?",
+                    stringResource(R.string.settings_clear_detection_logs_title),
                     color = TextPrimary
                 )
             },
             text = {
                 Text(
-                    "This removes local detection review log files from this phone.",
+                    stringResource(R.string.settings_clear_detection_logs_message),
                     color = TextSecondary
                 )
             },
@@ -1230,7 +1253,7 @@ private fun shareDetectionLogFile(context: Context, uri: Uri) {
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(shareIntent, "Save Detection Log"))
+    context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.settings_save_detection_log_chooser)))
 }
 
 private fun shareDetectionLogUrl(context: Context, signedUrl: String) {
@@ -1238,7 +1261,7 @@ private fun shareDetectionLogUrl(context: Context, signedUrl: String) {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, signedUrl)
     }
-    context.startActivity(Intent.createChooser(shareIntent, "Share Detection Log URL"))
+    context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.settings_share_detection_log_chooser)))
 }
 
 private fun shareLogExportUrl(context: Context, signedUrl: String) {
@@ -1246,8 +1269,17 @@ private fun shareLogExportUrl(context: Context, signedUrl: String) {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, signedUrl)
     }
-    context.startActivity(Intent.createChooser(shareIntent, "Share Recent Logs URL"))
+    context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.settings_share_recent_logs_chooser)))
 }
+
+@Composable
+private fun LogExporter.TimeWindow.localizedDisplayName(): String = stringResource(
+    when (this) {
+        LogExporter.TimeWindow.LAST_5_MINUTES -> R.string.settings_log_window_5_minutes
+        LogExporter.TimeWindow.LAST_30_MINUTES -> R.string.settings_log_window_30_minutes
+        LogExporter.TimeWindow.LAST_6_HOURS -> R.string.settings_log_window_6_hours
+    }
+)
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable

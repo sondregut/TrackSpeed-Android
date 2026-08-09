@@ -188,7 +188,7 @@ fun PerpendicularDialContent(
     ) {
         if (!hasRotationSensor) {
             Text(
-                text = "Rotation sensor unavailable",
+                text = stringResource(R.string.perpendicular_sensor_unavailable),
                 style = MaterialTheme.typography.bodyMedium,
                 color = DialOrange,
                 textAlign = TextAlign.Center
@@ -210,11 +210,20 @@ fun PerpendicularDialContent(
 
             Text(
                 text = when {
-                    isStable -> "Perpendicular - Locked!"
-                    confidence == LevelConfidence.PASS -> "Perpendicular - Hold steady..."
-                    confidence == LevelConfidence.ACCEPTABLE -> "Almost perpendicular (${formatAngle(errorFromTarget)} off)"
-                    currentAngle < 90.0 -> "Rotate ${formatAngle(errorFromTarget)} more clockwise"
-                    else -> "Rotate ${formatAngle(errorFromTarget)} more counter-clockwise"
+                    isStable -> stringResource(R.string.perpendicular_locked)
+                    confidence == LevelConfidence.PASS -> stringResource(R.string.perpendicular_hold_steady)
+                    confidence == LevelConfidence.ACCEPTABLE -> stringResource(
+                        R.string.perpendicular_almost,
+                        formatAngle(errorFromTarget)
+                    )
+                    currentAngle < 90.0 -> stringResource(
+                        R.string.perpendicular_rotate_clockwise,
+                        formatAngle(errorFromTarget)
+                    )
+                    else -> stringResource(
+                        R.string.perpendicular_rotate_counterclockwise,
+                        formatAngle(errorFromTarget)
+                    )
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = statusColor,
@@ -226,7 +235,10 @@ fun PerpendicularDialContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${formatAngle(currentAngle)} from track",
+                    text = stringResource(
+                        R.string.perpendicular_angle_from_track,
+                        formatAngle(currentAngle)
+                    ),
                     style = MaterialTheme.typography.labelLarge,
                     color = TextSecondary
                 )
@@ -278,19 +290,19 @@ private fun SetDirectionPrompt(
         }
 
         Text(
-            text = "Point camera down the track",
+            text = stringResource(R.string.perpendicular_point_camera),
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
             color = TextPrimary,
             textAlign = TextAlign.Center
         )
         Text(
-            text = "Then set this as the track direction.",
+            text = stringResource(R.string.perpendicular_set_direction_hint),
             style = MaterialTheme.typography.bodySmall,
             color = TextSecondary,
             textAlign = TextAlign.Center
         )
         Button(onClick = onSetDirection) {
-            Text("Set Direction")
+            Text(stringResource(R.string.perpendicular_set_direction))
         }
     }
 }

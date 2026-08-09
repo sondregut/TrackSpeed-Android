@@ -12,6 +12,7 @@ import android.util.Log
 import android.util.Range
 import android.util.Size
 import android.view.Surface
+import com.trackspeed.android.R
 import com.trackspeed.android.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -236,7 +237,9 @@ class CameraManager @Inject constructor(
         if (initialize(useFront)) {
             openCamera(previewSurface, callback)
         } else {
-            _cameraState.value = CameraState.Error("Requested camera is not available")
+            _cameraState.value = CameraState.Error(
+                context.getString(R.string.camera_error_requested_unavailable)
+            )
         }
     }
 
@@ -286,7 +289,9 @@ class CameraManager @Inject constructor(
         closeCamera()
 
         val cameraId = selectedCameraId ?: run {
-            _cameraState.value = CameraState.Error("Camera not initialized. Call initialize() first.")
+            _cameraState.value = CameraState.Error(
+                context.getString(R.string.camera_error_not_initialized)
+            )
             return
         }
 
@@ -328,19 +333,19 @@ class CameraManager @Inject constructor(
                     Log.e(TAG, "Camera error: $error")
                     camera.close()
                     if (generation == cameraGeneration.get()) {
-                        failCamera("Camera error: $error")
+                        failCamera(context.getString(R.string.camera_error_code, error))
                     }
                 }
             }, cameraHandler)
         } catch (e: CameraAccessException) {
             Log.e(TAG, "Failed to open camera", e)
-            failCamera("Failed to open camera: ${e.message}")
+            failCamera(context.getString(R.string.camera_error_open_failed))
         } catch (e: SecurityException) {
             Log.e(TAG, "Camera permission was revoked while opening", e)
-            failCamera("Camera permission is required")
+            failCamera(context.getString(R.string.camera_error_permission))
         } catch (e: IllegalArgumentException) {
             Log.e(TAG, "Camera rejected the selected configuration", e)
-            failCamera("Camera configuration is not supported")
+            failCamera(context.getString(R.string.camera_error_configuration_unsupported))
         }
     }
 
@@ -381,7 +386,7 @@ class CameraManager @Inject constructor(
                         Log.e(TAG, "Session configuration failed")
                         session.close()
                         if (generation == cameraGeneration.get()) {
-                            failCamera("Session configuration failed")
+                            failCamera(context.getString(R.string.camera_error_session_configuration))
                         }
                     }
                 },
@@ -390,12 +395,12 @@ class CameraManager @Inject constructor(
         } catch (e: CameraAccessException) {
             Log.e(TAG, "Failed to create capture session", e)
             if (generation == cameraGeneration.get()) {
-                failCamera("Session creation failed: ${e.message}")
+                failCamera(context.getString(R.string.camera_error_session_creation))
             }
         } catch (e: IllegalArgumentException) {
             Log.e(TAG, "Invalid capture-session surface configuration", e)
             if (generation == cameraGeneration.get()) {
-                failCamera("Session surfaces are not supported")
+                failCamera(context.getString(R.string.camera_error_surfaces_unsupported))
             }
         }
     }
@@ -480,12 +485,12 @@ class CameraManager @Inject constructor(
         } catch (e: CameraAccessException) {
             Log.e(TAG, "Failed to start capture", e)
             if (generation == cameraGeneration.get()) {
-                failCamera("Capture start failed: ${e.message}")
+                failCamera(context.getString(R.string.camera_error_capture_start))
             }
         } catch (e: IllegalArgumentException) {
             Log.e(TAG, "Camera rejected repeating request", e)
             if (generation == cameraGeneration.get()) {
-                failCamera("Capture settings are not supported")
+                failCamera(context.getString(R.string.camera_error_capture_settings))
             }
         } catch (e: IllegalStateException) {
             if (isClosed || generation != cameraGeneration.get()) {
@@ -493,7 +498,7 @@ class CameraManager @Inject constructor(
                 return
             }
             Log.e(TAG, "Capture session closed unexpectedly", e)
-            failCamera("Camera session ended unexpectedly")
+            failCamera(context.getString(R.string.camera_error_session_ended))
         }
     }
 

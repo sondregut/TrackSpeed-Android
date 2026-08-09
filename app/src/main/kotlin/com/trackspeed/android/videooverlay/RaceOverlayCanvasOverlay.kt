@@ -42,7 +42,7 @@ private class RaceOverlayCanvasRenderer {
         val margin = max(16f * scale, 10f)
         val state = snapshot.frameState(currentTimeSeconds)
 
-        drawTopStack(canvas, width, margin, scale, state)
+        drawTopStack(canvas, width, margin, scale, state, snapshot.readyLabel)
         drawBottomLeft(canvas, height, margin, scale, state)
         drawWatermark(canvas, width, height, margin, scale)
     }
@@ -52,10 +52,11 @@ private class RaceOverlayCanvasRenderer {
         width: Float,
         margin: Float,
         scale: Float,
-        state: RaceOverlayFrameState
+        state: RaceOverlayFrameState,
+        readyLabel: String
     ) {
         val timerText = when (state.phase) {
-            RaceOverlayPhase.READY -> "READY"
+            RaceOverlayPhase.READY -> readyLabel
             RaceOverlayPhase.RUNNING,
             RaceOverlayPhase.FINISHED -> formatOverlayTime(state.displayedTimeSeconds)
         }
@@ -75,7 +76,7 @@ private class RaceOverlayCanvasRenderer {
             textColor = Color.WHITE,
             horizontalPadding = 18f * scale,
             verticalPadding = 7f * scale,
-            uppercase = state.phase == RaceOverlayPhase.READY
+            uppercase = false
         )
 
         val speed = state.speedDisplay

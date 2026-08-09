@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.trackspeed.android.R
 import com.trackspeed.android.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
@@ -84,8 +85,6 @@ class NotificationService @Inject constructor(
     companion object {
         private const val TAG = "NotificationService"
         const val CHANNEL_ID = "trackspeed_reminders"
-        private const val CHANNEL_NAME = "TrackSpeed Reminders"
-        private const val CHANNEL_DESCRIPTION = "Training reminders and tips"
     }
 
     private val notificationManager: NotificationManager =
@@ -100,10 +99,10 @@ class NotificationService @Inject constructor(
     fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            CHANNEL_NAME,
+            context.getString(R.string.notification_channel_name),
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = CHANNEL_DESCRIPTION
+            description = context.getString(R.string.notification_channel_description)
             enableVibration(true)
             setShowBadge(true)
         }
@@ -147,8 +146,8 @@ class NotificationService @Inject constructor(
 
         val intent = createAlarmIntent(
             notificationType = NotificationIds.TRY_PRO_REMINDER,
-            title = "Time your next sprint",
-            body = "Set the phone chest-high, ~2.5 metres from the line. Press start and sprint through."
+            title = context.getString(R.string.notification_try_pro_title),
+            body = context.getString(R.string.notification_try_pro_body)
         )
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -194,8 +193,8 @@ class NotificationService @Inject constructor(
 
         val intent = createAlarmIntent(
             notificationType = NotificationIds.TRAINING_REMINDER,
-            title = "Ready to Train?",
-            body = "It's been a while - start a new timing session!"
+            title = context.getString(R.string.notification_training_title),
+            body = context.getString(R.string.notification_training_body)
         )
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -238,8 +237,8 @@ class NotificationService @Inject constructor(
         scheduleNotificationAtWallClock(
             requestCode = NotificationIds.BILLING_ISSUE_REQUEST_CODE,
             notificationType = NotificationIds.BILLING_ISSUE_REMINDER,
-            title = "Payment Issue",
-            body = "Please update your payment method to keep Pro access",
+            title = context.getString(R.string.notification_billing_title),
+            body = context.getString(R.string.notification_billing_body),
             fireAtMillis = fireAtMillis
         )
     }
@@ -263,8 +262,8 @@ class NotificationService @Inject constructor(
         scheduleNotificationAtWallClock(
             requestCode = NotificationIds.TRIAL_ENDING_REQUEST_CODE,
             notificationType = NotificationIds.TRIAL_ENDING_REMINDER,
-            title = "Your free trial ends soon",
-            body = "Your TrackSpeed trial ends in 2 days. Keep training, or cancel anytime in Settings - no charge if you cancel before it ends.",
+            title = context.getString(R.string.notification_trial_title),
+            body = context.getString(R.string.notification_trial_body),
             fireAtMillis = fireAtMillis
         )
     }
@@ -288,8 +287,8 @@ class NotificationService @Inject constructor(
         scheduleNotificationAfter(
             requestCode = NotificationIds.PROMO_OFFER_REQUEST_CODE,
             notificationType = NotificationIds.PROMO_OFFER_REMINDER,
-            title = "Your discount is live",
-            body = "Save on your first year of TrackSpeed Pro - offer good for 48 hours after you open it.",
+            title = context.getString(R.string.notification_promo_title),
+            body = context.getString(R.string.notification_promo_body),
             delayMillis = TimeUnit.DAYS.toMillis(NotificationTiming.PROMO_OFFER_DELAY_DAYS.toLong())
         )
     }
@@ -313,8 +312,8 @@ class NotificationService @Inject constructor(
         scheduleNotificationAfter(
             requestCode = NotificationIds.FIRST_SESSION_NUDGE_REQUEST_CODE,
             notificationType = NotificationIds.FIRST_SESSION_NUDGE,
-            title = "See Your Finish Frame-by-Frame",
-            body = "Pro shows exactly where you crossed the line. Try it free for 7 days.",
+            title = context.getString(R.string.notification_first_session_title),
+            body = context.getString(R.string.notification_first_session_body),
             delayMillis = TimeUnit.HOURS.toMillis(2)
         )
     }
@@ -334,8 +333,8 @@ class NotificationService @Inject constructor(
         scheduleNotificationAfter(
             requestCode = NotificationIds.MILESTONE_NUDGE_REQUEST_CODE,
             notificationType = NotificationIds.MILESTONE_NUDGE,
-            title = "You're Getting Faster",
-            body = "3 sessions done. Track your improvement over time with Pro.",
+            title = context.getString(R.string.notification_milestone_title),
+            body = context.getString(R.string.notification_milestone_body),
             delayMillis = TimeUnit.DAYS.toMillis(1)
         )
     }
@@ -361,8 +360,8 @@ class NotificationService @Inject constructor(
         scheduleNotificationAtWallClock(
             requestCode = NotificationIds.DAY_14_FOLLOW_UP_REQUEST_CODE,
             notificationType = NotificationIds.DAY_14_FOLLOW_UP,
-            title = "Unlock All Start Types & Presets",
-            body = "Solo mode is just the start. Try 2-phone sync and precision timing free.",
+            title = context.getString(R.string.notification_day_14_title),
+            body = context.getString(R.string.notification_day_14_body),
             fireAtMillis = fireAtMillis
         )
     }
@@ -388,8 +387,8 @@ class NotificationService @Inject constructor(
         scheduleNotificationAtWallClock(
             requestCode = NotificationIds.DAY_30_FINAL_NUDGE_REQUEST_CODE,
             notificationType = NotificationIds.DAY_30_FINAL_NUDGE,
-            title = "Still Timing Solo?",
-            body = "Unlock 2-phone sync, all presets, and unlimited history. Start your free trial.",
+            title = context.getString(R.string.notification_day_30_title),
+            body = context.getString(R.string.notification_day_30_body),
             fireAtMillis = fireAtMillis
         )
     }
@@ -466,8 +465,8 @@ class NotificationService @Inject constructor(
 
         val intent = createAlarmIntent(
             notificationType = NotificationIds.RATING_PROMPT,
-            title = "Enjoying TrackSpeed?",
-            body = "You've completed 3 sessions! Take a moment to rate the app."
+            title = context.getString(R.string.notification_rating_title),
+            body = context.getString(R.string.notification_rating_body)
         )
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -505,8 +504,8 @@ class NotificationService @Inject constructor(
 
         val intent = createAlarmIntent(
             notificationType = NotificationIds.TEST_NOTIFICATION,
-            title = "TrackSpeed Test",
-            body = "Notifications are working correctly!"
+            title = context.getString(R.string.notification_test_title),
+            body = context.getString(R.string.notification_test_body)
         )
 
         val pendingIntent = PendingIntent.getBroadcast(

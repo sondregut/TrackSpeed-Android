@@ -1,6 +1,7 @@
 package com.trackspeed.android.ui.screens.paywall
 
 import android.app.Activity
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,6 +9,7 @@ import com.revenuecat.purchases.Offerings
 import com.revenuecat.purchases.Package
 import com.revenuecat.purchases.models.Period
 import com.trackspeed.android.analytics.AnalyticsEvent
+import com.trackspeed.android.R
 import com.trackspeed.android.analytics.AnalyticsService
 import com.trackspeed.android.billing.BillingConfig
 import com.trackspeed.android.billing.PromoCodeError
@@ -17,6 +19,7 @@ import com.trackspeed.android.billing.SubscriptionManager
 import com.trackspeed.android.cloud.safeCloudErrorCode
 import com.trackspeed.android.data.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,6 +66,7 @@ data class PlanInfo(
 
 @HiltViewModel
 class PaywallViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val subscriptionManager: SubscriptionManager,
     private val settingsRepository: SettingsRepository,
     private val analyticsService: AnalyticsService
@@ -123,7 +127,7 @@ class PaywallViewModel @Inject constructor(
                 _isLoadingOfferings.value = false
             },
             onError = { error ->
-                _offeringsError.value = error
+                _offeringsError.value = context.getString(R.string.paywall_offerings_failed)
                 _isLoadingOfferings.value = false
                 analyticsService.trackPaywall(
                     AnalyticsEvent.PAYWALL_OFFERINGS_UNAVAILABLE,
@@ -300,7 +304,7 @@ class PaywallViewModel @Inject constructor(
             type = PlanType.YEARLY,
             rcPackage = rcPackage,
             priceDisplay = rcPackage?.product?.price?.formatted
-                ?: if (requiresDiscount) "Price unavailable" else BillingConfig.YEARLY_PRICE_DISPLAY,
+                ?: if (requiresDiscount) context.getString(R.string.paywall_price_unavailable) else BillingConfig.YEARLY_PRICE_DISPLAY,
             periodDisplay = "year",
             monthlyEquivalent = monthlyEquiv,
             savingsPercent = BillingConfig.YEARLY_SAVINGS_PERCENT,
@@ -352,7 +356,8 @@ class PaywallViewModel @Inject constructor(
         return PlanInfo(
             type = PlanType.YEARLY,
             rcPackage = rcPackage,
-            priceDisplay = rcPackage?.product?.price?.formatted ?: "Price unavailable",
+            priceDisplay = rcPackage?.product?.price?.formatted
+                ?: context.getString(R.string.paywall_price_unavailable),
             periodDisplay = "year",
             monthlyEquivalent = monthlyEquiv,
             savingsPercent = savingsPercent,
@@ -372,7 +377,9 @@ class PaywallViewModel @Inject constructor(
         }
         val rcPackage = plan.rcPackage
         if (rcPackage == null) {
-            _purchaseState.value = PurchaseState.Error("Package not available. Please try again.")
+            _purchaseState.value = PurchaseState.Error(
+                context.getString(R.string.paywall_purchase_unavailable)
+            )
             return
         }
 
@@ -407,7 +414,9 @@ class PaywallViewModel @Inject constructor(
                         AnalyticsEvent.PAYWALL_PURCHASE_FAILED,
                         analyticsProperties + mapOf("error" to message)
                     )
-                    _purchaseState.value = PurchaseState.Error(message)
+                    _purchaseState.value = PurchaseState.Error(
+                        context.getString(R.string.paywall_purchase_failed)
+                    )
                 }
             }
         )
@@ -424,11 +433,15 @@ class PaywallViewModel @Inject constructor(
                 if (subscriptionManager.isProUser.value) {
                     _purchaseState.value = PurchaseState.Success
                 } else {
-                    _purchaseState.value = PurchaseState.Error("No active subscription found.")
+                    _purchaseState.value = PurchaseState.Error(
+                        context.getString(R.string.paywall_no_active_subscription)
+                    )
                 }
             },
-            onError = { message ->
-                _purchaseState.value = PurchaseState.Error(message)
+            onError = {
+                _purchaseState.value = PurchaseState.Error(
+                    context.getString(R.string.paywall_restore_failed)
+                )
             }
         )
     }
@@ -510,20 +523,20 @@ class PaywallViewModel @Inject constructor(
                     PromoCodeType.TRIAL -> Unit
                 }
             } catch (e: PromoCodeError) {
-                val message = when (e) {
-                    is PromoCodeError.InvalidCode -> "Invalid or inactive promo code"
-                    is PromoCodeError.Expired -> "This promo code has expired"
-                    is PromoCodeError.MaxUsesReached -> "This code has reached its maximum uses"
-                    is PromoCodeError.AlreadyRedeemed -> "You've already redeemed this code"
-                    is PromoCodeError.RateLimited -> "Please wait before trying again"
-                    is PromoCodeError.NetworkError -> "Network error. Check your connection."
-                }
+                val message = context.getString(when (e) {
+                    is PromoCodeError.InvalidCode -> R.string.onboarding_promo_error_invalid
+                    is PromoCodeError.Expired -> R.string.onboarding_promo_error_expired
+                    is PromoCodeError.MaxUsesReached -> R.string.onboarding_promo_error_max_uses
+                    is PromoCodeError.AlreadyRedeemed -> R.string.onboarding_promo_error_redeemed
+                    is PromoCodeError.RateLimited -> R.string.onboarding_promo_error_rate_limited
+                    is PromoCodeError.NetworkError -> R.string.onboarding_promo_error_network
+                })
                 _promoSheetState.value = current.copy(isLoading = false, error = message)
             } catch (e: Exception) {
                 Log.e(TAG, "Promo redemption failed: ${e.safeCloudErrorCode()}")
                 _promoSheetState.value = current.copy(
                     isLoading = false,
-                    error = "Something went wrong. Please try again."
+                    error = context.getString(R.string.onboarding_promo_error_generic)
                 )
             }
         }

@@ -58,7 +58,6 @@ import com.trackspeed.android.ui.components.ExpandedThumbnail
 import com.trackspeed.android.ui.components.ThumbnailViewerDialog
 import com.trackspeed.android.ui.util.formatDistance
 import com.trackspeed.android.ui.util.formatSessionMode
-import com.trackspeed.android.ui.util.formatSegmentLabel
 import com.trackspeed.android.ui.util.formatSplitDuration
 import com.trackspeed.android.ui.util.formatTime
 import com.trackspeed.android.ui.util.formatSpeed
@@ -70,6 +69,7 @@ import com.trackspeed.android.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import com.trackspeed.android.model.StartType
+import com.trackspeed.android.ui.util.localizedDisplayName
 import java.util.Locale
 
 private val BestGreen = Color(0xFF4CAF50)
@@ -446,7 +446,7 @@ private fun SessionInfoBar(
                 .padding(horizontal = 10.dp, vertical = 4.dp)
         ) {
             Text(
-                text = StartType.fromRawValue(session.startType).displayName,
+                text = StartType.fromRawValue(session.startType).localizedDisplayName(),
                 style = MaterialTheme.typography.labelMedium,
                 color = TextSecondary
             )
@@ -684,7 +684,7 @@ private fun CompactRunRow(
 
         // Type
         Text(
-            text = StartType.fromRawValue(run.startType).displayName,
+            text = StartType.fromRawValue(run.startType).localizedDisplayName(),
             modifier = Modifier.weight(0.17f),
             style = MaterialTheme.typography.labelSmall,
             color = TextMuted,
@@ -739,6 +739,24 @@ private fun ExpandedThumbnailRow(
     onDeleteClick: () -> Unit
 ) {
     val segments = remember(run.splitsJson) { parseSegmentSplits(run.splitsJson) }
+    val context = LocalContext.current
+    val detectionGateLabel = if (run.numberOfPhones <= 1) {
+        stringResource(R.string.run_detail_crossing_label)
+    } else {
+        stringResource(R.string.device_role_finish)
+    }
+    val segmentSummary = segments.joinToString("  ·  ") {
+        val gateLabel = context.getString(
+            R.string.race_gate_number_range,
+            it.fromGateIndex,
+            it.toGateIndex
+        )
+        val splitTime = context.getString(
+            R.string.common_seconds_value,
+            formatSplitDuration(it.splitNanos)
+        )
+        "$gateLabel $splitTime"
+    }
     val gatePosition = remember(run.finishGatePosition, run.gatePosition) {
         (run.finishGatePosition ?: run.gatePosition).toFloat().coerceIn(0f, 1f)
     }
@@ -787,7 +805,10 @@ private fun ExpandedThumbnailRow(
                                     bitmap = currentBitmap,
                                     gatePosition = gatePosition,
                                     reviewTarget = if (detectionReviewEnabled) {
-                                        run.toDetectionReviewTarget(gatePosition)
+                                        run.toDetectionReviewTarget(
+                                            gatePosition = gatePosition,
+                                            gateLabel = detectionGateLabel
+                                        )
                                     } else {
                                         null
                                     },
@@ -837,15 +858,13 @@ private fun ExpandedThumbnailRow(
                 color = TextPrimary
             )
             Text(
-                text = "${formatTime(run.timeSeconds)}s",
+                text = stringResource(R.string.common_seconds_value, formatTime(run.timeSeconds)),
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 color = TextSecondary
             )
             if (segments.isNotEmpty()) {
                 Text(
-                    text = segments.joinToString("  ·  ") {
-                        "${formatSegmentLabel(it)} ${formatSplitDuration(it.splitNanos)}s"
-                    },
+                    text = segmentSummary,
                     style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                     color = TextMuted,
                     maxLines = 2,
@@ -871,14 +890,14 @@ private fun ExpandedThumbnailRow(
                 modifier = Modifier.clickable { onShareClick() }
             )
             Text(
-                text = "Video Overlay",
+                text = stringResource(R.string.video_overlay_title),
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
                 color = AccentBlue,
                 modifier = Modifier.clickable { onVideoOverlayClick() }
             )
             if (run.hasFrameScrubberPayload()) {
                 Text(
-                    text = "Frame Scrubber",
+                    text = stringResource(R.string.frame_scrubber_title),
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
                     color = AccentBlue,
                     modifier = Modifier.clickable { onFramesClick() }
@@ -899,14 +918,17 @@ private fun ExpandedThumbnailRow(
     )
 }
 
-private fun RunEntity.toDetectionReviewTarget(gatePosition: Float): DetectionReviewTarget {
+private fun RunEntity.toDetectionReviewTarget(
+    gatePosition: Float,
+    gateLabel: String
+): DetectionReviewTarget {
     val isSolo = numberOfPhones <= 1
     return DetectionReviewTarget(
         sessionId = sessionId,
         runId = id,
         runNumber = runNumber,
         numberOfPhones = numberOfPhones,
-        gateLabel = if (isSolo) "Crossing" else "Finish",
+        gateLabel = gateLabel,
         target = if (isSolo) "crossing" else "finish",
         mode = if (isSolo) "solo" else "multi",
         distanceMeters = distance,

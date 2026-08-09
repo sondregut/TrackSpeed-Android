@@ -30,9 +30,9 @@ import kotlin.random.Random
 /**
  * Voice gender preference for TTS voice selection.
  */
-enum class VoiceGender(val displayName: String) {
-    MALE("Male"),
-    FEMALE("Female");
+enum class VoiceGender {
+    MALE,
+    FEMALE;
 
     companion object {
         fun fromString(value: String): VoiceGender =
@@ -44,19 +44,19 @@ enum class VoiceGender(val displayName: String) {
  * Current phase of the voice start sequence.
  * Mirrors the iOS VoiceStartPhase for UI parity.
  */
-enum class VoiceStartPhase(val displayText: String) {
-    IDLE("Ready to start"),
-    PRELOADING("Preparing voice..."),
-    PRE_START("GET READY..."),
-    ON_YOUR_MARKS("ON YOUR MARKS"),
-    WAITING_FOR_SET("ON YOUR MARKS"),
-    READY("READY"),
-    WAITING_AFTER_READY("READY"),
-    SET("SET"),
-    WAITING_FOR_GO("SET"),
-    GO("GO!"),
-    STARTED("GO!"),
-    CANCELLED("Cancelled");
+enum class VoiceStartPhase {
+    IDLE,
+    PRELOADING,
+    PRE_START,
+    ON_YOUR_MARKS,
+    WAITING_FOR_SET,
+    READY,
+    WAITING_AFTER_READY,
+    SET,
+    WAITING_FOR_GO,
+    GO,
+    STARTED,
+    CANCELLED;
 
     val isWaiting: Boolean
         get() = this == PRELOADING || this == PRE_START || this == WAITING_FOR_SET ||
@@ -129,7 +129,7 @@ class VoiceStartService @Inject constructor(
     private var sequenceJob: kotlinx.coroutines.Job? = null
 
     private var voiceGender: VoiceGender = VoiceGender.MALE
-    private var currentCommands: VoiceCommands = VoiceCommandPhrases.forLanguage("en")
+    private var currentCommands: VoiceCommands = VoiceCommandPhrases.forLanguage(context, "en")
     private var currentLanguageTag: String = "en"
     var voiceProvider: VoiceProvider = VoiceProvider.ELEVEN_LABS
     var elevenLabsVoiceId: ElevenLabsVoiceId = ElevenLabsVoiceId.ARNOLD
@@ -216,9 +216,9 @@ class VoiceStartService @Inject constructor(
         }
         settingsScope.launch {
             settingsRepository.appLanguage.collect { lang ->
-                val tag = if (lang == "system") "en" else lang
+                val tag = lang
                 currentLanguageTag = tag
-                currentCommands = VoiceCommandPhrases.forLanguage(tag)
+                currentCommands = VoiceCommandPhrases.forLanguage(context, tag)
                 applyLanguageAndVoice()
             }
         }
@@ -304,7 +304,7 @@ class VoiceStartService @Inject constructor(
      */
     fun setLanguage(languageTag: String) {
         currentLanguageTag = languageTag
-        currentCommands = VoiceCommandPhrases.forLanguage(languageTag)
+        currentCommands = VoiceCommandPhrases.forLanguage(context, languageTag)
         applyLanguageAndVoice()
         Log.i(TAG, "Voice language set to: $languageTag (${currentCommands.onYourMarks})")
     }
@@ -489,7 +489,7 @@ class VoiceStartService @Inject constructor(
     private fun setPhase(newPhase: VoiceStartPhase) {
         _phase.value = newPhase
         onPhaseChange?.invoke(newPhase)
-        Log.d(TAG, "Phase: ${newPhase.displayText}")
+        Log.d(TAG, "Phase: ${newPhase.name}")
     }
 
     private suspend fun speak(text: String) {

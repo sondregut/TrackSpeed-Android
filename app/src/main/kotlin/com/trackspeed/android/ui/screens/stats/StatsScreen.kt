@@ -61,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -72,6 +73,68 @@ import java.util.Locale
 
 private val ChartGreen = Color(0xFF30D158)
 private val StatWarning = Color(0xFFFF9500)
+
+@Composable
+private fun StatsTimeRange.localizedDisplayName(): String = stringResource(
+    when (this) {
+        StatsTimeRange.RECENT -> R.string.stats_range_recent
+        StatsTimeRange.DAYS_90 -> R.string.stats_range_90_days
+        StatsTimeRange.DAYS_30 -> R.string.stats_range_30_days
+    }
+)
+
+@Composable
+private fun StatsTimeRange.localizedContext(sessionCount: Int): String = when (this) {
+    StatsTimeRange.RECENT -> pluralStringResource(
+        R.plurals.stats_latest_sessions,
+        sessionCount,
+        sessionCount
+    )
+    StatsTimeRange.DAYS_90 -> pluralStringResource(
+        R.plurals.stats_sessions_last_90_days,
+        sessionCount,
+        sessionCount
+    )
+    StatsTimeRange.DAYS_30 -> pluralStringResource(
+        R.plurals.stats_sessions_last_30_days,
+        sessionCount,
+        sessionCount
+    )
+}
+
+@Composable
+private fun StatsTimeRange.localizedEmptyTitle(): String = stringResource(
+    if (this == StatsTimeRange.RECENT) R.string.stats_no_data else R.string.stats_no_data_in_range
+)
+
+@Composable
+private fun StatsTimeRange.localizedEmptyMessage(): String = stringResource(
+    when (this) {
+        StatsTimeRange.RECENT -> R.string.stats_complete_sessions
+        StatsTimeRange.DAYS_90 -> R.string.stats_no_sessions_90_days
+        StatsTimeRange.DAYS_30 -> R.string.stats_no_sessions_30_days
+    }
+)
+
+@Composable
+private fun TestType.localizedLabel(): String = stringResource(
+    when (this) {
+        TestType.FLYING_10M -> R.string.stats_test_flying_10m
+        TestType.FLYING_20M -> R.string.stats_test_flying_20m
+        TestType.FLYING_30M -> R.string.stats_test_flying_30m
+        TestType.SPRINT_10M -> R.string.stats_test_10m
+        TestType.SPRINT_20M -> R.string.stats_test_20m
+        TestType.SPRINT_30M -> R.string.stats_test_30m
+        TestType.SPRINT_60M -> R.string.stats_test_60m
+        TestType.SPRINT_100M -> R.string.stats_test_100m
+        TestType.FORTY_YARD_DASH -> R.string.stats_test_40yd
+        TestType.PRO_AGILITY -> R.string.stats_test_pro_agility
+        TestType.L_DRILL -> R.string.stats_test_l_drill
+        TestType.TAKE_OFF_VELOCITY -> R.string.stats_test_takeoff_velocity
+        TestType.PRACTICE -> R.string.stats_test_practice
+        TestType.OTHER -> R.string.stats_test_other
+    }
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -152,7 +215,7 @@ fun StatsScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "RANGE",
+                    text = stringResource(R.string.stats_range),
                     style = MaterialTheme.typography.labelSmall,
                     color = TextMuted,
                     fontWeight = FontWeight.SemiBold,
@@ -167,7 +230,7 @@ fun StatsScreen(
                 )
 
                 Text(
-                    text = state.rangeContextText,
+                    text = state.selectedTimeRange.localizedContext(state.rangeSessionCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted,
                     modifier = Modifier.padding(top = 8.dp)
@@ -176,7 +239,7 @@ fun StatsScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "TEST TYPE",
+                    text = stringResource(R.string.stats_test_type),
                     style = MaterialTheme.typography.labelSmall,
                     color = TextMuted,
                     fontWeight = FontWeight.SemiBold,
@@ -294,13 +357,13 @@ fun StatsScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = state.emptyStateTitle,
+                                text = state.selectedTimeRange.localizedEmptyTitle(),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = TextPrimary,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = state.emptyStateMessage,
+                                text = state.selectedTimeRange.localizedEmptyMessage(),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = TextSecondary,
                                 textAlign = TextAlign.Center
@@ -334,7 +397,7 @@ private fun TimeRangeSelector(
                 onClick = { onRangeSelected(range) },
                 label = {
                     Text(
-                        text = range.displayName,
+                        text = range.localizedDisplayName(),
                         color = if (isSelected) Color.White else TextSecondary
                     )
                 },
@@ -384,7 +447,7 @@ private fun TestTypeSelector(
                             modifier = Modifier.size(15.dp)
                         )
                         Text(
-                            text = testType.label,
+                            text = testType.localizedLabel(),
                             color = if (isSelected) Color.White else TextSecondary
                         )
                     }
@@ -436,7 +499,7 @@ private fun AthleteSelector(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         AthleteFilterChip(
-            name = "All",
+            name = stringResource(R.string.stats_all_athletes),
             count = athletes.sumOf { it.runCount },
             color = null,
             isSelected = selectedAthleteId == null,
@@ -444,7 +507,7 @@ private fun AthleteSelector(
         )
         athletes.forEach { athlete ->
             AthleteFilterChip(
-                name = athlete.name,
+                name = athlete.name.ifBlank { stringResource(R.string.stats_unknown_athlete) },
                 count = athlete.runCount,
                 color = athlete.color,
                 isSelected = selectedAthleteId == athlete.id,
@@ -478,7 +541,7 @@ private fun AthleteFilterChip(
                     )
                 }
                 Text(
-                    text = "$name ($count)",
+                    text = stringResource(R.string.stats_athlete_filter_label, name, count),
                     color = if (isSelected) Color.White else TextSecondary
                 )
             }
@@ -519,13 +582,13 @@ private fun RangeBestBanner(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Best in Range",
+                    text = stringResource(R.string.stats_best_in_range),
                     style = MaterialTheme.typography.labelMedium,
                     color = TextMuted,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "${formatTime(timeSeconds)}s",
+                    text = stringResource(R.string.common_seconds_value, formatTime(timeSeconds)),
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
@@ -555,21 +618,30 @@ private fun SummaryStatsCard(
     totalRuns: Int,
     totalSessions: Int
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    fun seconds(value: Double): String = context.getString(
+        R.string.common_seconds_value,
+        formatTime(value)
+    )
+    fun preciseSeconds(value: Double): String = context.getString(
+        R.string.common_seconds_value,
+        formatSeconds3(value)
+    )
     val metrics = buildList {
-        add(StatMetric("Best Time", bestTime?.let { "${formatTime(it)}s" } ?: "\u2014", TimerGreen))
-        add(StatMetric("Last 5 Avg", recentAverageTime?.let { "${formatTime(it)}s" } ?: "\u2014", AccentBlue))
-        add(StatMetric("Average", averageTime?.let { "${formatTime(it)}s" } ?: "\u2014", AccentBlue))
-        add(StatMetric("Best Speed", bestSpeed?.let { formatSpeedValue(it, speedUnit) } ?: "\u2014", TextPrimary))
-        add(StatMetric("Runs", totalRuns.toString(), TextPrimary))
-        add(StatMetric("Sessions", totalSessions.toString(), TextPrimary))
+        add(StatMetric(context.getString(R.string.stats_metric_best_time), bestTime?.let(::seconds) ?: "\u2014", TimerGreen))
+        add(StatMetric(context.getString(R.string.stats_metric_last_five_average), recentAverageTime?.let(::seconds) ?: "\u2014", AccentBlue))
+        add(StatMetric(context.getString(R.string.stats_metric_average), averageTime?.let(::seconds) ?: "\u2014", AccentBlue))
+        add(StatMetric(context.getString(R.string.stats_metric_best_speed), bestSpeed?.let { formatSpeedValue(it, speedUnit) } ?: "\u2014", TextPrimary))
+        add(StatMetric(context.getString(R.string.stats_runs), totalRuns.toString(), TextPrimary))
+        add(StatMetric(context.getString(R.string.stats_sessions), totalSessions.toString(), TextPrimary))
         performanceDelta?.let {
-            add(StatMetric("Since First", formatDeltaSeconds(it), if (it <= 0.0) TimerGreen else StatWarning))
+            add(StatMetric(context.getString(R.string.stats_metric_since_first), formatDeltaSeconds(it), if (it <= 0.0) TimerGreen else StatWarning))
         }
         consistency?.let {
-            add(StatMetric("Consistency", "${formatSeconds3(it)}s", TextPrimary))
+            add(StatMetric(context.getString(R.string.stats_metric_consistency), preciseSeconds(it), TextPrimary))
         }
         averageReactionTime?.let {
-            add(StatMetric("Avg Reaction", "${formatSeconds3(it)}s", StatWarning))
+            add(StatMetric(context.getString(R.string.stats_metric_average_reaction), preciseSeconds(it), StatWarning))
         }
     }
 

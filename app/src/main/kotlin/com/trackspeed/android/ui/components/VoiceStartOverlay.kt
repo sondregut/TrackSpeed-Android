@@ -92,6 +92,19 @@ private val PhaseBlue = AccentNavy.copy(alpha = 0.85f)
 private val PhaseAmber = Color(0xE5FF9500)
 private val PhaseGo = Color(0xFF30D158)
 
+@Composable
+private fun ElevenLabsVoiceId.localizedDisplayName(): String {
+    val gender = when (this) {
+        ElevenLabsVoiceId.ADAM,
+        ElevenLabsVoiceId.JOSH,
+        ElevenLabsVoiceId.ARNOLD -> stringResource(R.string.settings_voice_gender_male)
+        ElevenLabsVoiceId.RACHEL,
+        ElevenLabsVoiceId.BELLA,
+        ElevenLabsVoiceId.ELLI -> stringResource(R.string.settings_voice_gender_female)
+    }
+    return stringResource(R.string.settings_voice_name_gender, displayName, gender)
+}
+
 data class VoiceStartOverlaySettings(
     val voiceProvider: String,
     val elevenLabsVoice: String,
@@ -406,9 +419,9 @@ private fun VoiceStartSettingsSheet(
             val selectedVoice = ElevenLabsVoiceId.fromString(settings.elevenLabsVoice)
             VoiceSettingsPickerRow(
                 label = stringResource(R.string.settings_ai_voice),
-                value = "${selectedVoice.displayName} (${selectedVoice.gender})",
+                value = selectedVoice.localizedDisplayName(),
                 options = ElevenLabsVoiceId.entries.map { voice ->
-                    voice.name.lowercase() to "${voice.displayName} (${voice.gender})"
+                    voice.name.lowercase() to voice.localizedDisplayName()
                 },
                 onSelected = actions.onElevenLabsVoiceChanged
             )
@@ -417,9 +430,9 @@ private fun VoiceStartSettingsSheet(
         val selectedSound = StartSoundType.fromRawValue(settings.startSoundType)
         VoiceSettingsPickerRow(
             label = stringResource(R.string.settings_go_sound),
-            value = selectedSound.displayName,
+            value = stringResource(selectedSound.displayNameRes),
             options = StartSoundType.selectable.map { sound ->
-                sound.rawValue to sound.displayName
+                sound.rawValue to stringResource(sound.displayNameRes)
             },
             onSelected = actions.onStartSoundTypeChanged
         )
@@ -427,7 +440,11 @@ private fun VoiceStartSettingsSheet(
         VoiceSettingsSliderRow(
             label = stringResource(R.string.settings_pre_start_delay),
             value = settings.preStartDelayMin,
-            valueText = "${settings.preStartDelayMin.toInt()}-${(settings.preStartDelayMin + 2f).toInt()}s",
+            valueText = stringResource(
+                R.string.settings_seconds_range_int,
+                settings.preStartDelayMin.toInt(),
+                (settings.preStartDelayMin + 2f).toInt()
+            ),
             helper = stringResource(R.string.settings_pre_start_delay_helper),
             valueRange = 1f..8f,
             steps = 6,
@@ -437,7 +454,11 @@ private fun VoiceStartSettingsSheet(
         VoiceSettingsSliderRow(
             label = stringResource(R.string.settings_marks_delay),
             value = settings.marksSetDelayMin,
-            valueText = "${settings.marksSetDelayMin.toInt()}-${(settings.marksSetDelayMin + 4f).toInt()}s",
+            valueText = stringResource(
+                R.string.settings_seconds_range_int,
+                settings.marksSetDelayMin.toInt(),
+                (settings.marksSetDelayMin + 4f).toInt()
+            ),
             helper = stringResource(R.string.settings_marks_delay_helper),
             valueRange = 3f..15f,
             steps = 11,
@@ -447,7 +468,11 @@ private fun VoiceStartSettingsSheet(
         VoiceSettingsSliderRow(
             label = stringResource(R.string.settings_set_hold_time),
             value = settings.setGoHoldMin,
-            valueText = String.format(java.util.Locale.getDefault(), "%.1f-%.1fs", settings.setGoHoldMin, settings.setGoHoldMin + 0.8f),
+            valueText = stringResource(
+                R.string.settings_seconds_range_decimal,
+                settings.setGoHoldMin,
+                settings.setGoHoldMin + 0.8f
+            ),
             helper = stringResource(R.string.settings_set_hold_time_helper),
             valueRange = 1f..3f,
             steps = 19,

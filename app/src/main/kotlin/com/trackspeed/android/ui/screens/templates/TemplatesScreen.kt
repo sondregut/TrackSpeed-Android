@@ -58,6 +58,10 @@ import com.trackspeed.android.R
 import com.trackspeed.android.model.TestPreset
 import com.trackspeed.android.model.TestPresetCategory
 import com.trackspeed.android.ui.theme.*
+import com.trackspeed.android.ui.util.localizedDisplayName
+import com.trackspeed.android.ui.util.localizedName
+import com.trackspeed.android.ui.util.localizedShortName
+import com.trackspeed.android.ui.util.localizedTips
 
 private val AccentGreen = Color(0xFF30D158)
 private val AccentOrange = Color(0xFFFF9500)
@@ -87,17 +91,24 @@ fun TemplatesScreen(
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val filteredTemplates = remember(searchQuery) {
-        val query = searchQuery.trim()
-        if (query.isBlank()) {
-            TestPreset.all
-        } else {
-            TestPreset.all.filter { preset ->
-                preset.name.contains(query, ignoreCase = true) ||
-                    preset.shortName.contains(query, ignoreCase = true) ||
-                    preset.category.displayName.contains(query, ignoreCase = true)
-            }
+    val localizedSearchRows = buildList {
+        for (preset in TestPreset.all) {
+            add(
+                preset to listOf(
+                    preset.localizedName(),
+                    preset.shortName,
+                    preset.category.localizedDisplayName()
+                )
+            )
         }
+    }
+    val query = searchQuery.trim()
+    val filteredTemplates = if (query.isBlank()) {
+        TestPreset.all
+    } else {
+        localizedSearchRows.filter { (_, terms) ->
+            terms.any { it.contains(query, ignoreCase = true) }
+        }.map { it.first }
     }
     val templatesByCategory = filteredTemplates.groupBy { it.category }
 
@@ -146,7 +157,7 @@ fun TemplatesScreen(
             val templates = templatesByCategory[category] ?: continue
 
             item(key = "header_${category.name}") {
-                SectionHeader(title = category.displayName, color = category.accentColor())
+                SectionHeader(title = category.localizedDisplayName(), color = category.accentColor())
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
@@ -305,7 +316,7 @@ private fun TemplateCard(
             // Text content
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = template.name,
+                    text = template.localizedName(),
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
@@ -326,12 +337,12 @@ private fun TemplateCard(
                     }
                     PhoneCountBadge(minPhones = template.minPhones, maxPhones = template.maxPhones)
                     StartTypeBadge(
-                        text = template.defaultStartType.shortName
+                        text = template.defaultStartType.localizedShortName()
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = template.tips.firstOrNull().orEmpty(),
+                    text = template.localizedTips().firstOrNull().orEmpty(),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     maxLines = 1,
@@ -344,7 +355,7 @@ private fun TemplateCard(
             // Chevron
             Icon(
                 imageVector = Icons.Outlined.ChevronRight,
-                contentDescription = "Start template",
+                contentDescription = stringResource(R.string.templates_start_template_cd),
                 tint = TextMuted,
                 modifier = Modifier.size(20.dp)
             )

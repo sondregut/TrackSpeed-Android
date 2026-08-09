@@ -194,10 +194,17 @@ private fun DebugToolsContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                InfoRow("Model", "${Build.MANUFACTURER} ${Build.MODEL}")
-                InfoRow("OS Version", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-                InfoRow("Device", Build.DEVICE)
-                InfoRow("Board", Build.BOARD)
+                InfoRow(stringResource(R.string.debug_label_model), "${Build.MANUFACTURER} ${Build.MODEL}")
+                InfoRow(
+                    stringResource(R.string.debug_label_os_version),
+                    stringResource(
+                        R.string.debug_os_version_value,
+                        Build.VERSION.RELEASE,
+                        Build.VERSION.SDK_INT
+                    )
+                )
+                InfoRow(stringResource(R.string.debug_label_device), Build.DEVICE)
+                InfoRow(stringResource(R.string.debug_label_board), Build.BOARD)
 
                 // Camera info
                 val cameraInfo = remember { getCameraInfo(context) }
@@ -235,15 +242,15 @@ private fun DebugToolsContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                InfoRow("Work Resolution", "160 x 284")
-                InfoRow("Diff Threshold Range", "8 - 40")
-                InfoRow("Min Blob Height", "33%")
-                InfoRow("Min Velocity", "60 px/s")
-                InfoRow("Cooldown", "0.3s")
-                InfoRow("Gyro Threshold", "0.35 rad/s")
-                InfoRow("Trajectory Buffer", "6 points")
-                InfoRow("Hysteresis Distance", "25%")
-                InfoRow("Exit Zone", "35%")
+                InfoRow(stringResource(R.string.debug_label_work_resolution), "160 × 284")
+                InfoRow(stringResource(R.string.debug_label_diff_threshold), "8–40")
+                InfoRow(stringResource(R.string.debug_label_min_blob_height), "33%")
+                InfoRow(stringResource(R.string.debug_label_min_velocity), "60 px/s")
+                InfoRow(stringResource(R.string.debug_label_cooldown), "0.3 s")
+                InfoRow(stringResource(R.string.debug_label_gyro_threshold), "0.35 rad/s")
+                InfoRow(stringResource(R.string.debug_label_trajectory_buffer), "6")
+                InfoRow(stringResource(R.string.debug_label_hysteresis_distance), "25%")
+                InfoRow(stringResource(R.string.debug_label_exit_zone), "35%")
             }
         }
 
@@ -257,17 +264,26 @@ private fun DebugToolsContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                InfoRow(stringResource(R.string.debug_label_status), state.clockSyncStatus)
+                val clockSyncStatus = state.clockSyncStatus.ifBlank {
+                    stringResource(R.string.debug_default_not_connected)
+                }
+                val clockSyncQuality = state.clockSyncQuality.ifBlank {
+                    stringResource(R.string.debug_default_na)
+                }
+                InfoRow(stringResource(R.string.debug_label_status), clockSyncStatus)
                 InfoRow(
                     stringResource(R.string.debug_label_quality),
-                    state.clockSyncQuality,
-                    valueColor = when (state.clockSyncQuality) {
-                        "Excellent", "Good" -> AccentGreen
-                        "Fair" -> AccentOrange
+                    clockSyncQuality,
+                    valueColor = when (state.clockSyncQuality.lowercase()) {
+                        "excellent", "good" -> AccentGreen
+                        "fair" -> AccentOrange
                         else -> TextSecondary
                     }
                 )
-                InfoRow(stringResource(R.string.debug_label_offset), state.clockSyncOffset)
+                InfoRow(
+                    stringResource(R.string.debug_label_offset),
+                    state.clockSyncOffset.ifBlank { stringResource(R.string.debug_default_na) }
+                )
             }
         }
 
@@ -450,24 +466,35 @@ private fun getCameraInfo(context: Context): List<Pair<String, String>> {
     try {
         val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         val cameraIds = cameraManager.cameraIdList
-        results.add("Cameras" to "${cameraIds.size} available")
+        results.add(
+            context.getString(R.string.debug_cameras) to context.resources.getQuantityString(
+                R.plurals.debug_cameras_available,
+                cameraIds.size,
+                cameraIds.size
+            )
+        )
 
         for (id in cameraIds.take(2)) {
             val chars = cameraManager.getCameraCharacteristics(id)
             val facing = when (chars.get(CameraCharacteristics.LENS_FACING)) {
-                CameraCharacteristics.LENS_FACING_BACK -> "Back"
-                CameraCharacteristics.LENS_FACING_FRONT -> "Front"
-                else -> "External"
+                CameraCharacteristics.LENS_FACING_BACK -> context.getString(R.string.debug_camera_back)
+                CameraCharacteristics.LENS_FACING_FRONT -> context.getString(R.string.debug_camera_front)
+                else -> context.getString(R.string.debug_camera_external)
             }
 
             val configs = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
             val fpsRanges = chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
             val maxFps = fpsRanges?.maxOfOrNull { it.upper } ?: 0
 
-            results.add("Camera $id" to "$facing, max ${maxFps}fps")
+            results.add(
+                context.getString(R.string.debug_camera_id, id) to
+                    context.getString(R.string.debug_camera_value, facing, maxFps)
+            )
         }
     } catch (e: Exception) {
-        results.add("Camera" to "Error: ${e.message}")
+        results.add(
+            context.getString(R.string.debug_camera) to context.getString(R.string.debug_camera_error)
+        )
     }
     return results
 }

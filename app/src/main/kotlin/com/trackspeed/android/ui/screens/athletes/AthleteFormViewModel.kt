@@ -36,7 +36,7 @@ data class AthleteFormUiState(
     val personalBests: Map<String, Double> = emptyMap(),
     val isEditMode: Boolean = false,
     val isLoaded: Boolean = false,
-    val errorMessage: String? = null
+    val hasBirthdateError: Boolean = false
 )
 
 @HiltViewModel
@@ -85,7 +85,7 @@ class AthleteFormViewModel @Inject constructor(
     }
 
     fun onNameChanged(name: String) {
-        _uiState.value = _uiState.value.copy(name = name, errorMessage = null)
+        _uiState.value = _uiState.value.copy(name = name, hasBirthdateError = false)
     }
 
     fun onNicknameChanged(nickname: String) {
@@ -97,7 +97,7 @@ class AthleteFormViewModel @Inject constructor(
     }
 
     fun onBirthdateChanged(birthdate: String) {
-        _uiState.value = _uiState.value.copy(birthdateText = birthdate, errorMessage = null)
+        _uiState.value = _uiState.value.copy(birthdateText = birthdate, hasBirthdateError = false)
     }
 
     fun onGenderSelected(gender: String?) {
@@ -126,7 +126,7 @@ class AthleteFormViewModel @Inject constructor(
         if (state.name.isBlank()) return
         val birthdate = parseBirthdate(state.birthdateText)
         if (state.birthdateText.isNotBlank() && birthdate == null) {
-            _uiState.value = state.copy(errorMessage = "Use birthdate format YYYY-MM-DD")
+            _uiState.value = state.copy(hasBirthdateError = true)
             return
         }
 

@@ -61,6 +61,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.data.local.entities.AthleteEntity
 import com.trackspeed.android.ui.theme.*
@@ -150,7 +151,7 @@ private fun AthleteListContent(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No matching athletes",
+                            text = stringResource(R.string.athlete_list_no_matches),
                             style = MaterialTheme.typography.bodyLarge,
                             color = TextSecondary
                         )
@@ -178,7 +179,7 @@ private fun SearchBar(
         onValueChange = onQueryChanged,
         modifier = Modifier.fillMaxWidth(),
         placeholder = {
-            Text("Search athletes", color = TextSecondary)
+            Text(stringResource(R.string.athlete_list_search), color = TextSecondary)
         },
         leadingIcon = {
             Icon(
@@ -359,7 +360,10 @@ private fun AthleteRow(
                     modifier = Modifier.padding(start = 12.dp)
                 ) {
                     Text(
-                        text = String.format(Locale.US, "%.3fs", fastestBest),
+                        text = stringResource(
+                            R.string.common_seconds_value,
+                            String.format(Locale.getDefault(), "%.3f", fastestBest)
+                        ),
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
@@ -368,7 +372,11 @@ private fun AthleteRow(
                     )
 
                     Text(
-                        text = "${personalBests.size} PRs",
+                        text = pluralStringResource(
+                            R.plurals.athlete_personal_record_count,
+                            personalBests.size,
+                            personalBests.size
+                        ),
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary,
                         maxLines = 1
@@ -405,7 +413,7 @@ private fun EmptyState(onAddClick: () -> Unit) {
         Spacer(modifier = Modifier.height(20.dp))
 
         Text(
-            text = "No Athletes Yet",
+            text = stringResource(R.string.athlete_list_empty_title),
             style = MaterialTheme.typography.titleLarge.copy(
                 fontWeight = FontWeight.Bold
             ),
@@ -415,7 +423,7 @@ private fun EmptyState(onAddClick: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Add athletes to track their times\nand personal bests.",
+            text = stringResource(R.string.athlete_list_empty_body),
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
             lineHeight = 22.sp,
@@ -441,7 +449,7 @@ private fun EmptyState(onAddClick: () -> Unit) {
                     modifier = Modifier.size(20.dp)
                 )
                 Text(
-                    text = "Add Athlete",
+                    text = stringResource(R.string.athlete_add),
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
                     ),

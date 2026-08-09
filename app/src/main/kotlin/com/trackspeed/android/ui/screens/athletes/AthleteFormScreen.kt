@@ -68,6 +68,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.model.StartType
 import com.trackspeed.android.ui.theme.*
+import com.trackspeed.android.ui.util.localizedDisplayName
 import java.util.Locale
 import com.trackspeed.android.R
 
@@ -138,7 +139,9 @@ private fun AthleteFormContent(
         TopAppBar(
             title = {
                 Text(
-                    text = if (uiState.isEditMode) "Edit Athlete" else "Add Athlete",
+                    text = stringResource(
+                        if (uiState.isEditMode) R.string.athlete_edit else R.string.athlete_add
+                    ),
                     fontWeight = FontWeight.SemiBold
                 )
             },
@@ -233,7 +236,13 @@ private fun AthleteFormContent(
 
                 TextButton(onClick = onPickPhoto) {
                     Text(
-                        text = if (uiState.photoPath == null) "Add Photo" else "Change Photo",
+                        text = stringResource(
+                            if (uiState.photoPath == null) {
+                                R.string.athlete_add_photo
+                            } else {
+                                R.string.athlete_change_photo
+                            }
+                        ),
                         color = AccentBlue
                     )
                 }
@@ -248,7 +257,7 @@ private fun AthleteFormContent(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Name section
-            SectionLabel("NAME")
+            SectionLabel(stringResource(R.string.athlete_section_name))
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -279,7 +288,9 @@ private fun AthleteFormContent(
                         value = uiState.nickname,
                         onValueChange = onNicknameChanged,
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Nickname (optional)", color = TextSecondary) },
+                        placeholder = {
+                            Text(stringResource(R.string.athlete_nickname_optional), color = TextSecondary)
+                        },
                         singleLine = true,
                         colors = textFieldColors()
                     )
@@ -289,7 +300,7 @@ private fun AthleteFormContent(
             Spacer(modifier = Modifier.height(28.dp))
 
             // Profile section
-            SectionLabel("PROFILE")
+            SectionLabel(stringResource(R.string.athlete_section_profile))
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -303,9 +314,11 @@ private fun AthleteFormContent(
                         value = uiState.birthdateText,
                         onValueChange = onBirthdateChanged,
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Birthdate (YYYY-MM-DD)", color = TextSecondary) },
+                        placeholder = {
+                            Text(stringResource(R.string.athlete_birthdate_hint), color = TextSecondary)
+                        },
                         singleLine = true,
-                        isError = uiState.errorMessage != null,
+                        isError = uiState.hasBirthdateError,
                         colors = textFieldColors()
                     )
 
@@ -324,10 +337,10 @@ private fun AthleteFormContent(
                 }
             }
 
-            if (uiState.errorMessage != null) {
+            if (uiState.hasBirthdateError) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = uiState.errorMessage,
+                    text = stringResource(R.string.athlete_birthdate_error),
                     style = MaterialTheme.typography.bodySmall,
                     color = DeleteRed,
                     modifier = Modifier.padding(start = 4.dp)
@@ -337,7 +350,7 @@ private fun AthleteFormContent(
             Spacer(modifier = Modifier.height(28.dp))
 
             // Color section
-            SectionLabel("COLOR")
+            SectionLabel(stringResource(R.string.athlete_section_color))
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -373,7 +386,10 @@ private fun AthleteFormContent(
                             if (isSelected) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
-                                    contentDescription = "$name selected",
+                                    contentDescription = stringResource(
+                                        R.string.athlete_color_selected_cd,
+                                        localizedColorName(name)
+                                    ),
                                     tint = Color.White,
                                     modifier = Modifier.size(24.dp)
                                 )
@@ -386,7 +402,7 @@ private fun AthleteFormContent(
             if (uiState.isEditMode) {
                 Spacer(modifier = Modifier.height(28.dp))
 
-                SectionLabel("PERSONAL BESTS")
+                SectionLabel(stringResource(R.string.athlete_section_personal_bests))
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -417,7 +433,7 @@ private fun AthleteFormContent(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Delete Athlete",
+                            text = stringResource(R.string.athlete_delete),
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -434,9 +450,9 @@ private fun AthleteFormContent(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Athlete") },
+            title = { Text(stringResource(R.string.athlete_delete)) },
             text = {
-                Text("Are you sure you want to delete ${uiState.name}? This action cannot be undone.")
+                Text(stringResource(R.string.athlete_delete_confirmation, uiState.name))
             },
             confirmButton = {
                 TextButton(
@@ -484,7 +500,7 @@ private fun PersonalBestsCard(personalBests: Map<String, Double>) {
                 }
 
                 Text(
-                    text = group.startType.displayName,
+                    text = group.startType.localizedDisplayName(),
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
@@ -507,7 +523,10 @@ private fun PersonalBestsCard(personalBests: Map<String, Double>) {
                             modifier = Modifier.weight(1f)
                         )
                         Text(
-                            text = String.format(Locale.US, "%.3fs", entry.timeSeconds),
+                            text = stringResource(
+                                R.string.common_seconds_value,
+                                String.format(Locale.getDefault(), "%.3f", entry.timeSeconds)
+                            ),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
@@ -527,9 +546,9 @@ private fun GenderPicker(
     onGenderSelected: (String?) -> Unit
 ) {
     val options = listOf(
-        "male" to "Male",
-        "female" to "Female",
-        "other" to "Other"
+        "male" to stringResource(R.string.athlete_gender_male),
+        "female" to stringResource(R.string.athlete_gender_female),
+        "other" to stringResource(R.string.athlete_gender_other)
     )
 
     Column(
@@ -538,7 +557,7 @@ private fun GenderPicker(
             .padding(16.dp)
     ) {
         Text(
-            text = "Gender",
+            text = stringResource(R.string.athlete_gender),
             style = MaterialTheme.typography.bodySmall,
             color = TextSecondary
         )
@@ -578,6 +597,20 @@ private fun GenderPicker(
         }
     }
 }
+
+@Composable
+private fun localizedColorName(colorName: String): String = stringResource(
+    when (colorName) {
+        "red" -> R.string.athlete_color_red
+        "orange" -> R.string.athlete_color_orange
+        "yellow" -> R.string.athlete_color_yellow
+        "green" -> R.string.athlete_color_green
+        "blue" -> R.string.athlete_color_blue
+        "purple" -> R.string.athlete_color_purple
+        "pink" -> R.string.athlete_color_pink
+        else -> R.string.athlete_color_gray
+    }
+)
 
 @Composable
 private fun SectionLabel(text: String) {

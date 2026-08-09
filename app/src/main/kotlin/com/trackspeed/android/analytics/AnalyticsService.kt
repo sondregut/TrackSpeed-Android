@@ -1,6 +1,8 @@
 package com.trackspeed.android.analytics
 
+import android.os.Bundle
 import android.util.Log
+import com.google.firebase.analytics.FirebaseAnalytics
 import com.posthog.PostHog
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
@@ -72,36 +74,50 @@ class AnalyticsService @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile private var isConfigured = false
+    @Volatile private var firebaseAnalytics: FirebaseAnalytics? = null
 
+    @Synchronized
     fun configure(applicationContext: android.content.Context) {
         if (isConfigured) return
-        if (BuildConfig.POSTHOG_API_KEY.isBlank()) {
-            Log.w(TAG, "PostHog not configured: missing API key")
-            return
-        }
 
         runCatching {
-            val config = PostHogAndroidConfig(
-                apiKey = BuildConfig.POSTHOG_API_KEY,
-                host = BuildConfig.POSTHOG_HOST
-            ).apply {
-                captureApplicationLifecycleEvents = false
-                captureScreenViews = false
-                captureDeepLinks = false
-                sessionReplay = false
-                errorTrackingConfig.autoCapture = true
-                debug = false
-            }
-
-            PostHogAndroid.setup(applicationContext, config)
-            if (PostHog.isOptOut()) {
-                PostHog.optIn()
-            }
-            isConfigured = true
-            Log.i(TAG, "PostHog configured (manual analytics: on, screen/lifecycle autocapture: off, replay: off, error tracking: on)")
-            refreshPersonProperties()
+            firebaseAnalytics = FirebaseAnalytics.getInstance(applicationContext)
+            Log.i(TAG, "Firebase Analytics configured for acquisition and conversion measurement")
         }.onFailure {
-            Log.w(TAG, "PostHog configuration failed; analytics disabled", it)
+            Log.w(TAG, "Firebase Analytics configuration failed", it)
+        }
+
+        val postHogConfigured = if (BuildConfig.POSTHOG_API_KEY.isBlank()) {
+            Log.w(TAG, "PostHog not configured: missing API key")
+            false
+        } else {
+            runCatching {
+                val config = PostHogAndroidConfig(
+                    apiKey = BuildConfig.POSTHOG_API_KEY,
+                    host = BuildConfig.POSTHOG_HOST
+                ).apply {
+                    captureApplicationLifecycleEvents = false
+                    captureScreenViews = false
+                    captureDeepLinks = false
+                    sessionReplay = false
+                    errorTrackingConfig.autoCapture = true
+                    debug = false
+                }
+
+                PostHogAndroid.setup(applicationContext, config)
+                if (PostHog.isOptOut()) {
+                    PostHog.optIn()
+                }
+                Log.i(TAG, "PostHog configured (manual analytics: on, screen/lifecycle autocapture: off, replay: off, error tracking: on)")
+                true
+            }.onFailure {
+                Log.w(TAG, "PostHog configuration failed", it)
+            }.getOrDefault(false)
+        }
+
+        isConfigured = true
+        if (postHogConfigured) {
+            refreshPersonProperties()
         }
     }
 
@@ -164,6 +180,7 @@ class AnalyticsService @Inject constructor(
     fun track(event: AnalyticsEvent, properties: Map<String, Any?> = emptyMap()) {
         trackRaw(event.rawValue, properties)
         compatibilityAliases(event).forEach { alias -> trackRaw(alias, properties) }
+        trackFirebase(event, properties)
     }
 
     fun trackOnboardingStep(stepName: String, action: AnalyticsEvent) {
@@ -207,6 +224,27 @@ class AnalyticsService @Inject constructor(
             .getOrDefault("")
     }
 
+    private fun trackFirebase(event: AnalyticsEvent, properties: Map<String, Any?>) {
+        val eventName = firebaseEventName(event) ?: return
+        val analytics = firebaseAnalytics ?: return
+        val parameters = firebaseEventProperties(event, properties)
+        val bundle = Bundle().apply {
+            parameters.forEach { (key, value) ->
+                when (value) {
+                    is String -> putString(key, value)
+                    is Long -> putLong(key, value)
+                    is Double -> putDouble(key, value)
+                }
+            }
+        }
+
+        runCatching {
+            analytics.logEvent(eventName, bundle)
+        }.onFailure {
+            Log.w(TAG, "Firebase Analytics capture failed for $eventName", it)
+        }
+    }
+
     private fun compatibilityAliases(event: AnalyticsEvent): List<String> {
         return when (event) {
             AnalyticsEvent.SESSION_CREATED -> listOf("session_started")
@@ -222,6 +260,39 @@ class AnalyticsService @Inject constructor(
             Regex("[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}")
         private val emailRegex =
             Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}")
+        private val firebaseMeasuredEvents = setOf(
+            AnalyticsEvent.ONBOARDING_COMPLETED,
+            AnalyticsEvent.PAYWALL_VIEWED,
+            AnalyticsEvent.PAYWALL_PURCHASE_TAPPED,
+            AnalyticsEvent.PAYWALL_PURCHASE_COMPLETED,
+            AnalyticsEvent.DISCOUNT_PAYWALL_SHOWN,
+            AnalyticsEvent.SESSION_CREATED,
+            AnalyticsEvent.SESSION_COMPLETED
+        )
+        private val firebaseValueEvents = setOf(
+            AnalyticsEvent.PAYWALL_PURCHASE_TAPPED,
+            AnalyticsEvent.PAYWALL_PURCHASE_COMPLETED
+        )
+        private val firebaseAllowedParameters = setOf(
+            "source",
+            "is_referred",
+            "is_discount",
+            "offerings_available",
+            "plan",
+            "product_id",
+            "package_identifier",
+            "price",
+            "currency",
+            "is_pro",
+            "is_authenticated",
+            "role",
+            "number_of_gates",
+            "distance_m",
+            "mode",
+            "reason",
+            "run_count",
+            "solo_lap_count"
+        )
 
         fun sanitizedProperties(properties: Map<String, Any?>): Map<String, Any> {
             return properties.mapNotNull { (key, value) ->
@@ -243,6 +314,41 @@ class AnalyticsService @Inject constructor(
 
         fun sportCategoryRawValue(category: SportCategory): String {
             return category.name.lowercase(Locale.US)
+        }
+
+        fun firebaseEventName(event: AnalyticsEvent): String? {
+            return event.takeIf(firebaseMeasuredEvents::contains)?.rawValue
+        }
+
+        fun firebaseEventProperties(
+            event: AnalyticsEvent,
+            properties: Map<String, Any?>
+        ): Map<String, Any> {
+            return sanitizedProperties(properties)
+                .filterKeys(firebaseAllowedParameters::contains)
+                .mapNotNull { (key, value) ->
+                    val firebaseKey = if (
+                        key == "price" &&
+                        event in firebaseValueEvents
+                    ) {
+                        FirebaseAnalytics.Param.VALUE
+                    } else {
+                        key
+                    }
+                    val firebaseValue: Any = when (value) {
+                        is Boolean -> if (value) 1L else 0L
+                        is Byte -> value.toLong()
+                        is Short -> value.toLong()
+                        is Int -> value.toLong()
+                        is Long -> value
+                        is Float -> value.toDouble()
+                        is Double -> value
+                        is String -> value
+                        else -> return@mapNotNull null
+                    }
+                    firebaseKey to firebaseValue
+                }
+                .toMap()
         }
     }
 }

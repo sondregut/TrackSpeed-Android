@@ -22,6 +22,10 @@ googleId = "1.1.1"
 splashscreen = "1.0.1"
 media3 = "1.10.1"
 posthog = "3.49.0"
+# Firebase Analytics 23.2.0 in the current BoM uses Kotlin 2.2 metadata;
+# keep the pre-23 Analytics line until this project upgrades from Kotlin 2.0.
+firebaseBom = "33.16.0"
+googleServices = "4.5.0"
 
 [libraries]
 # Android Core
@@ -92,6 +96,10 @@ revenuecat-purchases-ui = { group = "com.revenuecat.purchases", name = "purchase
 # PostHog
 posthog-android = { group = "com.posthog", name = "posthog-android", version.ref = "posthog" }
 
+# Firebase / Google Analytics
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+
 # Credential Manager (Google Sign-In)
 credential-manager = { group = "androidx.credentials", name = "credentials", version.ref = "credentialManager" }
 credential-manager-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentialManager" }
@@ -112,3 +120,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

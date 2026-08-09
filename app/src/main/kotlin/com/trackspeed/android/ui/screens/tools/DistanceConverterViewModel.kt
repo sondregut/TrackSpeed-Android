@@ -12,22 +12,22 @@ import javax.inject.Inject
 import kotlin.math.exp
 import kotlin.math.sqrt
 
-enum class ConverterMode(val label: String) {
-    DISTANCE("Distance"),
-    FLYING("Flying"),
-    PREDICTOR("Predictor"),
-    LANES("Lanes")
+enum class ConverterMode {
+    DISTANCE,
+    FLYING,
+    PREDICTOR,
+    LANES
 }
 
-enum class SprintGender(val displayName: String) {
-    MEN("Men"),
-    WOMEN("Women")
+enum class SprintGender {
+    MEN,
+    WOMEN
 }
 
-enum class SprintDistance(val displayName: String, val meters: Int) {
-    M60("60m", 60),
-    M100("100m", 100),
-    M200("200m", 200)
+enum class SprintDistance(val meters: Int) {
+    M60(60),
+    M100(100),
+    M200(200)
 }
 
 object SprintDistanceConverter {
@@ -85,22 +85,10 @@ object SprintDistanceConverter {
 object FlyingSprintConverter {
     const val DEFAULT_ACCELERATION_PENALTY: Double = 1.00
 
-    enum class FlyingDistance(val displayName: String, val meters: Double, val caveat: String) {
-        FLY10(
-            displayName = "Flying 10m",
-            meters = 10.0,
-            caveat = "Converted to equivalent 30m fly via max velocity. Short distance amplifies individual variation."
-        ),
-        FLY20(
-            displayName = "Flying 20m",
-            meters = 20.0,
-            caveat = "Converted to equivalent 30m fly via max velocity. Good balance of reliability and practicality."
-        ),
-        FLY30(
-            displayName = "Flying 30m",
-            meters = 30.0,
-            caveat = "Most reliable for 100m prediction. Widely used by coaches."
-        )
+    enum class FlyingDistance(val meters: Double) {
+        FLY10(10.0),
+        FLY20(20.0),
+        FLY30(30.0)
     }
 
     data class FlyingResult(

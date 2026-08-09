@@ -1,5 +1,6 @@
 package com.trackspeed.android.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,28 +19,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.TextSecondary
 
 /**
  * Connection health status levels, matching iOS ConnectionStatus enum.
  */
 enum class ConnectionHealth(
-    val label: String,
+    @StringRes val labelRes: Int,
     val color: Color,
     val backgroundColor: Color
 ) {
     CONNECTED(
-        label = "Connected",
+        labelRes = R.string.connection_connected,
         color = Color(0xFF30D158),       // green
         backgroundColor = Color(0x2630D158) // 15% green
     ),
     WEAK(
-        label = "Weak",
+        labelRes = R.string.connection_weak,
         color = Color(0xFFFFAB00),       // amber/yellow
         backgroundColor = Color(0x26FFAB00) // 15% amber
     ),
     DISCONNECTED(
-        label = "Disconnected",
+        labelRes = R.string.connection_disconnected,
         color = Color(0xFFFF3B30),       // red
         backgroundColor = Color(0x26FF3B30) // 15% red
     )
@@ -121,7 +124,7 @@ fun ConnectionHealthIndicator(
         // Label
         if (showLabel) {
             Text(
-                text = health.label,
+                text = stringResource(health.labelRes),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Medium,
                     fontSize = 11.sp
@@ -132,11 +135,10 @@ fun ConnectionHealthIndicator(
 
         // Expanded details
         if (expanded && latencyMs != null) {
-            val detailText = buildString {
-                append("${latencyMs}ms")
-                if (syncUncertaintyMs != null) {
-                    append(" | \u00B1${String.format(java.util.Locale.getDefault(), "%.1f", syncUncertaintyMs)}ms")
-                }
+            val detailText = if (syncUncertaintyMs != null) {
+                stringResource(R.string.connection_latency_uncertainty_format, latencyMs, syncUncertaintyMs)
+            } else {
+                stringResource(R.string.connection_latency_format, latencyMs)
             }
             Text(
                 text = detailText,

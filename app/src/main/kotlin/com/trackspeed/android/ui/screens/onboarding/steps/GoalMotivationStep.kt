@@ -47,7 +47,10 @@ fun GoalMotivationStep(
         Spacer(Modifier.height(32.dp))
 
         Text(
-            text = if (hasGoalData) "Great goal!" else "Track your progress",
+            text = stringResource(
+                if (hasGoalData) R.string.onboarding_motivation_title
+                else R.string.onboarding_motivation_track_title
+            ),
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             color = TextPrimary,
@@ -55,7 +58,7 @@ fun GoalMotivationStep(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Your personalized training path",
+            text = stringResource(R.string.onboarding_motivation_path),
             fontSize = 15.sp,
             color = TextSecondary,
             textAlign = TextAlign.Center
@@ -103,6 +106,16 @@ private fun GoalProgressChart(
     val textSecondaryColor = TextSecondary
     val accentColor = AccentNavy // static val — no capture needed, but clarity
     val textMeasurer = rememberTextMeasurer()
+    val nowText = stringResource(R.string.onboarding_motivation_now)
+    val goalAxisText = stringResource(R.string.onboarding_motivation_goal_axis)
+    val prText = stringResource(
+        R.string.common_seconds_value,
+        String.format(java.util.Locale.getDefault(), "%.2f", flyingPR)
+    )
+    val goalText = stringResource(
+        R.string.common_seconds_value,
+        String.format(java.util.Locale.getDefault(), "%.2f", goalTime)
+    )
 
     // 5 linearly interpolated data points from PR → goal
     val dataPoints = (0..4).map { i -> flyingPR + (goalTime - flyingPR) * (i / 4.0) }
@@ -169,7 +182,6 @@ private fun GoalProgressChart(
         }
 
         // Time label above first point (Now / flyingPR)
-        val prText = String.format(java.util.Locale.getDefault(), "%.2f", flyingPR) + "s"
         val prLabelResult = textMeasurer.measure(
             text = prText,
             style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TimerRed)
@@ -183,7 +195,6 @@ private fun GoalProgressChart(
         )
 
         // Time label above last point (Goal / goalTime)
-        val goalText = String.format(java.util.Locale.getDefault(), "%.2f", goalTime) + "s"
         val goalLabelResult = textMeasurer.measure(
             text = goalText,
             style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AccentGreen)
@@ -198,7 +209,7 @@ private fun GoalProgressChart(
 
         // X-axis label "Now"
         val nowLabel = textMeasurer.measure(
-            text = "Now",
+            text = nowText,
             style = TextStyle(fontSize = 11.sp, color = textSecondaryColor)
         )
         drawText(
@@ -208,7 +219,7 @@ private fun GoalProgressChart(
 
         // X-axis label "Goal"
         val goalXLabel = textMeasurer.measure(
-            text = "Goal",
+            text = goalAxisText,
             style = TextStyle(fontSize = 11.sp, color = AccentGreen)
         )
         drawText(
@@ -220,7 +231,7 @@ private fun GoalProgressChart(
     // Distance label below chart
     if (flyingDistance != null) {
         Text(
-            text = "${flyingDistance.rawValue} flying start",
+            text = stringResource(R.string.onboarding_motivation_flying_start, flyingDistance.rawValue),
             fontSize = 12.sp,
             color = TextSecondary,
             textAlign = TextAlign.Center,
@@ -268,7 +279,7 @@ private fun ResearchCalloutCard() {
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Sprint athletes who track progress with structured goal-setting improve 2–5% more per training cycle.",
+                text = stringResource(R.string.onboarding_motivation_research),
                 fontSize = 13.sp,
                 color = TextSecondary,
                 lineHeight = 18.sp

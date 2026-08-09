@@ -27,6 +27,7 @@ import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 import com.trackspeed.android.data.model.FlyingDistance
 import com.trackspeed.android.data.model.SportDiscipline
+import com.trackspeed.android.ui.util.localizedDisplayName
 
 @Composable
 fun GoalTimeStep(
@@ -54,7 +55,8 @@ fun GoalTimeStep(
     }
 
     // Distance display name for subtitle
-    val distanceLabel = flyingDistance?.displayName ?: discipline?.displayName
+    val distanceLabel = flyingDistance?.localizedDisplayName()
+        ?: discipline?.localizedDisplayName()
 
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
@@ -99,7 +101,7 @@ fun GoalTimeStep(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    if (distanceLabel != null) "${stringResource(R.string.onboarding_goal_time_label)} for $distanceLabel"
+                    if (distanceLabel != null) stringResource(R.string.onboarding_goal_time_for_event, distanceLabel)
                     else stringResource(R.string.onboarding_goal_time_label),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
@@ -163,7 +165,7 @@ fun GoalTimeStep(
                 // Speed feedback
                 if (speedText != null) {
                     Text(
-                        "That's $speedText m/s",
+                        stringResource(R.string.onboarding_flying_speed_simple, speedText),
                         fontSize = 15.sp,
                         color = TextSecondary
                     )

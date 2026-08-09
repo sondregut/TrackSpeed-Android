@@ -29,6 +29,15 @@ import com.trackspeed.android.ui.theme.*
 private val AccentRed = Color(0xFFFF453A)
 private val AccentOrange = Color(0xFFFF9F0A)
 
+@Composable
+private fun WindAdjustmentCalculator.Event.localizedDisplayName(): String = stringResource(
+    when (this) {
+        WindAdjustmentCalculator.Event.SPRINT_100M -> R.string.wind_event_100m
+        WindAdjustmentCalculator.Event.SPRINT_200M -> R.string.wind_event_200m
+        WindAdjustmentCalculator.Event.HURDLES -> R.string.wind_event_hurdles
+    }
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WindAdjustmentScreen(
@@ -98,7 +107,7 @@ private fun WindAdjustmentContent(
                 // Event picker
                 Box {
                     OutlinedTextField(
-                        value = state.selectedEvent.displayName,
+                        value = state.selectedEvent.localizedDisplayName(),
                         onValueChange = {},
                         readOnly = true,
                         label = { Text(stringResource(R.string.wind_event_label), color = TextSecondary) },
@@ -128,7 +137,7 @@ private fun WindAdjustmentContent(
                         ) {
                             WindAdjustmentCalculator.Event.entries.forEach { event ->
                                 DropdownMenuItem(
-                                    text = { Text(event.displayName, color = TextPrimary) },
+                                    text = { Text(event.localizedDisplayName(), color = TextPrimary) },
                                     onClick = {
                                         onEventSelected(event)
                                         eventDropdownExpanded = false

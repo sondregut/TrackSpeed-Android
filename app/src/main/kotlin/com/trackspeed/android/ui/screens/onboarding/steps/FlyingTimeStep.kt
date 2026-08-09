@@ -126,7 +126,7 @@ fun FlyingTimeStep(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Enter it directly, or estimate it from an event PR if you don't have a flying split yet.",
+                stringResource(R.string.onboarding_flying_explainer),
                 fontSize = 15.sp,
                 color = TextSecondary,
                 textAlign = TextAlign.Center
@@ -263,7 +263,7 @@ private fun DirectFlyingPbForm(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            "Your personal best",
+            stringResource(R.string.onboarding_flying_personal_best),
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
             color = TextSecondary
@@ -278,8 +278,16 @@ private fun DirectFlyingPbForm(
         )
 
         when {
-            hasInvalidFlyingTime -> Text("Use seconds, for example 1.050.", fontSize = 13.sp, color = TextMuted)
-            speedText != null -> Text("That's $speedText m/s", fontSize = 15.sp, color = TextSecondary)
+            hasInvalidFlyingTime -> Text(
+                stringResource(R.string.onboarding_flying_invalid_time),
+                fontSize = 13.sp,
+                color = TextMuted
+            )
+            speedText != null -> Text(
+                stringResource(R.string.onboarding_flying_speed_simple, speedText),
+                fontSize = 15.sp,
+                color = TextSecondary
+            )
         }
 
         Button(
@@ -289,7 +297,11 @@ private fun DirectFlyingPbForm(
                 .height(44.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AccentBlue.copy(alpha = 0.12f))
         ) {
-            Text("I don't have a flying PB", color = AccentBlue, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.onboarding_flying_no_pb),
+                color = AccentBlue,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
@@ -316,7 +328,7 @@ private fun EventPrEstimateForm(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "What's your event?",
+                stringResource(R.string.onboarding_flying_event_question),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 color = TextSecondary
@@ -340,7 +352,7 @@ private fun EventPrEstimateForm(
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "Event PR",
+                stringResource(R.string.onboarding_flying_event_pr),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 color = TextSecondary
@@ -353,7 +365,11 @@ private fun EventPrEstimateForm(
                 onTextChanged = onEventPrTextChanged
             )
             if (hasInvalidEventPr) {
-                Text("Use seconds, for example 10.50.", fontSize = 13.sp, color = TextMuted)
+                Text(
+                    stringResource(R.string.onboarding_flying_invalid_event_time),
+                    fontSize = 13.sp,
+                    color = TextMuted
+                )
             }
         }
 
@@ -371,7 +387,11 @@ private fun EventPrEstimateForm(
                 .height(44.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AccentBlue.copy(alpha = 0.12f))
         ) {
-            Text("I have a flying PB", color = AccentBlue, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.onboarding_flying_has_pb),
+                color = AccentBlue,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
@@ -393,30 +413,41 @@ private fun EstimateSummary(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                "Estimated ${distance.rawValue} flying",
+                stringResource(R.string.onboarding_flying_estimated, distance.rawValue),
                 fontSize = 13.sp,
                 color = TextSecondary
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "${String.format(java.util.Locale.getDefault(), "%.3f", estimate)}s",
+                    stringResource(
+                        R.string.common_seconds_value,
+                        String.format(java.util.Locale.getDefault(), "%.3f", estimate)
+                    ),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
                     color = AccentBlue
                 )
                 if (speedText != null) {
-                    Text(" / $speedText m/s", fontSize = 15.sp, color = TextSecondary)
+                    Text(
+                        stringResource(R.string.onboarding_flying_speed_suffix, speedText),
+                        fontSize = 15.sp,
+                        color = TextSecondary
+                    )
                 }
             }
             Text(
-                "You can replace this later once you time a real flying sprint.",
+                stringResource(R.string.onboarding_flying_replace_later),
                 fontSize = 13.sp,
                 color = TextMuted
             )
         }
     } else if (eventPrValue != null) {
-        Text("This event can't be estimated yet.", fontSize = 13.sp, color = TextMuted)
+        Text(
+            stringResource(R.string.onboarding_flying_estimate_unavailable),
+            fontSize = 13.sp,
+            color = TextMuted
+        )
     }
 }
 

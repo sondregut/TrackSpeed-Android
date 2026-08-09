@@ -1,6 +1,7 @@
 package com.trackspeed.android.ui.components
 
 import android.graphics.Bitmap
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,20 +35,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.model.StartType
 import com.trackspeed.android.protocol.SegmentSplit
 import com.trackspeed.android.ui.util.formatDistance
-import com.trackspeed.android.ui.util.formatSegmentLabel
 import com.trackspeed.android.ui.util.formatSplitDuration
+import com.trackspeed.android.ui.util.localizedDisplayName
 
 /**
  * Share card gradient themes matching iOS parity.
  * Each theme defines background gradient colors, accent glow, and speed text color.
  */
 enum class ShareCardTheme(
-    val displayName: String,
+    @StringRes val displayNameRes: Int,
     val gradientColors: List<Color>,
     val swatchColor: Color,
     val accentGlow: Color,
@@ -55,7 +57,7 @@ enum class ShareCardTheme(
     val speedColor: Color
 ) {
     MIDNIGHT(
-        displayName = "Midnight",
+        displayNameRes = R.string.share_card_theme_midnight,
         gradientColors = listOf(Color(0xFF0F1219), Color(0xFF141824), Color(0xFF0F1219)),
         swatchColor = Color(0xFF141824),
         accentGlow = Color(0xFF4A90D9),
@@ -63,7 +65,7 @@ enum class ShareCardTheme(
         speedColor = Color(0xFF00BCD4)
     ),
     EMBER(
-        displayName = "Ember",
+        displayNameRes = R.string.share_card_theme_ember,
         gradientColors = listOf(Color(0xFF1A0A0A), Color(0xFF241210), Color(0xFF1A0A0A)),
         swatchColor = Color(0xFF241210),
         accentGlow = Color(0xFFE04040),
@@ -71,7 +73,7 @@ enum class ShareCardTheme(
         speedColor = Color(0xFFFF8A65)
     ),
     OCEAN(
-        displayName = "Ocean",
+        displayNameRes = R.string.share_card_theme_ocean,
         gradientColors = listOf(Color(0xFF0A1419), Color(0xFF0E1F24), Color(0xFF0A1419)),
         swatchColor = Color(0xFF0E1F24),
         accentGlow = Color(0xFF4DB6AC),
@@ -79,7 +81,7 @@ enum class ShareCardTheme(
         speedColor = Color(0xFF80CBC4)
     ),
     FOREST(
-        displayName = "Forest",
+        displayNameRes = R.string.share_card_theme_forest,
         gradientColors = listOf(Color(0xFF0A140E), Color(0xFF0E2418), Color(0xFF0A140E)),
         swatchColor = Color(0xFF0E2418),
         accentGlow = Color(0xFF4CAF50),
@@ -87,7 +89,7 @@ enum class ShareCardTheme(
         speedColor = Color(0xFF81C784)
     ),
     SLATE(
-        displayName = "Slate",
+        displayNameRes = R.string.share_card_theme_slate,
         gradientColors = listOf(Color(0xFF121212), Color(0xFF1E1E1E), Color(0xFF121212)),
         swatchColor = Color(0xFF1E1E1E),
         accentGlow = Color(0xFFE0E0E0),
@@ -411,6 +413,7 @@ private fun ShareSessionRunRow(
     textColor: Color,
     accentColor: Color
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val rowAccent = if (isBest) accentColor else textColor
 
     Column(
@@ -475,7 +478,16 @@ private fun ShareSessionRunRow(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = run.segments.take(4).joinToString("  \u2022  ") {
-                    "${formatSegmentLabel(it)} ${formatSplitDuration(it.splitNanos)}s"
+                    val gateLabel = context.getString(
+                        R.string.race_gate_number_range,
+                        it.fromGateIndex,
+                        it.toGateIndex
+                    )
+                    val splitTime = context.getString(
+                        R.string.common_seconds_value,
+                        formatSplitDuration(it.splitNanos)
+                    )
+                    "$gateLabel $splitTime"
                 },
                 color = textColor.copy(alpha = 0.48f),
                 fontFamily = FontFamily.Monospace,
@@ -596,13 +608,20 @@ private fun SplitSummary(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = formatSegmentLabel(segment),
+                    text = stringResource(
+                        R.string.race_gate_number_range,
+                        segment.fromGateIndex,
+                        segment.toGateIndex
+                    ),
                     color = textColor.copy(alpha = 0.72f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "${formatSplitDuration(segment.splitNanos)}s",
+                    text = stringResource(
+                        R.string.common_seconds_value,
+                        formatSplitDuration(segment.splitNanos)
+                    ),
                     color = accentColor,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
@@ -612,8 +631,13 @@ private fun SplitSummary(
         }
 
         if (segments.size > 3) {
+            val remainingSplits = segments.size - 3
             Text(
-                text = "+${segments.size - 3} more splits",
+                text = pluralStringResource(
+                    R.plurals.share_more_splits,
+                    remainingSplits,
+                    remainingSplits
+                ),
                 color = textColor.copy(alpha = 0.45f),
                 fontSize = 10.sp,
                 textAlign = TextAlign.Center,
@@ -771,9 +795,13 @@ private fun BottomSection(
         }
 
         // Start type + distance badge
-        val startLabel = StartType.fromRawValue(startType).displayName
+        val startLabel = StartType.fromRawValue(startType).localizedDisplayName()
         Text(
-            text = "$startLabel ${formatDistance(distance)}",
+            text = stringResource(
+                R.string.race_session_summary_format,
+                startLabel,
+                formatDistance(distance)
+            ),
             color = textColor.copy(alpha = 0.85f),
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,

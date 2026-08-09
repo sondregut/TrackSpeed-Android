@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 // Load local.properties so secrets are available via localProp()
@@ -86,6 +87,14 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // The in-app language picker must work immediately for every advertised
+    // locale, including offline installs delivered from an Android App Bundle.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
 }
 
 dependencies {
@@ -162,6 +171,10 @@ dependencies {
 
     // PostHog (analytics + crash diagnostics)
     implementation(libs.posthog.android)
+
+    // Firebase Analytics (Google Ads attribution + conversion measurement)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
 
     // Google Play In-App Review
     implementation("com.google.android.play:review:2.0.2")

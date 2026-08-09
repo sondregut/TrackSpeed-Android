@@ -24,10 +24,10 @@ import kotlin.math.abs
  */
 object WindAdjustmentCalculator {
 
-    enum class Event(val displayName: String) {
-        SPRINT_100M("100m"),
-        SPRINT_200M("200m"),
-        HURDLES("100/110m Hurdles");
+    enum class Event {
+        SPRINT_100M,
+        SPRINT_200M,
+        HURDLES;
 
         /** Linear coefficient (a). */
         val linearCoefficient: Double

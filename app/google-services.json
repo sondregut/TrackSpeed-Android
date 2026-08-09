@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "699834998156",
+    "project_id": "trackcam-pro",
+    "storage_bucket": "trackcam-pro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:699834998156:android:a8e54a0a54c3735bf84aa9",
+        "android_client_info": {
+          "package_name": "com.trackspeed.android"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgOZlTxZoMayAxsNdSHK11Hi1j56PyXsM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

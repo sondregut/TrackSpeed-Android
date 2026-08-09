@@ -1,19 +1,23 @@
 package com.trackspeed.android.ui.screens.sync
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.R
 import com.trackspeed.android.data.repository.SettingsRepository
 import com.trackspeed.android.protocol.TimingRole
 import com.trackspeed.android.protocol.TimingSessionConfig
 import com.trackspeed.android.sync.ClockSyncManager
 import com.trackspeed.android.sync.SyncQuality
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ClockSyncViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val clockSyncManager: ClockSyncManager,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
@@ -58,7 +62,7 @@ class ClockSyncViewModel @Inject constructor(
                         is ClockSyncManager.SyncState.Error -> current.copy(
                             status = SyncStatus.ERROR,
                             progress = 0f,
-                            errorMessage = state.message
+                            errorMessage = context.getString(R.string.sync_error_message)
                         )
                     }
                 }

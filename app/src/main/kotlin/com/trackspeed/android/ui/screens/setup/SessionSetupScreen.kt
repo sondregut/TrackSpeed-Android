@@ -77,6 +77,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.data.local.entities.AthleteEntity
@@ -85,6 +86,11 @@ import com.trackspeed.android.model.StartType
 import com.trackspeed.android.model.TestPreset
 import com.trackspeed.android.protocol.TimingRole
 import com.trackspeed.android.ui.theme.*
+import com.trackspeed.android.ui.util.localizedDescription
+import com.trackspeed.android.ui.util.localizedDisplayName
+import com.trackspeed.android.ui.util.localizedName
+import com.trackspeed.android.ui.util.localizedShortName
+import com.trackspeed.android.ui.util.localizedTips
 import java.util.Locale
 import com.trackspeed.android.R
 
@@ -562,6 +568,8 @@ private fun LegacySessionSetupScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val shouldShowSecondaryPhoneJoinTip by viewModel.shouldShowSecondaryPhoneJoinTip.collectAsStateWithLifecycle()
+    val sessionTitle = uiState.preset?.localizedName()
+        ?: stringResource(R.string.setup_new_session)
     val addAthleteFromSetup = {
         viewModel.prepareToAddAthleteFromSetup()
         onAddAthlete()
@@ -580,7 +588,7 @@ private fun LegacySessionSetupScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = uiState.preset?.name ?: "New Session",
+                        text = sessionTitle,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
@@ -803,14 +811,18 @@ private fun PresetInfoStep(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = preset.name,
+            text = preset.localizedName(),
             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
             color = TextPrimary,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp)
         )
         Text(
-            text = if (preset.hasSelectableDistance) "Select distance below" else preset.distanceDisplay,
+            text = if (preset.hasSelectableDistance) {
+                stringResource(R.string.setup_select_distance_below)
+            } else {
+                preset.distanceDisplay
+            },
             style = MaterialTheme.typography.titleMedium,
             color = TextSecondary,
             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
@@ -841,11 +853,14 @@ private fun PresetInfoStep(
             startType = preset.defaultStartType
         )
 
-        if (preset.tips.isNotEmpty()) {
+        val localizedTips = preset.localizedTips()
+        if (localizedTips.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
             TipsCard(
-                title = if (preset.isFlying) "IMPORTANT" else "TIPS",
-                tips = preset.tips,
+                title = stringResource(
+                    if (preset.isFlying) R.string.setup_important else R.string.setup_tips
+                ),
+                tips = localizedTips,
                 warning = preset.isFlying
             )
         }
@@ -865,7 +880,7 @@ private fun GateLayoutCard(
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(
-                text = "SETUP",
+                text = stringResource(R.string.setup_section_label),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.5.sp
@@ -875,7 +890,7 @@ private fun GateLayoutCard(
             if (isFlying) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "30m+ runup before the first phone",
+                    text = stringResource(R.string.setup_runup_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = AccentOrange
                 )
@@ -903,7 +918,15 @@ private fun GateLayoutCard(
 
             Spacer(modifier = Modifier.height(14.dp))
             Text(
-                text = if (selectedGateCount == 1) "Single phone lap timing" else "$selectedGateCount phones required",
+                text = if (selectedGateCount == 1) {
+                    stringResource(R.string.setup_single_phone_lap_timing)
+                } else {
+                    pluralStringResource(
+                        R.plurals.setup_phones_required,
+                        selectedGateCount,
+                        selectedGateCount
+                    )
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
@@ -972,12 +995,16 @@ private fun SetupSummaryCard(
         ) {
             SetupSummaryItem(
                 icon = Icons.Outlined.PhoneAndroid,
-                label = if (phoneCount == 1) "Solo" else "$phoneCount phones",
+                label = if (phoneCount == 1) {
+                    stringResource(R.string.common_solo)
+                } else {
+                    pluralStringResource(R.plurals.setup_phone_count, phoneCount, phoneCount)
+                },
                 color = AccentBlue
             )
             SetupSummaryItem(
                 icon = startTypeIcon(startType),
-                label = startType.shortName,
+                label = startType.localizedShortName(),
                 color = if (startType == StartType.FLYING) AccentOrange else AccentGreen
             )
         }
@@ -1079,7 +1106,7 @@ private fun AthleteSelectionStep(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Who's training?",
+            text = stringResource(R.string.setup_training_title),
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
@@ -1088,7 +1115,7 @@ private fun AthleteSelectionStep(
         )
 
         Text(
-            text = "Select athletes to track their times",
+            text = stringResource(R.string.setup_training_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
             modifier = Modifier.padding(bottom = 20.dp)
@@ -1104,7 +1131,7 @@ private fun AthleteSelectionStep(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "SELECT ATHLETES (${selectedIds.size})",
+                    text = stringResource(R.string.setup_select_athletes_count, selectedIds.size),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.5.sp
@@ -1182,13 +1209,13 @@ private fun EmptyAthletesPlaceholder(
         )
         Spacer(modifier = Modifier.height(20.dp))
         Text(
-            text = "No athletes added yet",
+            text = stringResource(R.string.setup_no_athletes_added),
             style = MaterialTheme.typography.bodyLarge,
             color = TextMuted
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Add athletes to track their times\nand personal bests.",
+            text = stringResource(R.string.setup_no_athletes_description),
             style = MaterialTheme.typography.bodySmall,
             color = TextMuted,
             textAlign = TextAlign.Center,
@@ -1214,7 +1241,7 @@ private fun EmptyAthletesPlaceholder(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = "Add First Athlete",
+                    text = stringResource(R.string.setup_add_first_athlete),
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
@@ -1262,7 +1289,7 @@ private fun SkipAthleteRow(
         Spacer(modifier = Modifier.width(12.dp))
 
         Text(
-            text = "Skip - assign athletes later",
+            text = stringResource(R.string.setup_skip_athletes),
             style = MaterialTheme.typography.bodyLarge,
             color = TextPrimary,
             modifier = Modifier.weight(1f)
@@ -1270,7 +1297,9 @@ private fun SkipAthleteRow(
 
         Icon(
             imageVector = if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-            contentDescription = if (isSelected) "Selected" else "Not selected",
+            contentDescription = stringResource(
+                if (isSelected) R.string.common_selected else R.string.common_not_selected
+            ),
             tint = if (isSelected) AccentGreen else TextMuted,
             modifier = Modifier.size(26.dp)
         )
@@ -1334,7 +1363,13 @@ private fun AthleteRow(
             when {
                 personalBest != null -> {
                     Text(
-                        text = "PB: ${String.format(Locale.US, "%.3fs", personalBest)}",
+                        text = stringResource(
+                            R.string.setup_personal_best_value,
+                            stringResource(
+                                R.string.common_seconds_value,
+                                String.format(Locale.getDefault(), "%.3f", personalBest)
+                            )
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = AccentGreen,
                         maxLines = 1
@@ -1353,7 +1388,9 @@ private fun AthleteRow(
 
         Icon(
             imageVector = if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-            contentDescription = if (isSelected) "Selected" else "Not selected",
+            contentDescription = stringResource(
+                if (isSelected) R.string.common_selected else R.string.common_not_selected
+            ),
             tint = if (isSelected) AccentGreen else TextMuted,
             modifier = Modifier.size(26.dp)
         )
@@ -1413,7 +1450,7 @@ private fun DistanceSelectionStep(
     ) {
         if (!compact) {
             Text(
-                text = "Select Distance",
+                text = stringResource(R.string.setup_select_distance),
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold
                 ),
@@ -1443,7 +1480,7 @@ private fun DistanceSelectionStep(
         Spacer(modifier = Modifier.height(if (compact) 18.dp else 32.dp))
 
         Text(
-            text = "or enter custom:",
+            text = stringResource(R.string.setup_or_enter_custom),
             style = MaterialTheme.typography.bodySmall,
             color = TextMuted,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -1474,7 +1511,7 @@ private fun DistanceSelectionStep(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "meters",
+                text = stringResource(R.string.setup_meters),
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextMuted
             )
@@ -1526,7 +1563,7 @@ private fun StartTypeSelectionStep(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "How to start?",
+            text = stringResource(R.string.setup_how_to_start),
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
@@ -1537,8 +1574,8 @@ private fun StartTypeSelectionStep(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             availableStartTypes.forEach { startType ->
                 StartTypeCard(
-                    title = startType.displayName,
-                    description = startType.description,
+                    title = startType.localizedDisplayName(),
+                    description = startType.localizedDescription(),
                     icon = startTypeIcon(startType),
                     isSelected = selectedStartType == startType.rawValue,
                     onClick = { onSelect(startType.rawValue) }
@@ -1607,7 +1644,7 @@ private fun StartTypeCard(
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Default.Check,
-                    contentDescription = "Selected",
+                    contentDescription = stringResource(R.string.common_selected),
                     tint = AccentGreen,
                     modifier = Modifier
                         .size(24.dp)
@@ -1636,13 +1673,13 @@ private fun GateCountSelectionStep(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "How many gates?",
+            text = stringResource(R.string.setup_how_many_gates),
             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
             color = TextPrimary,
             modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         )
         Text(
-            text = "Add phones for split times between start and finish.",
+            text = stringResource(R.string.setup_gate_count_description),
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
             textAlign = TextAlign.Center,
@@ -1691,13 +1728,18 @@ private fun GateCountCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "$count phones",
+                    text = pluralStringResource(R.plurals.setup_phone_count, count, count),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = TextPrimary,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = if (count <= 2) "Start + finish" else "${count - 2} split ${if (count == 3) "gate" else "gates"}",
+                    text = if (count <= 2) {
+                        stringResource(R.string.setup_start_and_finish)
+                    } else {
+                        val splitCount = count - 2
+                        pluralStringResource(R.plurals.setup_split_gate_count, splitCount, splitCount)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
@@ -1716,7 +1758,11 @@ private fun GateCountCard(
                             .background(if (isSelected) AccentGreen else TextMuted)
                     )
                     Text(
-                        text = "${gateLabel(index, positions.size)}: ${gateDistanceLabel(position)}",
+                        text = stringResource(
+                            R.string.setup_gate_with_distance,
+                            gateLabel(index, positions.size),
+                            gateDistanceLabel(position)
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary
                     )
@@ -1739,7 +1785,11 @@ private fun BottomBar(
 ) {
     val isFirstStep = currentStep == activeSteps.first()
     val isLastStep = currentStep == activeSteps.last()
-    val lastStepLabel = if (isMultiPhone) "Start Pairing" else "Start Session"
+    val lastStepLabel = if (isMultiPhone) {
+        stringResource(R.string.setup_start_pairing)
+    } else {
+        stringResource(R.string.setup_start_session)
+    }
 
     Row(
         modifier = Modifier
@@ -1796,7 +1846,7 @@ private fun BottomBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isLastStep) lastStepLabel else "Next",
+                    text = if (isLastStep) lastStepLabel else stringResource(R.string.common_next),
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Bold
                     ),
@@ -1819,13 +1869,19 @@ private fun ConnectPhonesStep(
     showSecondaryPhoneJoinTip: Boolean,
     onDismissSecondaryPhoneJoinTip: () -> Unit
 ) {
-    val timingPhoneText = if (gateCount == 1) "1 timing phone" else "$gateCount timing phones"
+    val timingPhoneText = pluralStringResource(
+        R.plurals.setup_timing_phone_count,
+        gateCount,
+        gateCount
+    )
     val requiredJoiners = if (selectedHostRole == TimingRole.CONTROL_ONLY) {
         gateCount
     } else {
         (gateCount - 1).coerceAtLeast(1)
     }
-    val joinerText = if (requiredJoiners == 1) "the other phone" else "each timing phone"
+    val joinerText = stringResource(
+        if (requiredJoiners == 1) R.string.setup_other_phone else R.string.setup_each_timing_phone
+    )
 
     Column(
         modifier = Modifier
@@ -1833,7 +1889,7 @@ private fun ConnectPhonesStep(
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "Connect Phones",
+            text = stringResource(R.string.setup_connect_phones),
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
@@ -1842,9 +1898,9 @@ private fun ConnectPhonesStep(
         )
         Text(
             text = if (selectedHostRole == TimingRole.CONTROL_ONLY) {
-                "This phone controls the session. $timingPhoneText will time start, splits, and finish."
+                stringResource(R.string.setup_control_connect_desc, timingPhoneText)
             } else {
-                "This phone is the finish-line camera. Put $joinerText at the assigned gate before pairing."
+                stringResource(R.string.setup_finish_connect_desc, joinerText)
             },
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
@@ -1899,15 +1955,15 @@ private fun ConnectPhonesStep(
         Text(
             text = if (selectedHostRole == TimingRole.CONTROL_ONLY) {
                 if (startsPairingNext) {
-                    "On the next screen, $joinerText taps Join Session. This phone stays on Create Session and starts each run."
+                    stringResource(R.string.setup_control_pair_next, joinerText)
                 } else {
-                    "After setup, $joinerText taps Join Session. This phone stays on Create Session and starts each run."
+                    stringResource(R.string.setup_control_pair_after, joinerText)
                 }
             } else {
                 if (startsPairingNext) {
-                    "On the next screen, $joinerText taps Join Session. TrackSpeed will pair phones over Bluetooth and synchronize their clocks."
+                    stringResource(R.string.setup_finish_pair_next, joinerText)
                 } else {
-                    "After setup, $joinerText taps Join Session. TrackSpeed will pair phones over Bluetooth and synchronize their clocks."
+                    stringResource(R.string.setup_finish_pair_after, joinerText)
                 }
             },
             style = MaterialTheme.typography.bodyMedium,
@@ -1945,12 +2001,12 @@ private fun SecondaryPhoneJoinTipCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Other phone joins for free",
+                    text = stringResource(R.string.setup_other_phone_free),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = TextPrimary
                 )
                 Text(
-                    text = "On the other phone, tap Join Session from the first screen. No account or subscription needed.",
+                    text = stringResource(R.string.setup_other_phone_instructions),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     lineHeight = 18.sp
@@ -1982,7 +2038,7 @@ private fun HostRoleSelector(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "THIS PHONE",
+                text = stringResource(R.string.setup_this_phone),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.5.sp
@@ -1990,7 +2046,13 @@ private fun HostRoleSelector(
                 color = TextMuted
             )
             Text(
-                text = if (selectedHostRole == TimingRole.CONTROL_ONLY) "Control only" else "Finish camera",
+                text = stringResource(
+                    if (selectedHostRole == TimingRole.CONTROL_ONLY) {
+                        R.string.setup_control_only
+                    } else {
+                        R.string.setup_finish_camera
+                    }
+                ),
                 style = MaterialTheme.typography.labelMedium,
                 color = TextMuted
             )
@@ -2005,14 +2067,14 @@ private fun HostRoleSelector(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             HostRoleSegmentButton(
-                title = "Finish",
+                title = stringResource(R.string.device_role_finish),
                 icon = Icons.Outlined.Flag,
                 isSelected = selectedHostRole == TimingRole.FINISH_LINE,
                 onClick = { onSelect(TimingRole.FINISH_LINE) },
                 modifier = Modifier.weight(1f)
             )
             HostRoleSegmentButton(
-                title = "Control",
+                title = stringResource(R.string.setup_control),
                 icon = Icons.Outlined.Tune,
                 isSelected = selectedHostRole == TimingRole.CONTROL_ONLY,
                 onClick = { onSelect(TimingRole.CONTROL_ONLY) },
@@ -2022,9 +2084,9 @@ private fun HostRoleSelector(
 
         Text(
             text = if (selectedHostRole == TimingRole.CONTROL_ONLY) {
-                "This phone controls the session while other phones time start and finish."
+                stringResource(R.string.setup_control_role_desc)
             } else {
-                "This phone is the finish-line camera. Add one start phone to continue."
+                stringResource(R.string.setup_finish_role_desc)
             },
             style = MaterialTheme.typography.bodySmall,
             color = TextSecondary
@@ -2082,11 +2144,12 @@ private fun startTypeIcon(startType: StartType): ImageVector = when (startType) 
     StartType.IN_FRAME -> Icons.Default.PersonOff
 }
 
+@Composable
 private fun gateLabel(index: Int, total: Int): String = when {
-    total <= 1 -> "Phone"
-    index == 0 -> "Start"
-    index == total - 1 -> "Finish"
-    else -> "Split $index"
+    total <= 1 -> stringResource(R.string.setup_phone)
+    index == 0 -> stringResource(R.string.device_role_start)
+    index == total - 1 -> stringResource(R.string.device_role_finish)
+    else -> stringResource(R.string.setup_split_number, index)
 }
 
 private fun gateDistanceLabel(position: GatePosition): String {
@@ -2106,7 +2169,9 @@ private fun previewGatePositions(
     gateCount: Int,
     distance: Double
 ): List<GatePosition> {
-    if (gateCount <= 1) return listOf(GatePosition(distance = 0.0, label = "Phone"))
+    if (gateCount <= 1) {
+        return listOf(GatePosition(distance = 0.0, label = "Phone"))
+    }
     if (preset?.isFlying == true || preset == null) {
         return (0 until gateCount).map { index ->
             val denominator = (gateCount - 1).coerceAtLeast(1)

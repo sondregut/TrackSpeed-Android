@@ -3,6 +3,7 @@ package com.trackspeed.android.ui.screens.paywall
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -301,10 +302,10 @@ private data class PaywallTestimonial(
     val initials: String,
     val photoResId: Int? = null,
     val name: String,
-    val age: String,
-    val role: String,
-    val previewQuote: String,
-    val quote: String
+    @StringRes val ageRes: Int,
+    @StringRes val roleRes: Int,
+    @StringRes val previewQuoteRes: Int,
+    @StringRes val quoteRes: Int
 )
 
 private val paywallTestimonials = listOf(
@@ -312,42 +313,42 @@ private val paywallTestimonials = listOf(
         initials = "SG",
         photoResId = R.drawable.sondre_profile,
         name = "Sondre Guttormsen",
-        age = "Olympian",
-        role = "Olympic Pole Vaulter",
-        previewQuote = "I use TrackSpeed to dial in my run-up before competitions. The accuracy is impressive.",
-        quote = "I use TrackSpeed to dial in my run-up before competitions. The accuracy is impressive and I always know exactly what speed I'm hitting at takeoff."
+        ageRes = R.string.paywall_testimonial_olympian,
+        roleRes = R.string.paywall_testimonial_olympic_pole_vaulter,
+        previewQuoteRes = R.string.paywall_testimonial_sondre_preview,
+        quoteRes = R.string.paywall_testimonial_sondre_quote
     ),
     PaywallTestimonial(
         initials = "ER",
         name = "Ethan R.",
-        age = "Sprinter",
-        role = "Track Athlete",
-        previewQuote = "Timing gates were too expensive. This was a better choice.",
-        quote = "I always wanted timing gates, but they were so expensive. This was a much better choice."
+        ageRes = R.string.paywall_testimonial_sprinter,
+        roleRes = R.string.paywall_testimonial_track_athlete,
+        previewQuoteRes = R.string.paywall_testimonial_ethan_preview,
+        quoteRes = R.string.paywall_testimonial_ethan_quote
     ),
     PaywallTestimonial(
         initials = "ML",
         name = "Marcus L.",
-        age = "Jumper",
-        role = "Horizontal Jumps",
-        previewQuote = "Laser system comparison was accurate. Got it right every time.",
-        quote = "Compared against a laser system and it was very accurate. Got it right every time."
+        ageRes = R.string.paywall_testimonial_jumper,
+        roleRes = R.string.paywall_testimonial_horizontal_jumps,
+        previewQuoteRes = R.string.paywall_testimonial_marcus_preview,
+        quoteRes = R.string.paywall_testimonial_marcus_quote
     ),
     PaywallTestimonial(
         initials = "AV",
         name = "Ava V.",
-        age = "Sprinter",
-        role = "Sprinter",
-        previewQuote = "Photo finish review makes the timing feel trustworthy.",
-        quote = "The photo finish review makes the timing feel trustworthy."
+        ageRes = R.string.paywall_testimonial_sprinter,
+        roleRes = R.string.paywall_testimonial_sprinter,
+        previewQuoteRes = R.string.paywall_testimonial_ava_preview,
+        quoteRes = R.string.paywall_testimonial_ava_quote
     ),
     PaywallTestimonial(
         initials = "JL",
         name = "Jonas L.",
-        age = "Coach",
-        role = "Coach",
-        previewQuote = "Phones and tripods beat hauling timing hardware.",
-        quote = "Two phones and tripods are easier than hauling timing hardware."
+        ageRes = R.string.paywall_testimonial_coach,
+        roleRes = R.string.paywall_testimonial_coach,
+        previewQuoteRes = R.string.paywall_testimonial_jonas_preview,
+        quoteRes = R.string.paywall_testimonial_jonas_quote
     )
 )
 
@@ -550,7 +551,7 @@ private fun TestimonialCard(
                         maxLines = 1
                     )
                     Text(
-                        text = testimonial.role,
+                        text = stringResource(testimonial.roleRes),
                         color = Color.Black.copy(alpha = 0.58f),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -571,7 +572,7 @@ private fun TestimonialCard(
             }
 
             Text(
-                text = "\"${testimonial.previewQuote}\"",
+                text = "\"${stringResource(testimonial.previewQuoteRes)}\"",
                 color = Color.Black.copy(alpha = 0.86f),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -784,12 +785,12 @@ private fun StickyPurchasePanel(
                     horizontalArrangement = Arrangement.spacedBy(18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    PaywallLegalLink("Have a code?", onClick = onShowPromoSheet)
-                    PaywallLegalLink("Restore", onClick = onRestore)
-                    PaywallLegalLink("Terms") {
+                    PaywallLegalLink(stringResource(R.string.paywall_have_code), onClick = onShowPromoSheet)
+                    PaywallLegalLink(stringResource(R.string.paywall_restore), onClick = onRestore)
+                    PaywallLegalLink(stringResource(R.string.paywall_terms)) {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TERMS_URL)))
                     }
-                    PaywallLegalLink("Privacy") {
+                    PaywallLegalLink(stringResource(R.string.paywall_privacy)) {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL)))
                     }
                 }
@@ -852,7 +853,7 @@ private fun PlanChoiceCard(
                 if (!subtitle.isNullOrBlank()) {
                     Text(
                         text = subtitle,
-                        color = if (title == "Yearly Plan") PaywallHeroBlue else PaywallTextSecondary,
+                        color = if (isMostPopular) PaywallHeroBlue else PaywallTextSecondary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
@@ -912,7 +913,7 @@ private fun TestimonialDetailSheet(testimonial: PaywallTestimonial) {
         TestimonialAvatar(testimonial = testimonial, size = 58)
 
         Text(
-            text = "\"${testimonial.quote}\"",
+            text = "\"${stringResource(testimonial.quoteRes)}\"",
             color = Color.Black.copy(alpha = 0.88f),
             fontSize = 18.sp,
             fontWeight = FontWeight.Medium,
@@ -937,7 +938,7 @@ private fun TestimonialDetailSheet(testimonial: PaywallTestimonial) {
                     .background(Color.Black.copy(alpha = 0.18f))
             )
             Text(
-                text = testimonial.age,
+                text = stringResource(testimonial.ageRes),
                 color = PaywallTextDark,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Black
@@ -945,7 +946,7 @@ private fun TestimonialDetailSheet(testimonial: PaywallTestimonial) {
         }
 
         Text(
-            text = testimonial.role,
+            text = stringResource(testimonial.roleRes),
             color = Color.Black.copy(alpha = 0.62f),
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium
@@ -1032,13 +1033,15 @@ private fun PlanInfo.billingSummary(): String {
     return stringResource(R.string.paywall_billed_summary, priceDisplay, period)
 }
 
+@Composable
 private fun PlanInfo.yearlyWeeklyPriceDisplay(): String {
-    val price = rcPackage?.product?.price ?: return "\$0.96/week"
+    val price = rcPackage?.product?.price
+        ?: return stringResource(R.string.paywall_price_per_week, "\$0.96")
     val weekly = price.amountMicros / 52.0 / 1_000_000.0
     val formatter = NumberFormat.getCurrencyInstance().apply {
         currency = Currency.getInstance(price.currencyCode)
     }
-    return "${formatter.format(weekly)}/week"
+    return stringResource(R.string.paywall_price_per_week, formatter.format(weekly))
 }
 
 // ---------- All Plans Bottom Sheet ----------
@@ -1108,7 +1111,7 @@ private fun AllPlansSheet(
                     yearlyPlan.priceDisplay
                 ),
                 trailingPrice = yearlyPlan.monthlyEquivalent ?: yearlyPlan.priceDisplay,
-                trailingLabel = "per month",
+                trailingLabel = stringResource(R.string.paywall_per_month),
                 isSelected = selectedPlan == PlanType.YEARLY,
                 onClick = { onSelectPlan(PlanType.YEARLY) }
             )
@@ -1120,7 +1123,7 @@ private fun AllPlansSheet(
                 title = stringResource(R.string.paywall_monthly),
                 subtitle = null,
                 trailingPrice = monthlyPlan.priceDisplay,
-                trailingLabel = "per month",
+                trailingLabel = stringResource(R.string.paywall_per_month),
                 isSelected = selectedPlan == PlanType.MONTHLY,
                 onClick = { onSelectPlan(PlanType.MONTHLY) }
             )

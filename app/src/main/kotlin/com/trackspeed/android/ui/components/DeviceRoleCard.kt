@@ -1,5 +1,6 @@
 package com.trackspeed.android.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.AccentNavy
 import com.trackspeed.android.ui.theme.TextSecondary
 import com.trackspeed.android.ui.theme.TextPrimary
@@ -29,22 +32,22 @@ import com.trackspeed.android.ui.theme.SurfaceDark
  * Role assigned to a device in a multi-device timing session.
  */
 enum class DeviceRole(
-    val displayName: String,
+    @StringRes val displayNameRes: Int,
     val icon: ImageVector,
     val color: Color
 ) {
     START(
-        displayName = "Start",
+        displayNameRes = R.string.device_role_start,
         icon = Icons.Outlined.PlayArrow,
         color = Color(0xFF30D158) // green
     ),
     FINISH(
-        displayName = "Finish",
+        displayNameRes = R.string.device_role_finish,
         icon = Icons.Outlined.Flag,
         color = Color(0xFFFFAB00) // amber
     ),
     SPLIT(
-        displayName = "Split",
+        displayNameRes = R.string.device_role_split,
         icon = Icons.Outlined.Timer,
         color = AccentNavy
     )
@@ -155,10 +158,10 @@ fun DeviceRoleCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = when {
-                        role != null -> role.displayName
-                        connectionState == DeviceConnectionState.CONNECTING -> "Connecting..."
-                        connectionState == DeviceConnectionState.CONNECTED -> "Tap to assign role"
-                        else -> "Disconnected"
+                        role != null -> stringResource(role.displayNameRes)
+                        connectionState == DeviceConnectionState.CONNECTING -> stringResource(R.string.device_role_connecting)
+                        connectionState == DeviceConnectionState.CONNECTED -> stringResource(R.string.device_role_tap_to_assign)
+                        else -> stringResource(R.string.device_role_disconnected)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = if (role != null) roleColor else TextSecondary

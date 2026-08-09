@@ -82,6 +82,7 @@ import com.trackspeed.android.ui.components.VoiceStartOverlaySettingsActions
 import com.trackspeed.android.ui.screens.settings.applyLanguage
 import com.trackspeed.android.ui.util.formatDistance
 import com.trackspeed.android.ui.util.formatTime
+import com.trackspeed.android.ui.util.localizedShortName
 import com.trackspeed.android.ui.util.parseAthleteColor
 import com.trackspeed.android.ui.theme.*
 import com.google.android.play.core.review.ReviewManagerFactory
@@ -107,6 +108,7 @@ fun BasicTimingScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isProUser by viewModel.isProUser.collectAsState()
     val context = LocalContext.current
+    val detectionLogFailedMessage = stringResource(R.string.settings_detection_log_failed)
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var expandedThumbnail by remember { mutableStateOf<ExpandedThumbnail?>(null) }
@@ -118,7 +120,7 @@ fun BasicTimingScreen(
     fun showDetectionLogError(error: Throwable) {
         Toast.makeText(
             context,
-            error.message ?: "Detection log action failed",
+            detectionLogFailedMessage,
             Toast.LENGTH_LONG
         ).show()
     }
@@ -210,8 +212,11 @@ fun BasicTimingScreen(
     // Pro feature gate dialog for start modes
     proGateDialogMode?.let { mode ->
         ProFeatureGateDialog(
-            featureName = "${mode.displayName} Start",
-            featureDescription = mode.description,
+            featureName = stringResource(
+                R.string.pro_feature_start_name,
+                stringResource(mode.displayNameRes)
+            ),
+            featureDescription = stringResource(mode.descriptionRes),
             onUpgrade = {
                 proGateDialogMode = null
                 onPaywallClick()
@@ -225,8 +230,8 @@ fun BasicTimingScreen(
     // Paywall prompt when free session limit reached
     if (uiState.showPaywallPrompt) {
         ProFeatureGateDialog(
-            featureName = "Unlimited Sessions",
-            featureDescription = "You've reached the free session limit. Upgrade to Pro to save unlimited training sessions.",
+            featureName = stringResource(R.string.pro_feature_unlimited_sessions),
+            featureDescription = stringResource(R.string.pro_feature_unlimited_sessions_desc),
             onUpgrade = {
                 viewModel.onPaywallPromptConsumed()
                 onPaywallClick()
@@ -611,7 +616,7 @@ private fun SessionSettingsSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Session Settings",
+                    text = stringResource(R.string.session_settings_title),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = TextPrimary,
                     modifier = Modifier.weight(1f)
@@ -621,7 +626,7 @@ private fun SessionSettingsSheet(
                 }
             }
 
-            SessionSheetSection(title = "Test Type") {
+            SessionSheetSection(title = stringResource(R.string.session_settings_test_type)) {
                 StartType.entries.chunked(2).forEach { row ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -629,8 +634,8 @@ private fun SessionSettingsSheet(
                     ) {
                         row.forEach { type ->
                             SessionSettingsChip(
-                                title = type.shortName,
-                                subtitle = if (type.isPro) "PRO" else null,
+                                title = type.localizedShortName(),
+                                subtitle = if (type.isPro) stringResource(R.string.common_pro_badge) else null,
                                 selected = pendingStartType == type.rawValue,
                                 onClick = { pendingStartType = type.rawValue },
                                 modifier = Modifier.weight(1f)
@@ -643,7 +648,7 @@ private fun SessionSettingsSheet(
                 }
             }
 
-            SessionSheetSection(title = "Distance") {
+            SessionSheetSection(title = stringResource(R.string.setup_distance)) {
                 val distancePresets = listOf(5, 10, 20, 30, 40, 50, 60, 100)
                 distancePresets.chunked(4).forEach { row ->
                     Row(
@@ -668,8 +673,8 @@ private fun SessionSettingsSheet(
                         pendingDistanceText = filtered
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Custom distance", color = TextSecondary) },
-                    suffix = { Text("m", color = TextSecondary) },
+                    label = { Text(stringResource(R.string.setup_custom_distance), color = TextSecondary) },
+                    suffix = { Text(stringResource(R.string.common_meters_abbreviation), color = TextSecondary) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -683,12 +688,14 @@ private fun SessionSettingsSheet(
             }
 
             SessionSheetSection(
-                title = "Active Athlete",
-                trailing = if (pendingAthleteIds.isNotEmpty()) "${pendingAthleteIds.size} selected" else null
+                title = stringResource(R.string.session_settings_active_athlete),
+                trailing = if (pendingAthleteIds.isNotEmpty()) {
+                    stringResource(R.string.common_selected_count, pendingAthleteIds.size)
+                } else null
             ) {
                 if (athletes.isEmpty()) {
                     Text(
-                        text = "No athletes added yet",
+                        text = stringResource(R.string.session_settings_no_athletes),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextMuted,
                         modifier = Modifier
@@ -713,7 +720,7 @@ private fun SessionSettingsSheet(
                 }
             }
 
-            SessionSheetSection(title = "Performance") {
+            SessionSheetSection(title = stringResource(R.string.session_settings_performance)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -725,7 +732,7 @@ private fun SessionSettingsSheet(
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        text = "Start Sound",
+                        text = stringResource(R.string.session_settings_start_sound),
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                         color = TextPrimary
                     )
@@ -737,7 +744,7 @@ private fun SessionSettingsSheet(
                 ) {
                     StartSoundType.selectable.forEach { soundType ->
                         SessionSettingsChip(
-                            title = soundType.displayName,
+                            title = stringResource(soundType.displayNameRes),
                             selected = pendingStartSoundType == soundType.rawValue,
                             onClick = { pendingStartSoundType = soundType.rawValue },
                             modifier = Modifier.weight(1f)
@@ -746,7 +753,9 @@ private fun SessionSettingsSheet(
                 }
 
                 Text(
-                    text = StartSoundType.fromRawValue(pendingStartSoundType).subtitle,
+                    text = stringResource(
+                        StartSoundType.fromRawValue(pendingStartSoundType).subtitleRes
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = TextMuted
                 )
@@ -761,12 +770,12 @@ private fun SessionSettingsSheet(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Show Speed",
+                            text = stringResource(R.string.session_settings_show_speed),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                             color = TextPrimary
                         )
                         Text(
-                            text = "Display speed in live timing and run results.",
+                            text = stringResource(R.string.session_settings_show_speed_live_desc),
                             style = MaterialTheme.typography.labelSmall,
                             color = TextMuted
                         )
@@ -785,10 +794,10 @@ private fun SessionSettingsSheet(
             }
 
             if (BuildConfig.DEBUG) {
-                SessionSheetSection(title = "Detection Debug") {
+                SessionSheetSection(title = stringResource(R.string.session_settings_detection_debug)) {
                     SessionSettingsToggleRow(
-                        title = "Detection Review Logging",
-                        subtitle = "Show review controls and keep detector diagnostics active.",
+                        title = stringResource(R.string.settings_detection_review_logging),
+                        subtitle = stringResource(R.string.session_settings_detection_review_desc),
                         checked = pendingDiagnosticsEnabled,
                         onCheckedChange = { pendingDiagnosticsEnabled = it }
                     )
@@ -796,8 +805,8 @@ private fun SessionSettingsSheet(
                     HorizontalDivider(color = DividerColor)
 
                     SessionSettingsToggleRow(
-                        title = "Auto Upload Logs",
-                        subtitle = "Upload a backend snapshot after timing ends and after manual markers.",
+                        title = stringResource(R.string.session_settings_auto_upload_logs),
+                        subtitle = stringResource(R.string.session_settings_auto_upload_logs_desc),
                         checked = pendingReviewAutoUploadEnabled,
                         onCheckedChange = { pendingReviewAutoUploadEnabled = it }
                     )
@@ -805,8 +814,8 @@ private fun SessionSettingsSheet(
                     HorizontalDivider(color = DividerColor)
 
                     SessionSettingsToggleRow(
-                        title = "Camera Timing Summaries",
-                        subtitle = "Log frame callback timing summaries while timing.",
+                        title = stringResource(R.string.settings_camera_timing_summaries),
+                        subtitle = stringResource(R.string.session_settings_camera_summaries_desc),
                         checked = pendingCameraPerformanceDiagnosticsEnabled,
                         onCheckedChange = { pendingCameraPerformanceDiagnosticsEnabled = it }
                     )
@@ -815,8 +824,10 @@ private fun SessionSettingsSheet(
 
                     SessionSettingsActionRow(
                         icon = Icons.Filled.CheckCircle,
-                        title = if (detectionLogBusy) "Working..." else "Save Detection Log File",
-                        subtitle = "Share the current per-session detection log from this phone.",
+                        title = stringResource(
+                            if (detectionLogBusy) R.string.common_working else R.string.settings_save_detection_log
+                        ),
+                        subtitle = stringResource(R.string.session_settings_save_log_desc),
                         enabled = !detectionLogBusy,
                         onClick = onDetectionLogExport
                     )
@@ -825,8 +836,10 @@ private fun SessionSettingsSheet(
 
                     SessionSettingsActionRow(
                         icon = Icons.Filled.Sync,
-                        title = if (detectionLogBusy) "Working..." else "Upload Detection Log",
-                        subtitle = "Upload the current log and share a temporary backend link.",
+                        title = stringResource(
+                            if (detectionLogBusy) R.string.common_working else R.string.settings_upload_detection_log
+                        ),
+                        subtitle = stringResource(R.string.session_settings_upload_log_desc),
                         enabled = !detectionLogBusy,
                         onClick = onDetectionLogUpload
                     )
@@ -859,14 +872,14 @@ private fun SessionSettingsSheet(
                 ),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Save Changes", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.common_save_changes), fontWeight = FontWeight.Bold)
             }
 
             TextButton(
                 onClick = onEndSession,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("End Session", color = StatusRed, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.common_end_session), color = StatusRed, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -1054,7 +1067,11 @@ private fun SessionAthleteRow(
 
         Icon(
             imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-            contentDescription = if (selected) "Selected" else "Not selected",
+            contentDescription = if (selected) {
+                stringResource(R.string.common_selected)
+            } else {
+                stringResource(R.string.common_not_selected)
+            },
             tint = if (selected) athleteColor else TextMuted,
             modifier = Modifier.size(22.dp)
         )
@@ -1388,7 +1405,9 @@ private fun ActiveAthleteChipBar(
     runCounts: Map<String, Int>,
     onAthleteSelected: (String) -> Unit
 ) {
-    if (athletes.isEmpty()) return
+    if (athletes.isEmpty()) {
+        return
+    }
 
     LazyRow(
         modifier = Modifier
@@ -1455,7 +1474,7 @@ private fun ActiveAthleteChip(
                 maxLines = 1
             )
             Text(
-                text = "$runCount run${if (runCount == 1) "" else "s"}",
+                text = pluralStringResource(R.plurals.session_run_count, runCount, runCount),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isSelected) TextSecondary else TextMuted,
                 maxLines = 1
@@ -2449,7 +2468,7 @@ private fun BottomButtonBar(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = startMode.displayName,
+                        text = stringResource(startMode.displayNameRes),
                         color = TextSecondary,
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Medium
@@ -2516,7 +2535,12 @@ private fun shareDetectionLogFile(context: Context, uri: Uri) {
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(shareIntent, "Save Detection Log"))
+    context.startActivity(
+        Intent.createChooser(
+            shareIntent,
+            context.getString(R.string.settings_save_detection_log_chooser)
+        )
+    )
 }
 
 private fun shareDetectionLogUrl(context: Context, signedUrl: String) {
@@ -2524,5 +2548,10 @@ private fun shareDetectionLogUrl(context: Context, signedUrl: String) {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, signedUrl)
     }
-    context.startActivity(Intent.createChooser(shareIntent, "Share Detection Log URL"))
+    context.startActivity(
+        Intent.createChooser(
+            shareIntent,
+            context.getString(R.string.settings_share_detection_log_chooser)
+        )
+    )
 }

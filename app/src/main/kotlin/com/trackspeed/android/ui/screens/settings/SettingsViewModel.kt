@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.R
 import com.trackspeed.android.audio.ElevenLabsService
 import com.trackspeed.android.audio.ElevenLabsVoiceId
 import com.trackspeed.android.audio.VoiceProvider
@@ -12,7 +13,6 @@ import com.trackspeed.android.billing.SubscriptionManager
 import com.trackspeed.android.data.repository.SettingsRepository
 import com.trackspeed.android.diagnostics.DetectionReviewLogStore
 import com.trackspeed.android.diagnostics.LogExporter
-import com.trackspeed.android.model.StartType
 import com.trackspeed.android.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -63,11 +63,6 @@ data class SettingsUiState(
             else -> "${defaultDistance.toInt()}m"
         }
 
-    /**
-     * Returns a display-friendly start type label.
-     */
-    val startTypeLabel: String
-        get() = StartType.fromRawValue(startType).displayName
 }
 
 @HiltViewModel
@@ -311,7 +306,7 @@ class SettingsViewModel @Inject constructor(
             if (voiceProvider == VoiceProvider.ELEVEN_LABS) {
                 val voiceId = ElevenLabsVoiceId.fromString(state.elevenLabsVoice)
                 val audioData = elevenLabsService.generateSpeech(
-                    text = "On your marks. Set. Go!",
+                    text = context.getString(R.string.voice_preview_script),
                     voiceId = voiceId
                 )
                 if (audioData != null) {

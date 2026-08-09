@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
+import com.trackspeed.android.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -98,9 +99,12 @@ class ContactsService @Inject constructor(
     }
 
     fun inviteMessage(referralCode: String, referralLink: String): String {
-        return "Join me on TrackSpeed and use my code $referralCode to get started!\n\n" +
-            "Download for iOS: https://apps.apple.com/app/trackspeed/id6757509163\n" +
-            "Download for Android: https://play.google.com/store/apps/details?id=com.trackspeed.android\n\n" +
+        return context.getString(
+            R.string.referral_share_message,
+            referralCode,
+            "https://apps.apple.com/app/trackspeed/id6757509163",
+            "https://play.google.com/store/apps/details?id=com.trackspeed.android",
             referralLink
+        )
     }
 }

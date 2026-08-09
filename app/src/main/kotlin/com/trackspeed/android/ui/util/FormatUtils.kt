@@ -1,6 +1,10 @@
 package com.trackspeed.android.ui.util
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.trackspeed.android.R
 import com.trackspeed.android.util.HistoryDistanceFormatter
 
 fun parseAthleteColor(colorStr: String): Color {
@@ -37,11 +41,22 @@ fun formatDistance(distance: Double): String {
     return HistoryDistanceFormatter.labelForMeters(distance)
 }
 
+@Composable
 fun formatSessionMode(numberOfPhones: Int, numberOfGates: Int): String {
+    val phones = pluralStringResource(
+        R.plurals.session_mode_phone_count,
+        numberOfPhones,
+        numberOfPhones
+    )
     return if (numberOfGates > 2) {
-        "$numberOfPhones-Phone, $numberOfGates Gates"
+        val gates = pluralStringResource(
+            R.plurals.session_mode_gate_count,
+            numberOfGates,
+            numberOfGates
+        )
+        stringResource(R.string.session_mode_with_gates, phones, gates)
     } else {
-        "$numberOfPhones-Phone"
+        phones
     }
 }
 

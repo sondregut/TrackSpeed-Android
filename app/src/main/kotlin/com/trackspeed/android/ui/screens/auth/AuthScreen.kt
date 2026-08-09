@@ -72,8 +72,8 @@ fun AuthScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            if (state.isSignUp) "Create an account to sync your data and unlock cloud features."
-            else "Sign in to access your account.",
+            if (state.isSignUp) stringResource(R.string.auth_sign_up_subtitle)
+            else stringResource(R.string.auth_sign_in_subtitle),
             fontSize = 15.sp, color = TextSecondary, lineHeight = 22.sp
         )
         Spacer(Modifier.height(32.dp))
@@ -108,7 +108,7 @@ fun AuthScreen(
             value = state.email,
             onValueChange = { viewModel.updateEmail(it) },
             label = { Text(stringResource(R.string.auth_email)) },
-            placeholder = { Text("you@example.com", color = TextMuted) },
+            placeholder = { Text(stringResource(R.string.auth_email_placeholder), color = TextMuted) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(

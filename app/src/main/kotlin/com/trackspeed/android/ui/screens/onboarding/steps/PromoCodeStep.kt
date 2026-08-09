@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.billing.PromoCodeType
 import com.trackspeed.android.ui.screens.onboarding.PromoRedemptionState
+import com.trackspeed.android.ui.screens.onboarding.PromoRedemptionError
 import com.trackspeed.android.ui.theme.*
 
 private val ErrorRed = Color(0xFFFF5252)
@@ -149,7 +150,7 @@ fun PromoCodeStep(
                             strokeWidth = 2.dp
                         )
                         Text(
-                            text = "Verifying code...",
+                            text = stringResource(R.string.onboarding_promo_verifying),
                             fontSize = 14.sp,
                             color = TextSecondary
                         )
@@ -192,7 +193,17 @@ fun PromoCodeStep(
                             tint = ErrorRed
                         )
                         Text(
-                            text = redemptionState.message,
+                            text = stringResource(
+                                when (redemptionState.reason) {
+                                    PromoRedemptionError.INVALID -> R.string.onboarding_promo_error_invalid
+                                    PromoRedemptionError.EXPIRED -> R.string.onboarding_promo_error_expired
+                                    PromoRedemptionError.MAX_USES -> R.string.onboarding_promo_error_max_uses
+                                    PromoRedemptionError.ALREADY_REDEEMED -> R.string.onboarding_promo_error_redeemed
+                                    PromoRedemptionError.RATE_LIMITED -> R.string.onboarding_promo_error_rate_limited
+                                    PromoRedemptionError.NETWORK -> R.string.onboarding_promo_error_network
+                                    PromoRedemptionError.GENERIC -> R.string.onboarding_promo_error_generic
+                                }
+                            ),
                             fontSize = 14.sp,
                             color = ErrorRed
                         )
@@ -235,7 +246,7 @@ fun PromoCodeStep(
                     text = when {
                         promoCode.isBlank() -> stringResource(R.string.common_skip)
                         isSuccess -> stringResource(R.string.common_continue)
-                        else -> "Apply Code"
+                        else -> stringResource(R.string.onboarding_promo_apply_code)
                     },
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,

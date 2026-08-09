@@ -22,6 +22,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import com.trackspeed.android.ui.theme.AccentNavy
 import com.trackspeed.android.ui.theme.BorderSubtle
 import com.trackspeed.android.ui.theme.SurfaceDark
@@ -115,7 +116,7 @@ fun AthleteChipSelector(
 
             // "No Athlete" chip
             AthleteChip(
-                name = "No Athlete",
+                name = stringResource(R.string.athlete_chip_no_athlete),
                 initial = "?",
                 chipColor = TextSecondary,
                 isSelected = selectedIds.isEmpty(),
@@ -205,7 +206,11 @@ private fun AthleteChip(
             )
             if (runCount != null) {
                 Text(
-                    text = "$runCount run${if (runCount != 1) "s" else ""}",
+                    text = pluralStringResource(
+                        R.plurals.athlete_chip_run_count,
+                        runCount,
+                        runCount
+                    ),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                     color = if (isSelected) Color.White.copy(alpha = 0.7f) else TextSecondary
                 )

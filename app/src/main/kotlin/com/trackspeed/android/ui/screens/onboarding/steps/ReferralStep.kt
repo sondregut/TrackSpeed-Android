@@ -182,7 +182,12 @@ fun ReferralStep(
                     Surface(
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Referral Link", referralLink))
+                            clipboard.setPrimaryClip(
+                                ClipData.newPlainText(
+                                    context.getString(R.string.onboarding_referral_clipboard_label),
+                                    referralLink
+                                )
+                            )
                             copiedLink = true
                         },
                         color = if (copiedLink)

@@ -1,5 +1,6 @@
 package com.trackspeed.android.ui.components
 
+import androidx.annotation.StringRes
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
@@ -102,19 +103,19 @@ data class DetectionReviewSubmission(
 
 private data class ReviewIssue(
     val rawValue: String,
-    val label: String
+    @StringRes val labelRes: Int
 )
 
 private val reviewIssues = listOf(
-    ReviewIssue("good", "Good"),
-    ReviewIssue("early", "Early"),
-    ReviewIssue("late", "Late"),
-    ReviewIssue("arm", "Arm"),
-    ReviewIssue("leg", "Leg"),
-    ReviewIssue("wrongFrame", "Wrong frame"),
-    ReviewIssue("blur", "Blur"),
-    ReviewIssue("thumbnail", "Thumbnail"),
-    ReviewIssue("other", "Other")
+    ReviewIssue("good", R.string.thumbnail_review_good),
+    ReviewIssue("early", R.string.thumbnail_review_early),
+    ReviewIssue("late", R.string.thumbnail_review_late),
+    ReviewIssue("arm", R.string.thumbnail_review_arm),
+    ReviewIssue("leg", R.string.thumbnail_review_leg),
+    ReviewIssue("wrongFrame", R.string.thumbnail_review_wrong_frame),
+    ReviewIssue("blur", R.string.thumbnail_review_blur),
+    ReviewIssue("thumbnail", R.string.thumbnail_review_thumbnail),
+    ReviewIssue("other", R.string.thumbnail_review_other)
 )
 
 /**
@@ -475,7 +476,7 @@ private fun ReviewControls(
             .padding(12.dp)
     ) {
         Text(
-            text = "Tag this crossing",
+            text = stringResource(R.string.thumbnail_review_title),
             style = MaterialTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.72f)
         )
@@ -490,7 +491,7 @@ private fun ReviewControls(
                 FilterChip(
                     selected = selectedIssue == issue.rawValue,
                     onClick = { onIssueSelected(issue.rawValue) },
-                    label = { Text(issue.label) },
+                    label = { Text(stringResource(issue.labelRes)) },
                     modifier = Modifier.padding(end = 8.dp)
                 )
             }
@@ -502,7 +503,7 @@ private fun ReviewControls(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp),
-            label = { Text("Add a note") },
+            label = { Text(stringResource(R.string.thumbnail_review_note)) },
             maxLines = 3
         )
 
@@ -513,7 +514,7 @@ private fun ReviewControls(
                 .align(Alignment.End)
                 .padding(top = 8.dp)
         ) {
-            Text("Submit")
+            Text(stringResource(R.string.common_submit))
         }
     }
 }

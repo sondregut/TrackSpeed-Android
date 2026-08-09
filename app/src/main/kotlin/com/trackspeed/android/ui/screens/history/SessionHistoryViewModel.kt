@@ -1,14 +1,17 @@
 package com.trackspeed.android.ui.screens.history
 
 import android.net.Uri
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.data.export.CsvExporter
+import com.trackspeed.android.R
 import com.trackspeed.android.data.local.entities.TrainingSessionEntity
 import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.model.StartType
 import com.trackspeed.android.util.HistoryDistanceFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -70,6 +73,7 @@ data class HistoryStats(
 
 @HiltViewModel
 class SessionHistoryViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val sessionRepository: SessionRepository,
     private val csvExporter: CsvExporter
 ) : ViewModel() {
@@ -100,7 +104,7 @@ class SessionHistoryViewModel @Inject constructor(
     val distanceFilters: StateFlow<List<DistanceFilter>> =
         sessionRepository.getDistinctDistances()
             .map { distances ->
-                val filters = mutableListOf(DistanceFilter("All", null))
+                val filters = mutableListOf(DistanceFilter("", null))
                 distances.forEach { d ->
                     val label = formatDistanceLabel(d)
                     filters.add(DistanceFilter(label, d))
@@ -114,13 +118,13 @@ class SessionHistoryViewModel @Inject constructor(
             )
 
     // Dynamic start type filters
-    val startTypeFilters: StateFlow<List<String>> =
+    val startTypeFilters: StateFlow<List<StartType>> =
         sessionRepository.getDistinctStartTypes()
-            .map { types -> listOf("All") + types.map { StartType.fromRawValue(it).displayName } }
+            .map { types -> types.map { StartType.fromRawValue(it) }.distinct() }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = listOf("All")
+                initialValue = emptyList()
             )
 
     // Header stats
@@ -324,24 +328,42 @@ class SessionHistoryViewModel @Inject constructor(
             .sortedBy { HistoryDistanceFormatter.descriptor(it.value.distance).sortMeters }
 
         return buildString {
-            appendLine("Sprint Training Summary")
+            appendLine(context.getString(R.string.history_summary_title))
             appendLine("========================")
             appendLine()
-            appendLine("Total Sessions: ${sessions.size}")
-            appendLine("Total Runs: ${runs.size}")
+            appendLine(
+                context.resources.getQuantityString(
+                    R.plurals.history_summary_total_sessions,
+                    sessions.size,
+                    sessions.size
+                )
+            )
+            appendLine(
+                context.resources.getQuantityString(
+                    R.plurals.history_summary_total_runs,
+                    runs.size,
+                    runs.size
+                )
+            )
             appendLine()
 
             if (bestByDistance.isNotEmpty()) {
-                appendLine("Best Times:")
+                appendLine(context.getString(R.string.history_summary_best_times))
                 bestByDistance.forEach { entry ->
                     val run = entry.value
                     val descriptor = HistoryDistanceFormatter.descriptor(run.distance)
-                    appendLine("  ${descriptor.label}: ${formatSeconds(run.timeSeconds)}s")
+                    appendLine(
+                        context.getString(
+                            R.string.history_summary_time,
+                            descriptor.label,
+                            formatSeconds(run.timeSeconds)
+                        )
+                    )
                 }
             }
 
             appendLine()
-            append("Recorded with TrackSpeed")
+            append(context.getString(R.string.history_summary_recorded_with))
         }
     }
 

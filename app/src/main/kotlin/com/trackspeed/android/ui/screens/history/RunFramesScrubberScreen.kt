@@ -195,7 +195,7 @@ fun RunFramesScrubberScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Frame Scrubber", color = TextPrimary)
+                        Text(stringResource(R.string.frame_scrubber_title), color = TextPrimary)
                         uiState.run?.localGateRole?.takeIf { it.isNotBlank() }?.let { role ->
                             Text(
                                 text = role.replaceFirstChar { it.titlecase(Locale.US) },
@@ -218,7 +218,13 @@ fun RunFramesScrubberScreen(
                     IconButton(onClick = { showOverlays = !showOverlays }) {
                         Icon(
                             imageVector = if (showOverlays) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = if (showOverlays) "Hide overlays" else "Show overlays",
+                            contentDescription = stringResource(
+                                if (showOverlays) {
+                                    R.string.frame_scrubber_hide_overlays_cd
+                                } else {
+                                    R.string.frame_scrubber_show_overlays_cd
+                                }
+                            ),
                             tint = if (showOverlays) TextPrimary else TextMuted
                         )
                     }
@@ -232,8 +238,8 @@ fun RunFramesScrubberScreen(
             uiState.isLoading -> LoadingScrubber(paddingValues)
             run == null -> EmptyScrubberState(
                 paddingValues = paddingValues,
-                title = "Run not found",
-                message = "This run is no longer available."
+                title = stringResource(R.string.frame_scrubber_run_missing_title),
+                message = stringResource(R.string.frame_scrubber_run_missing_body)
             )
             frames.isNotEmpty() -> FrameScrubberContent(
                 paddingValues = paddingValues,
@@ -250,8 +256,8 @@ fun RunFramesScrubberScreen(
             )
             else -> EmptyScrubberState(
                 paddingValues = paddingValues,
-                title = "No frame data available",
-                message = "This run has no saved local gate frames."
+                title = stringResource(R.string.frame_scrubber_no_data_title),
+                message = stringResource(R.string.frame_scrubber_no_data_body)
             )
         }
     }
@@ -388,7 +394,7 @@ private fun FrameImagePanel(
             if (currentBitmap != null) {
                 Image(
                     bitmap = currentBitmap.asImageBitmap(),
-                    contentDescription = "Gate frame",
+                    contentDescription = stringResource(R.string.frame_scrubber_gate_frame_cd),
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -444,7 +450,7 @@ private fun FrameImagePanel(
                         tint = TextMuted,
                         modifier = Modifier.size(36.dp)
                     )
-                    Text("Frame image unavailable", color = TextSecondary)
+                    Text(stringResource(R.string.frame_scrubber_image_unavailable), color = TextSecondary)
                     Text(
                         text = frame.imagePath,
                         style = MaterialTheme.typography.labelSmall,
@@ -481,15 +487,17 @@ private fun CrossingMetricsStrip(
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MetricLabel("Occ", percent(frame.occupancy.toDouble()))
-            MetricLabel("Run", frame.longestRun.toString())
-            MetricLabel("Vel", run.crossingVelocityLabel())
+            MetricLabel(stringResource(R.string.frame_scrubber_metric_occupancy_short), percent(frame.occupancy.toDouble()))
+            MetricLabel(stringResource(R.string.frame_scrubber_metric_run_short), frame.longestRun.toString())
+            MetricLabel(stringResource(R.string.frame_scrubber_metric_velocity_short), run.crossingVelocityLabel())
             run.finishInterpolationAlpha?.let { MetricLabel("alpha", decimal(it)) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             run.finishS0?.let { MetricLabel("s0", decimal(it)) }
             run.finishS1?.let { MetricLabel("s1", decimal(it)) }
-            (run.finishCrossingDirection ?: run.startCrossingDirection)?.let { MetricLabel("Dir", it) }
+            (run.finishCrossingDirection ?: run.startCrossingDirection)?.let {
+                MetricLabel(stringResource(R.string.frame_scrubber_metric_direction_short), it)
+            }
         }
     }
 }
@@ -534,12 +542,19 @@ private fun FrameSummaryRow(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
-                    text = "Frame ${currentIndex + 1} / $frameCount",
+                    text = stringResource(
+                        R.string.frame_scrubber_frame_position,
+                        currentIndex + 1,
+                        frameCount
+                    ),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = TextPrimary
                 )
                 Text(
-                    text = "Occupancy ${percent(frame.occupancy.toDouble())}",
+                    text = stringResource(
+                        R.string.frame_scrubber_occupancy_value,
+                        percent(frame.occupancy.toDouble())
+                    ),
                     style = MaterialTheme.typography.labelMedium,
                     color = TextSecondary
                 )
@@ -552,10 +567,10 @@ private fun FrameSummaryRow(
 @Composable
 private fun FrameStateBadge(frame: LocalGateFrameData, isCrossingFrame: Boolean) {
     val (label, color) = when {
-        isCrossingFrame -> "CROSSING" to ScrubberWarning
-        frame.occupancy >= 0.15f -> "IN FRAME" to ScrubberGreen
-        frame.isTracking -> "TRACKING" to AccentBlue
-        else -> "CLEAR" to TextMuted
+        isCrossingFrame -> stringResource(R.string.frame_scrubber_status_crossing) to ScrubberWarning
+        frame.occupancy >= 0.15f -> stringResource(R.string.frame_scrubber_status_in_frame) to ScrubberGreen
+        frame.isTracking -> stringResource(R.string.frame_scrubber_status_tracking) to AccentBlue
+        else -> stringResource(R.string.frame_scrubber_status_clear) to TextMuted
     }
     Text(
         text = label,
@@ -637,12 +652,12 @@ private fun CalibrationSnapshotContent(
     ) {
         item {
             Text(
-                text = "Calibration snapshots",
+                text = stringResource(R.string.frame_scrubber_calibration_title),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = TextPrimary
             )
             Text(
-                text = "This run has gate calibration metadata but no saved frame images.",
+                text = stringResource(R.string.frame_scrubber_calibration_body),
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
                 modifier = Modifier.padding(top = 4.dp)
@@ -680,12 +695,16 @@ private fun CalibrationSnapshotCard(snapshot: LocalGateCalibrationSnapshot) {
                 }
                 Column {
                     Text(
-                        text = snapshot.role.ifBlank { "Gate" },
+                        text = snapshot.role.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.frame_scrubber_gate_default),
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                         color = TextPrimary
                     )
                     Text(
-                        text = "Gate position ${percent(snapshot.gatePosition)}",
+                        text = stringResource(
+                            R.string.frame_scrubber_gate_position,
+                            percent(snapshot.gatePosition)
+                        ),
                         style = MaterialTheme.typography.labelMedium,
                         color = TextSecondary
                     )
@@ -695,9 +714,19 @@ private fun CalibrationSnapshotCard(snapshot: LocalGateCalibrationSnapshot) {
             HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
 
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                SnapshotMetric("Velocity", "${decimal(snapshot.velocityPxPerSec, 0)} px/s")
-                snapshot.workWidth?.let { SnapshotMetric("Work width", it.toString()) }
-                snapshot.crossingDirection?.let { SnapshotMetric("Direction", it) }
+                SnapshotMetric(
+                    stringResource(R.string.frame_scrubber_velocity),
+                    stringResource(
+                        R.string.frame_scrubber_velocity_value,
+                        decimal(snapshot.velocityPxPerSec, 0)
+                    )
+                )
+                snapshot.workWidth?.let {
+                    SnapshotMetric(stringResource(R.string.frame_scrubber_work_width), it.toString())
+                }
+                snapshot.crossingDirection?.let {
+                    SnapshotMetric(stringResource(R.string.frame_scrubber_direction), it)
+                }
             }
         }
     }

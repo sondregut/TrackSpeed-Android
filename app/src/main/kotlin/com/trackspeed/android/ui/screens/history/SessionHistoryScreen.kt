@@ -63,6 +63,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import com.trackspeed.android.model.StartType
+import com.trackspeed.android.ui.util.localizedDisplayName
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -230,7 +231,13 @@ fun SessionHistoryScreen(
         // Distance filter chips (Task 4 - dynamic)
         FilterChipRow(
             label = stringResource(R.string.session_history_filter_distance),
-            options = distanceFilters.map { it.label },
+            options = distanceFilters.map { filter ->
+                if (filter.distance == null) {
+                    stringResource(R.string.session_history_filter_all)
+                } else {
+                    filter.label
+                }
+            },
             selectedIndex = distanceFilters.indexOfFirst { it.distance == filterDistance },
             onSelected = { index ->
                 viewModel.setFilterDistance(distanceFilters[index].distance)
@@ -240,15 +247,22 @@ fun SessionHistoryScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         // Start type filter chips (Task 5)
-        if (startTypeFilters.size > 1) {
+        if (startTypeFilters.isNotEmpty()) {
+            val startTypeOptions = listOf(stringResource(R.string.session_history_filter_all)) +
+                startTypeFilters.map { it.localizedDisplayName() }
             FilterChipRow(
                 label = stringResource(R.string.session_history_filter_start_type),
-                options = startTypeFilters,
-                selectedIndex = if (filterStartType == null) 0 else
-                    startTypeFilters.indexOfFirst { it.equals(filterStartType, ignoreCase = true) },
+                options = startTypeOptions,
+                selectedIndex = if (filterStartType == null) {
+                    0
+                } else {
+                    startTypeFilters.indexOfFirst {
+                        it.rawValue.equals(filterStartType, ignoreCase = true)
+                    } + 1
+                },
                 onSelected = { index ->
                     viewModel.setFilterStartType(
-                        if (index == 0) null else startTypeFilters[index].lowercase()
+                        if (index == 0) null else startTypeFilters[index - 1].rawValue
                     )
                 }
             )
@@ -746,7 +760,7 @@ private fun SessionCard(
                         )
                     }
                     Text(
-                        text = StartType.fromRawValue(session.startType).displayName,
+                        text = StartType.fromRawValue(session.startType).localizedDisplayName(),
                         style = MaterialTheme.typography.labelSmall,
                         color = TextMuted
                     )
@@ -766,7 +780,10 @@ private fun SessionCard(
                 if (cardData.bestTime != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "${formatTime(cardData.bestTime)}s",
+                        text = stringResource(
+                            R.string.common_seconds_value,
+                            formatTime(cardData.bestTime)
+                        ),
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold

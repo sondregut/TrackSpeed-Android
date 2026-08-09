@@ -326,7 +326,10 @@ fun ThemeSelector(
                 if (isSelected) {
                     Icon(
                         imageVector = Icons.Default.Check,
-                        contentDescription = stringResource(R.string.share_theme_selected_cd, theme.displayName),
+                        contentDescription = stringResource(
+                            R.string.share_theme_selected_cd,
+                            stringResource(theme.displayNameRes)
+                        ),
                         tint = Color.White,
                         modifier = Modifier.size(16.dp)
                     )

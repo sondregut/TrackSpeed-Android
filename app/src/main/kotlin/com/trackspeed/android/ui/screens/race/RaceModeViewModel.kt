@@ -13,6 +13,7 @@ import android.view.Surface
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.R
 import com.trackspeed.android.analytics.AnalyticsEvent
 import com.trackspeed.android.analytics.AnalyticsService
 import com.trackspeed.android.camera.CameraManager
@@ -422,7 +423,7 @@ class RaceModeViewModel @Inject constructor(
                             }
                         )
                         is ClockSyncManager.SyncState.Error -> current.copy(
-                            errorMessage = syncState.message
+                            errorMessage = context.getString(R.string.race_error_clock_sync)
                         )
                     }
                 }
@@ -439,9 +440,9 @@ class RaceModeViewModel @Inject constructor(
                             _uiState.update {
                                 it.copy(
                                     pairingStatus = pairingStatusForMode(
-                                        joinStatus = "Scanning for host phone",
-                                        hostStatus = "Waiting for phones on Join Session",
-                                        defaultStatus = "scanning"
+                                        joinStatus = context.getString(R.string.race_pairing_status_scanning_host),
+                                        hostStatus = context.getString(R.string.race_pairing_status_waiting_joiners),
+                                        defaultStatus = context.getString(R.string.race_pairing_status_scanning)
                                     )
                                 )
                             }
@@ -451,9 +452,9 @@ class RaceModeViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 pairingStatus = pairingStatusForMode(
-                                    joinStatus = "Connecting to host phone",
-                                    hostStatus = "Connecting timing phone",
-                                    defaultStatus = "connecting"
+                                    joinStatus = context.getString(R.string.race_pairing_status_connecting_host),
+                                    hostStatus = context.getString(R.string.race_pairing_status_connecting_phone),
+                                    defaultStatus = context.getString(R.string.race_pairing_status_connecting)
                                 )
                             )
                         }
@@ -468,7 +469,7 @@ class RaceModeViewModel @Inject constructor(
                         }
                         _uiState.update {
                             it.copy(
-                                pairingStatus = "connected",
+                                pairingStatus = context.getString(R.string.race_pairing_status_connected),
                                 isDeviceConnected = true,
                                 role = resolvedRole ?: it.role,
                                 isHostingSession = isServer,
@@ -516,8 +517,8 @@ class RaceModeViewModel @Inject constructor(
                     is BleClockSyncService.State.Error -> {
                         _uiState.update {
                             it.copy(
-                                errorMessage = bleState.message,
-                                pairingStatus = "error"
+                                errorMessage = context.getString(R.string.race_error_connection),
+                                pairingStatus = context.getString(R.string.race_pairing_status_error)
                             )
                         }
                     }
@@ -529,9 +530,9 @@ class RaceModeViewModel @Inject constructor(
                             _uiState.update {
                                 it.copy(
                                     pairingStatus = pairingStatusForMode(
-                                        joinStatus = "Scanning for host phone",
-                                        hostStatus = "Waiting for phones on Join Session",
-                                        defaultStatus = "searching"
+                                        joinStatus = context.getString(R.string.race_pairing_status_scanning_host),
+                                        hostStatus = context.getString(R.string.race_pairing_status_waiting_joiners),
+                                        defaultStatus = context.getString(R.string.race_pairing_status_searching)
                                     )
                                 )
                             }
@@ -657,7 +658,11 @@ class RaceModeViewModel @Inject constructor(
     private fun initializeCamera(useFrontCamera: Boolean) {
         if (!cameraManager.initialize(useFrontCamera = useFrontCamera)) {
             _uiState.update {
-                it.copy(cameraState = CameraManager.CameraState.Error("No suitable camera found."))
+                it.copy(
+                    cameraState = CameraManager.CameraState.Error(
+                        context.getString(R.string.camera_error_no_suitable)
+                    )
+                )
             }
         } else {
             updateCameraMetadata()
@@ -724,8 +729,8 @@ class RaceModeViewModel @Inject constructor(
         if (!granted) {
             _uiState.update {
                 it.copy(
-                    pairingStatus = "permission required",
-                    errorMessage = "Nearby devices permission is required to join or host a timing session."
+                    pairingStatus = context.getString(R.string.race_pairing_status_permission),
+                    errorMessage = context.getString(R.string.race_error_nearby_permission)
                 )
             }
             return
@@ -751,9 +756,9 @@ class RaceModeViewModel @Inject constructor(
             it.copy(
                 phase = RacePhase.PAIRING,
                 pairingStatus = pairingStatusForMode(
-                    joinStatus = "Scanning for host phone",
-                    hostStatus = "Waiting for phones on Join Session",
-                    defaultStatus = "searching"
+                    joinStatus = context.getString(R.string.race_pairing_status_scanning_host),
+                    hostStatus = context.getString(R.string.race_pairing_status_waiting_joiners),
+                    defaultStatus = context.getString(R.string.race_pairing_status_searching)
                 )
             )
         }
@@ -805,9 +810,17 @@ class RaceModeViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     errorMessage = if (count < requiredCount) {
-                        "Connect $requiredCount phones before starting this session."
+                        context.resources.getQuantityString(
+                            R.plurals.race_error_connect_phones,
+                            requiredCount,
+                            requiredCount
+                        )
                     } else {
-                        "Wait for all $requiredCount phones to finish synchronizing."
+                        context.resources.getQuantityString(
+                            R.plurals.race_error_wait_sync,
+                            requiredCount,
+                            requiredCount
+                        )
                     }
                 )
             }
@@ -1043,29 +1056,33 @@ class RaceModeViewModel @Inject constructor(
     private fun gateReadinessBlockedReason(readiness: GateReadinessStatus): String {
         return when {
             !readiness.isStable ->
-                "Hold the phone steady before arming."
+                context.getString(R.string.race_error_hold_before_arming)
             readiness.lastFrameTimestampNanos == null ->
-                "Waiting for camera frames. Check the camera preview."
+                context.getString(R.string.race_error_wait_camera_frames)
             !readiness.isPrebufferReady ->
-                "Waiting for camera buffer. Keep the phone steady."
+                context.getString(R.string.race_error_wait_camera_buffer)
             !readiness.isClear ->
-                "Gate line is occupied. Clear the gate before arming."
+                context.getString(R.string.race_error_gate_occupied)
             else ->
-                "Gate is not ready yet."
+                context.getString(R.string.race_error_gate_not_ready)
         }
     }
 
     private fun startSessionBlockedReason(state: RaceModeUiState): String {
         return when {
             !state.isLocalGateReady ->
-                "Calibrate this phone before starting timing."
+                context.getString(R.string.race_error_calibrate_phone)
             !state.isRemoteGateReadinessSatisfied -> {
                 val missing = (state.requiredRemoteReadyGateCount - state.remoteArmedGateIds.size)
                     .coerceAtLeast(1)
-                "Waiting for $missing gate phone(s) to arm."
+                context.resources.getQuantityString(
+                    R.plurals.race_error_wait_gate_phones,
+                    missing,
+                    missing
+                )
             }
             else ->
-                "Gates are not ready yet."
+                context.getString(R.string.race_error_gates_not_ready)
         }
     }
 
@@ -1391,7 +1408,9 @@ class RaceModeViewModel @Inject constructor(
                 sessionRepository.updateRunDistance(runId, newDistance.coerceAtLeast(1.0))
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to update race run distance", e)
-                _uiState.update { it.copy(errorMessage = "Could not update run distance") }
+                _uiState.update {
+                    it.copy(errorMessage = context.getString(R.string.race_error_update_distance))
+                }
             }
         }
     }
@@ -1402,7 +1421,9 @@ class RaceModeViewModel @Inject constructor(
                 sessionRepository.deleteRun(runId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to delete race run", e)
-                _uiState.update { it.copy(errorMessage = "Could not delete run") }
+                _uiState.update {
+                    it.copy(errorMessage = context.getString(R.string.race_error_delete_run))
+                }
             }
         }
     }
@@ -2061,7 +2082,7 @@ class RaceModeViewModel @Inject constructor(
                 }
                 Log.w(TAG, "Still waiting for startEvent after ${warningAt / 1000}s")
                 _uiState.update {
-                    it.copy(errorMessage = "Waiting for start phone. Connection may be down.")
+                    it.copy(errorMessage = context.getString(R.string.race_error_waiting_start_phone))
                 }
             }
 
@@ -2175,7 +2196,7 @@ class RaceModeViewModel @Inject constructor(
             it.copy(
                 raceStatus = "waiting",
                 elapsedTimeSeconds = 0.0,
-                errorMessage = "Start event timed out. Waiting for next crossing."
+                errorMessage = context.getString(R.string.race_error_start_timeout)
             )
         }
         Log.i(TAG, "Discarded buffered finish after startEvent timeout ($reason)")
@@ -2365,7 +2386,7 @@ class RaceModeViewModel @Inject constructor(
                 resultUncertaintyMs = null,
                 resultSegments = emptyList(),
                 receivedGateCount = 0,
-                errorMessage = "Run canceled: $reason"
+                errorMessage = context.getString(R.string.race_error_run_canceled)
             )
         }
     }
@@ -2568,7 +2589,9 @@ class RaceModeViewModel @Inject constructor(
             }
             is TimingPayload.Abort -> {
                 Log.i(TAG, "Remote aborted: ${payload.reason}")
-                _uiState.update { it.copy(errorMessage = "Remote: ${payload.reason}") }
+                _uiState.update {
+                    it.copy(errorMessage = context.getString(R.string.race_error_remote))
+                }
             }
             else -> {
                 Log.d(TAG, "Received remote message: ${payload::class.simpleName}")
@@ -2628,7 +2651,7 @@ class RaceModeViewModel @Inject constructor(
                 } else {
                     current.phase
                 },
-                pairingStatus = "start_timing"
+                pairingStatus = context.getString(R.string.race_pairing_status_starting)
             )
         }
         val state = _uiState.value
@@ -2918,7 +2941,7 @@ class RaceModeViewModel @Inject constructor(
                 },
                 remoteArmedGateIds = emptySet(),
                 raceStatus = if (it.phase == RacePhase.ACTIVE_RACE) "paused" else it.raceStatus,
-                errorMessage = "Re-arm gates before timing after backgrounding."
+                errorMessage = context.getString(R.string.race_error_rearm_after_background)
             )
         }
         foregroundGateReadinessRecoveryInProgress = true
@@ -3222,7 +3245,7 @@ class RaceModeViewModel @Inject constructor(
         } else {
             gateReadinessRecoveryJob = null
             _uiState.update {
-                it.copy(errorMessage = "Gate recovery timed out. Check peer phones and re-arm gates.")
+                it.copy(errorMessage = context.getString(R.string.race_error_gate_recovery_timeout))
             }
             Log.e(TAG, "Gate-readiness recovery timed out after $MAX_GATE_READINESS_RECOVERY_ATTEMPTS attempts")
         }
@@ -3298,7 +3321,7 @@ class RaceModeViewModel @Inject constructor(
             if (!allGateReadinessBarrierSatisfied()) {
                 Log.w(TAG, "Ignoring resumeDetection while gate-readiness recovery is incomplete")
                 _uiState.update {
-                    it.copy(errorMessage = "Re-arm all gates before resuming timing.")
+                    it.copy(errorMessage = context.getString(R.string.race_error_rearm_all))
                 }
                 return false
             }
@@ -4390,7 +4413,9 @@ class RaceModeViewModel @Inject constructor(
         val splitNanos = finish - start
         if (splitNanos <= 0) {
             Log.e(TAG, "Invalid split: finish ($finish) is not after start ($start)")
-            _uiState.update { it.copy(errorMessage = "Invalid timing: start must happen before finish") }
+            _uiState.update {
+                it.copy(errorMessage = context.getString(R.string.race_error_invalid_timing))
+            }
             return
         }
         // Reject sub-millisecond splits as clock sync artifacts (matches iOS 1ms floor)
@@ -5771,7 +5796,7 @@ data class RaceModeUiState(
     val isDeviceConnected: Boolean = false,
     val connectedDeviceCount: Int = 0,
     val syncedDeviceCount: Int = 0,
-    val connectedDeviceName: String = "Other Device",
+    val connectedDeviceName: String = "",
 
     // Sync
     val syncProgress: Float = 0f,

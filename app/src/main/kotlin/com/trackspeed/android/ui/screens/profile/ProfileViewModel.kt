@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.R
 import com.trackspeed.android.billing.SubscriptionManager
 import com.trackspeed.android.cloud.AuthState
 import com.trackspeed.android.cloud.DeviceIdProvider
@@ -257,7 +258,7 @@ class ProfileViewModel @Inject constructor(
             runCatching {
                 authRepository.signOut()
             }.onFailure {
-                _accountActionError.value = "Unable to sign out. Please try again."
+                _accountActionError.value = context.getString(R.string.profile_sign_out_failed)
             }
         }
     }
@@ -268,7 +269,7 @@ class ProfileViewModel @Inject constructor(
             runCatching {
                 authRepository.deleteAccount(deviceIdProvider.deviceId)
             }.onFailure {
-                _accountActionError.value = "Unable to delete account. Please try again."
+                _accountActionError.value = context.getString(R.string.profile_delete_account_failed)
             }
         }
     }

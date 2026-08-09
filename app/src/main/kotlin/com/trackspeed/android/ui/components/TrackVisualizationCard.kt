@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import com.trackspeed.android.ui.theme.AccentNavy
 import com.trackspeed.android.ui.theme.BorderSubtle
 import com.trackspeed.android.ui.theme.SurfaceDark
@@ -92,7 +93,11 @@ fun TrackVisualizationCard(
                 )
                 if (gates.isNotEmpty()) {
                     Text(
-                        text = "${gates.size} phone${if (gates.size != 1) "s" else ""}",
+                        text = pluralStringResource(
+                            R.plurals.track_phone_count,
+                            gates.size,
+                            gates.size
+                        ),
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                         color = TextSecondary
                     )

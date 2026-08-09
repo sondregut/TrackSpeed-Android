@@ -34,15 +34,6 @@ import com.trackspeed.android.ui.theme.*
 
 private data class DataPoint(val month: String, val time: Double)
 
-private val dataPoints = listOf(
-    DataPoint("Mar", 1.07),
-    DataPoint("Apr", 1.05),
-    DataPoint("May", 1.03),
-    DataPoint("Jun", 1.01),
-    DataPoint("Jul", 0.99),
-    DataPoint("Aug", 0.98)
-)
-
 private const val MIN_TIME = 0.90
 private const val MAX_TIME = 1.10
 
@@ -52,6 +43,14 @@ fun TrackProgressStep(onContinue: () -> Unit) {
     val graphProgress = remember { Animatable(0f) }
     var showResearchCard by remember { mutableStateOf(false) }
     val textMeasurer = rememberTextMeasurer()
+    val dataPoints = listOf(
+        DataPoint(stringResource(R.string.onboarding_progress_month_mar), 1.07),
+        DataPoint(stringResource(R.string.onboarding_progress_month_apr), 1.05),
+        DataPoint(stringResource(R.string.onboarding_progress_month_may), 1.03),
+        DataPoint(stringResource(R.string.onboarding_progress_month_jun), 1.01),
+        DataPoint(stringResource(R.string.onboarding_progress_month_jul), 0.99),
+        DataPoint(stringResource(R.string.onboarding_progress_month_aug), 0.98)
+    )
 
     LaunchedEffect(Unit) {
         appeared = true
@@ -64,6 +63,13 @@ fun TrackProgressStep(onContinue: () -> Unit) {
 
     // Pre-resolve strings for Canvas
     val chartTitle = stringResource(R.string.onboarding_progress_chart_title)
+    val yValues = listOf(1.10, 1.05, 1.00, 0.95, 0.90)
+    val yLabels = yValues.map { value ->
+        stringResource(
+            R.string.common_seconds_value,
+            String.format(java.util.Locale.getDefault(), "%.2f", value)
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -121,8 +127,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
             val chartHeight = chartBottom
 
             // Y-axis labels
-            val yValues = listOf(1.10, 1.05, 1.00, 0.95, 0.90)
-            yValues.forEach { value ->
+            yValues.forEachIndexed { index, value ->
                 val normalized = (value - MIN_TIME) / (MAX_TIME - MIN_TIME)
                 val y = chartBottom - (normalized.toFloat() * chartHeight)
 
@@ -136,7 +141,7 @@ fun TrackProgressStep(onContinue: () -> Unit) {
 
                 // Y label
                 val label = textMeasurer.measure(
-                    String.format(java.util.Locale.getDefault(), "%.2fs", value),
+                    yLabels[index],
                     style = TextStyle(
                         color = labelColor,
                         fontSize = 10.sp

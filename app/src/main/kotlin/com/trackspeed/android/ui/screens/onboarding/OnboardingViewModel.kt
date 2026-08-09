@@ -103,7 +103,17 @@ sealed interface PromoRedemptionState {
     data object Idle : PromoRedemptionState
     data object Loading : PromoRedemptionState
     data class Success(val result: PromoRedemptionResult) : PromoRedemptionState
-    data class Error(val message: String) : PromoRedemptionState
+    data class Error(val reason: PromoRedemptionError) : PromoRedemptionState
+}
+
+enum class PromoRedemptionError {
+    INVALID,
+    EXPIRED,
+    MAX_USES,
+    ALREADY_REDEEMED,
+    RATE_LIMITED,
+    NETWORK,
+    GENERIC
 }
 
 data class OnboardingUiState(
@@ -436,18 +446,18 @@ class OnboardingViewModel @Inject constructor(
                     )
                 }
             } catch (e: PromoCodeError) {
-                val message = when (e) {
-                    is PromoCodeError.InvalidCode -> "Invalid or inactive promo code"
-                    is PromoCodeError.Expired -> "This promo code has expired"
-                    is PromoCodeError.MaxUsesReached -> "This promo code has reached its maximum uses"
-                    is PromoCodeError.AlreadyRedeemed -> "You've already redeemed this code"
-                    is PromoCodeError.RateLimited -> "Please wait before trying again"
-                    is PromoCodeError.NetworkError -> "Network error. Please check your connection."
+                val reason = when (e) {
+                    is PromoCodeError.InvalidCode -> PromoRedemptionError.INVALID
+                    is PromoCodeError.Expired -> PromoRedemptionError.EXPIRED
+                    is PromoCodeError.MaxUsesReached -> PromoRedemptionError.MAX_USES
+                    is PromoCodeError.AlreadyRedeemed -> PromoRedemptionError.ALREADY_REDEEMED
+                    is PromoCodeError.RateLimited -> PromoRedemptionError.RATE_LIMITED
+                    is PromoCodeError.NetworkError -> PromoRedemptionError.NETWORK
                 }
-                _uiState.update { it.copy(promoRedemptionState = PromoRedemptionState.Error(message)) }
+                _uiState.update { it.copy(promoRedemptionState = PromoRedemptionState.Error(reason)) }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(promoRedemptionState = PromoRedemptionState.Error("Something went wrong. Please try again."))
+                    it.copy(promoRedemptionState = PromoRedemptionState.Error(PromoRedemptionError.GENERIC))
                 }
             }
         }

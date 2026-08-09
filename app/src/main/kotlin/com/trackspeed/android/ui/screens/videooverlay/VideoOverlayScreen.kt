@@ -3,6 +3,7 @@
 package com.trackspeed.android.ui.screens.videooverlay
 
 import android.content.Intent
+import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -100,6 +101,8 @@ fun VideoOverlayScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val shareChooserTitle = stringResource(R.string.video_overlay_share_chooser)
+    val localizedSnapshot = uiState.snapshot?.let(viewModel::localizeSnapshot)
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -107,8 +110,8 @@ fun VideoOverlayScreen(
         if (uri != null) viewModel.importVideo(uri)
     }
 
-    LaunchedEffect(uiState.savedMessage) {
-        if (uiState.savedMessage != null) {
+    LaunchedEffect(uiState.savedMessageRes) {
+        if (uiState.savedMessageRes != null) {
             delay(2_000)
             viewModel.clearSavedMessage()
         }
@@ -119,7 +122,7 @@ fun VideoOverlayScreen(
         modifier = Modifier.gradientBackground(),
         topBar = {
             TopAppBar(
-                title = { Text("Video Overlay", color = TextPrimary) },
+                title = { Text(stringResource(R.string.video_overlay_title), color = TextPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -148,7 +151,7 @@ fun VideoOverlayScreen(
                 else -> {
                     when (uiState.step) {
                         VideoOverlayStep.IMPORT -> ImportStep(
-                            importError = uiState.importError,
+                            importErrorRes = uiState.importErrorRes,
                             onChooseVideo = {
                                 picker.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
@@ -164,7 +167,7 @@ fun VideoOverlayScreen(
 
                         VideoOverlayStep.PREVIEW -> PreviewStep(
                             video = uiState.importedVideo,
-                            snapshot = uiState.snapshot,
+                            snapshot = localizedSnapshot,
                             showSpeed = uiState.showSpeed,
                             showRunType = uiState.showRunType,
                             exportPhase = uiState.exportPhase,
@@ -181,16 +184,16 @@ fun VideoOverlayScreen(
                                     putExtra(Intent.EXTRA_STREAM, shareUri)
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
-                                context.startActivity(Intent.createChooser(intent, "Share Video"))
+                                context.startActivity(Intent.createChooser(intent, shareChooserTitle))
                             }
                         )
                     }
                 }
             }
 
-            uiState.savedMessage?.let { message ->
+            uiState.savedMessageRes?.let { messageRes ->
                 Text(
-                    text = message,
+                    text = stringResource(messageRes),
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier
@@ -220,7 +223,7 @@ private fun MissingRunState() {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Run not found.",
+            text = stringResource(R.string.video_overlay_run_not_found),
             color = TextSecondary,
             textAlign = TextAlign.Center
         )
@@ -229,7 +232,7 @@ private fun MissingRunState() {
 
 @Composable
 private fun ImportStep(
-    importError: String?,
+    @StringRes importErrorRes: Int?,
     onChooseVideo: () -> Unit
 ) {
     Column(
@@ -247,22 +250,22 @@ private fun ImportStep(
         )
         Spacer(Modifier.height(24.dp))
         Text(
-            text = "Import your run video",
+            text = stringResource(R.string.video_overlay_import_title),
             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
             color = TextPrimary,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Choose an MP4, MOV, or HEVC clip from your photo library.",
+            text = stringResource(R.string.video_overlay_import_body),
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
             textAlign = TextAlign.Center
         )
-        if (importError != null) {
+        if (importErrorRes != null) {
             Spacer(Modifier.height(18.dp))
             Text(
-                text = importError,
+                text = stringResource(importErrorRes),
                 color = StatusRed,
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center
@@ -274,7 +277,7 @@ private fun ImportStep(
             colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
             contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)
         ) {
-            Text("Choose Video", fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.video_overlay_choose_video), fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -325,7 +328,7 @@ private fun MarkStartStep(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Scrub to the frame where the race starts, then tap Set Start Here.",
+                text = stringResource(R.string.video_overlay_mark_start_hint),
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
@@ -366,11 +369,11 @@ private fun MarkStartStep(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 14.dp)
             ) {
-                Text("Set Start Here", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.video_overlay_set_start), fontWeight = FontWeight.SemiBold)
             }
 
             TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                Text("Choose a different video", color = TextSecondary)
+                Text(stringResource(R.string.video_overlay_choose_different), color = TextSecondary)
             }
         }
     }
@@ -436,7 +439,7 @@ private fun PreviewStep(
                 Icon(Icons.Default.Tune, contentDescription = null, tint = TextSecondary)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "Overlay options",
+                    text = stringResource(R.string.video_overlay_options),
                     color = TextPrimary,
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
                 )
@@ -444,14 +447,14 @@ private fun PreviewStep(
 
             if (snapshot.speedDisplay != null) {
                 ToggleRow(
-                    title = "Show speed",
+                    title = stringResource(R.string.video_overlay_show_speed),
                     checked = showSpeed,
                     enabled = exportPhase !is VideoExportPhase.Exporting,
                     onCheckedChange = onShowSpeedChange
                 )
             }
             ToggleRow(
-                title = "Show run type",
+                title = stringResource(R.string.video_overlay_show_run_type),
                 checked = showRunType,
                 enabled = exportPhase !is VideoExportPhase.Exporting,
                 onCheckedChange = onShowRunTypeChange
@@ -472,7 +475,7 @@ private fun PreviewStep(
                 enabled = exportPhase !is VideoExportPhase.Exporting,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Back to start marker", color = TextSecondary)
+                Text(stringResource(R.string.video_overlay_back_to_marker), color = TextSecondary)
             }
         }
     }
@@ -514,7 +517,7 @@ private fun ExportActions(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 14.dp)
             ) {
-                Text("Create Video", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.video_overlay_create), fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -522,7 +525,7 @@ private fun ExportActions(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Creating video...",
+                        text = stringResource(R.string.video_overlay_creating),
                         color = TextPrimary,
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                     )
@@ -552,7 +555,7 @@ private fun ExportActions(
                 ) {
                     Icon(Icons.Default.Save, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Save to Photos", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.video_overlay_save_photos), fontWeight = FontWeight.SemiBold)
                 }
                 OutlinedButton(
                     onClick = { onShare(phase.file) },
@@ -561,10 +564,10 @@ private fun ExportActions(
                 ) {
                     Icon(Icons.Default.Share, contentDescription = null, tint = TextPrimary)
                     Spacer(Modifier.width(8.dp))
-                    Text("Share...", color = TextPrimary)
+                    Text(stringResource(R.string.video_overlay_share), color = TextPrimary)
                 }
                 TextButton(onClick = onExport, modifier = Modifier.fillMaxWidth()) {
-                    Text("Re-create with different options", color = TextMuted)
+                    Text(stringResource(R.string.video_overlay_recreate), color = TextMuted)
                 }
             }
         }
@@ -572,7 +575,7 @@ private fun ExportActions(
         is VideoExportPhase.Error -> {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = phase.message,
+                    text = stringResource(phase.messageRes),
                     color = StatusRed,
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
@@ -584,7 +587,7 @@ private fun ExportActions(
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(vertical = 13.dp)
                 ) {
-                    Text("Retry", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.video_overlay_retry), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -600,10 +603,10 @@ private fun MissingVideoState(onBack: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("No video selected.", color = TextSecondary)
+        Text(stringResource(R.string.video_overlay_no_video), color = TextSecondary)
         Spacer(Modifier.height(16.dp))
         OutlinedButton(onClick = onBack) {
-            Text("Choose Video")
+            Text(stringResource(R.string.video_overlay_choose_video))
         }
     }
 }
@@ -733,7 +736,7 @@ private fun RaceOverlayView(
 @Composable
 private fun TimerPill(state: RaceOverlayFrameState) {
     val text = when (state.phase) {
-        RaceOverlayPhase.READY -> "READY"
+        RaceOverlayPhase.READY -> stringResource(R.string.video_overlay_ready)
         RaceOverlayPhase.RUNNING,
         RaceOverlayPhase.FINISHED -> formatOverlayTime(state.displayedTimeSeconds)
     }

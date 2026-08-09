@@ -73,6 +73,7 @@ import com.trackspeed.android.ui.components.BillingIssueBanner
 import com.trackspeed.android.ui.screens.history.SessionHistoryScreen
 import com.trackspeed.android.ui.screens.profile.ProfileScreen
 import com.trackspeed.android.model.TestPreset
+import com.trackspeed.android.ui.util.localizedName
 import com.trackspeed.android.model.TestPresetCategory
 import com.trackspeed.android.ui.screens.templates.TemplatesScreen
 import com.trackspeed.android.ui.theme.*
@@ -439,9 +440,6 @@ private enum class FirstSessionTutorialStep(
         messageRes = R.string.home_tutorial_other_message,
         hintRes = R.string.home_tutorial_other_hint
     );
-
-    val stepLabel: String
-        get() = "${ordinal + 1} of ${entries.size}"
 
     val isFirst: Boolean
         get() = this == entries.first()
@@ -1029,7 +1027,7 @@ private fun FirstSessionStepBubble(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Close,
-                    contentDescription = "Skip tutorial",
+                    contentDescription = stringResource(R.string.home_skip_tutorial_cd),
                     tint = Color.White.copy(alpha = 0.78f),
                     modifier = Modifier.size(16.dp)
                 )
@@ -1057,7 +1055,11 @@ private fun FirstSessionStepBubble(
             }
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = step.stepLabel,
+                text = stringResource(
+                    R.string.home_tutorial_step_progress,
+                    step.ordinal + 1,
+                    FirstSessionTutorialStep.entries.size
+                ),
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                 color = Color.White.copy(alpha = 0.56f)
             )
@@ -1135,7 +1137,11 @@ private fun FirstSessionFinalCard(
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = FirstSessionTutorialStep.OTHER_PHONES.stepLabel,
+                    text = stringResource(
+                        R.string.home_tutorial_step_progress,
+                        FirstSessionTutorialStep.OTHER_PHONES.ordinal + 1,
+                        FirstSessionTutorialStep.entries.size
+                    ),
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = Color.White.copy(alpha = 0.54f)
                 )
@@ -1185,7 +1191,7 @@ private fun FirstSessionFinalCard(
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Start Setup", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.home_start_setup), fontWeight = FontWeight.Bold)
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1329,12 +1335,12 @@ private fun FirstSessionOnboardingJoinPreview() {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Joining phones can start here",
+                text = stringResource(R.string.home_joining_phones_title),
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.White
             )
             Text(
-                text = "A second phone can tap Join Session before making an account, or use Join Session later from Home.",
+                text = stringResource(R.string.home_joining_phones_body),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.66f)
             )
@@ -1661,7 +1667,9 @@ private fun DashboardMonthlyStatsCard(
         )
         DashboardMetricDivider()
         DashboardMetric(
-            value = personalBest?.let { String.format(Locale.getDefault(), "%.2fs", it) } ?: "—",
+            value = personalBest?.let {
+                stringResource(R.string.common_seconds_value, String.format(Locale.getDefault(), "%.2f", it))
+            } ?: "—",
             label = personalBestLabel,
             highlighted = personalBest != null
         )
@@ -1780,8 +1788,10 @@ private fun LegacyHomeContent(
                 celebratedBonusDays = 0
                 onReferralBonusSeen()
             },
-            title = { Text("You earned $celebratedBonusDays days of Pro!") },
-            text = { Text("A friend signed up with your code. Enjoy Pro on us.") },
+            title = {
+                Text(stringResource(R.string.home_referral_bonus_title, celebratedBonusDays))
+            },
+            text = { Text(stringResource(R.string.home_referral_bonus_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1790,7 +1800,7 @@ private fun LegacyHomeContent(
                         onReferralBonusAction()
                     }
                 ) {
-                    Text("See referrals")
+                    Text(stringResource(R.string.home_see_referrals))
                 }
             },
             dismissButton = {
@@ -2061,14 +2071,14 @@ private fun HomeInviteCard(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = "Invite & earn rewards",
+                    text = stringResource(R.string.home_invite_rewards_title),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "Give a friend 30 days of Pro.",
+                    text = stringResource(R.string.home_invite_rewards_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     maxLines = 1,
@@ -2089,7 +2099,7 @@ private fun HomeInviteCard(
         ) {
             Icon(
                 imageVector = Icons.Outlined.Close,
-                contentDescription = "Dismiss invite row",
+                contentDescription = stringResource(R.string.home_dismiss_invite_cd),
                 tint = TextSecondary,
                 modifier = Modifier.size(18.dp)
             )
@@ -2117,8 +2127,9 @@ private fun TestPreset.icon(): ImageVector = when (iconKey) {
     else -> Icons.Outlined.RocketLaunch
 }
 
+@Composable
 private fun TestPreset.phoneLabel(): String = when {
-    minPhones == 1 && maxPhones == 1 -> "Solo"
+    minPhones == 1 && maxPhones == 1 -> stringResource(R.string.common_solo)
     minPhones == maxPhones -> "${minPhones}P"
     else -> "$minPhones-${maxPhones}P"
 }
@@ -2183,7 +2194,7 @@ private fun PresetModeCard(
                 }
 
                 Text(
-                    text = preset.name,
+                    text = preset.localizedName(),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
@@ -2476,7 +2487,10 @@ private fun RecentSessionCard(
                     // Best time (green, matching iOS AppColors.success)
                     if (summary != null && summary.bestTime > 0) {
                         Text(
-                            text = "%.2fs".format(summary.bestTime),
+                            text = stringResource(
+                                R.string.common_seconds_value,
+                                String.format(Locale.getDefault(), "%.2f", summary.bestTime)
+                            ),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),

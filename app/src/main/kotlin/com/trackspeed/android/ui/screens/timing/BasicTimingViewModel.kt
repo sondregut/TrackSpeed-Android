@@ -1,6 +1,7 @@
 package com.trackspeed.android.ui.screens.timing
 
 import android.graphics.Bitmap
+import android.content.Context
 import android.net.Uri
 import android.os.SystemClock
 import android.view.Surface
@@ -8,6 +9,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.analytics.AnalyticsEvent
+import com.trackspeed.android.R
 import com.trackspeed.android.analytics.AnalyticsService
 import com.trackspeed.android.audio.CrossingFeedback
 import com.trackspeed.android.audio.VoiceStartService
@@ -29,6 +31,7 @@ import com.trackspeed.android.detection.GateEngine
 import com.trackspeed.android.detection.PhotoFinishDetector
 import com.trackspeed.android.notifications.NotificationService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -40,6 +43,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class BasicTimingViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
     private val cameraManager: CameraManager,
     private val gateEngine: GateEngine,
@@ -322,7 +326,11 @@ class BasicTimingViewModel @Inject constructor(
                 }
             } else {
                 _uiState.update {
-                    it.copy(cameraState = CameraManager.CameraState.Error("No suitable camera found."))
+                    it.copy(
+                        cameraState = CameraManager.CameraState.Error(
+                            context.getString(R.string.camera_error_no_suitable)
+                        )
+                    )
                 }
             }
         }

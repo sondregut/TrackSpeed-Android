@@ -1,13 +1,16 @@
 package com.trackspeed.android.ui.screens.referral
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.referral.ContactsService
+import com.trackspeed.android.R
 import com.trackspeed.android.referral.ReferralContact
 import com.trackspeed.android.referral.ReferralService
 import com.trackspeed.android.referral.ReferralStats
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +53,7 @@ enum class ContactsPermissionState {
 
 @HiltViewModel
 class ReferralViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val referralService: ReferralService,
     private val contactsService: ContactsService
 ) : ViewModel() {
@@ -184,7 +188,7 @@ class ReferralViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isContactsLoading = false,
-                        contactsErrorMessage = "Failed to load contacts"
+                        contactsErrorMessage = context.getString(R.string.referral_contacts_load_failed)
                     )
                 }
             }

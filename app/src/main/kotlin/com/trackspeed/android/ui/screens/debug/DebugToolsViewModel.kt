@@ -22,9 +22,9 @@ data class DebugToolsUiState(
     val runCount: Int = 0,
     val dbSizeFormatted: String = "---",
     val thumbnailSizeFormatted: String = "---",
-    val clockSyncStatus: String = "Not connected",
-    val clockSyncQuality: String = "N/A",
-    val clockSyncOffset: String = "N/A",
+    val clockSyncStatus: String = "",
+    val clockSyncQuality: String = "",
+    val clockSyncOffset: String = "",
     val detectionTestMode: Boolean = false
 )
 

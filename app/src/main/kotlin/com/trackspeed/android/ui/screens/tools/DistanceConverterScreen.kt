@@ -63,6 +63,51 @@ import com.trackspeed.android.ui.theme.TrackSpeedTheme
 import com.trackspeed.android.ui.theme.gradientBackground
 import java.util.Locale
 
+@Composable
+private fun ConverterMode.localizedLabel(): String = stringResource(
+    when (this) {
+        ConverterMode.DISTANCE -> R.string.distance_converter_mode_distance
+        ConverterMode.FLYING -> R.string.distance_converter_mode_flying
+        ConverterMode.PREDICTOR -> R.string.distance_converter_mode_predictor
+        ConverterMode.LANES -> R.string.distance_converter_mode_lanes
+    }
+)
+
+@Composable
+private fun SprintGender.localizedDisplayName(): String = stringResource(
+    when (this) {
+        SprintGender.MEN -> R.string.distance_converter_gender_men
+        SprintGender.WOMEN -> R.string.distance_converter_gender_women
+    }
+)
+
+@Composable
+private fun SprintDistance.localizedDisplayName(): String = stringResource(
+    when (this) {
+        SprintDistance.M60 -> R.string.distance_converter_60m
+        SprintDistance.M100 -> R.string.distance_converter_100m
+        SprintDistance.M200 -> R.string.distance_converter_200m
+    }
+)
+
+@Composable
+private fun FlyingSprintConverter.FlyingDistance.localizedDisplayName(): String = stringResource(
+    when (this) {
+        FlyingSprintConverter.FlyingDistance.FLY10 -> R.string.distance_converter_flying_10m
+        FlyingSprintConverter.FlyingDistance.FLY20 -> R.string.distance_converter_flying_20m
+        FlyingSprintConverter.FlyingDistance.FLY30 -> R.string.distance_converter_flying_30m
+    }
+)
+
+@Composable
+private fun FlyingSprintConverter.FlyingDistance.localizedCaveat(): String = stringResource(
+    when (this) {
+        FlyingSprintConverter.FlyingDistance.FLY10 -> R.string.distance_converter_flying_10m_caveat
+        FlyingSprintConverter.FlyingDistance.FLY20 -> R.string.distance_converter_flying_20m_caveat
+        FlyingSprintConverter.FlyingDistance.FLY30 -> R.string.distance_converter_flying_30m_caveat
+    }
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DistanceConverterScreen(
@@ -183,7 +228,7 @@ private fun ModePicker(
                 onClick = { onSelected(mode) },
                 label = {
                     Text(
-                        text = mode.label,
+                        text = mode.localizedLabel(),
                         maxLines = 1
                     )
                 },
@@ -207,7 +252,7 @@ private fun GenderPicker(
             FilterChip(
                 selected = selected == gender,
                 onClick = { onSelected(gender) },
-                label = { Text(gender.displayName) },
+                label = { Text(gender.localizedDisplayName()) },
                 modifier = Modifier.weight(1f),
                 colors = chipColors()
             )
@@ -222,18 +267,18 @@ private fun DistanceMode(
     onTimeInputChanged: (String) -> Unit
 ) {
     InputCard(
-        title = "Input",
-        footer = "Enter your time for the selected sprint distance."
+        title = stringResource(R.string.distance_converter_input),
+        footer = stringResource(R.string.distance_converter_distance_footer)
     ) {
         DropdownSelector(
-            label = "Distance",
+            label = stringResource(R.string.distance_converter_distance),
             selected = state.selectedDistance,
             options = SprintDistance.entries,
-            optionLabel = { it.displayName },
+            optionLabel = { it.localizedDisplayName() },
             onSelected = onSelectedDistanceChanged
         )
         TimeInputRow(
-            label = "Time",
+            label = stringResource(R.string.distance_converter_time),
             value = state.timeInput,
             placeholder = "10.25",
             suffix = "s",
@@ -241,23 +286,23 @@ private fun DistanceMode(
         )
     }
 
-    ResultsCard(title = "Estimated Times") {
+    ResultsCard(title = stringResource(R.string.distance_converter_estimated_times)) {
         SprintDistance.entries.filterNot { it == state.selectedDistance }.forEachIndexed { index, distance ->
-            ResultRow(label = distance.displayName, time = state.distanceResults[distance])
+            ResultRow(label = distance.localizedDisplayName(), time = state.distanceResults[distance])
             if (index < SprintDistance.entries.size - 2) Divider()
         }
     }
 
     NotesCard(
-        title = "Important Notes",
+        title = stringResource(R.string.distance_converter_important_notes),
         notes = buildList {
-            add("Based on 2025 World Athletics Scoring Tables.")
-            add("Uses quadratic-fit coefficients; audited sprint events are within about 0.02s of table lookup.")
-            add("Individual speed endurance profiles cause variation.")
+            add(stringResource(R.string.distance_converter_note_wa_tables))
+            add(stringResource(R.string.distance_converter_note_quadratic_fit))
+            add(stringResource(R.string.distance_converter_note_individual_variation))
             if (state.selectedDistance == SprintDistance.M60 || state.timeInput.isNotBlank()) {
-                add("60m to 100m is cross-context indoor-to-outdoor and less reliable.")
+                add(stringResource(R.string.distance_converter_note_60m_100m))
             }
-            add("Wind conditions are not factored here; use Wind Adjustment separately.")
+            add(stringResource(R.string.distance_converter_note_wind_excluded))
         }
     )
 }
@@ -269,18 +314,18 @@ private fun FlyingMode(
     onFlyingTimeChanged: (String) -> Unit
 ) {
     InputCard(
-        title = "Input",
-        footer = state.flyingDistance.caveat
+        title = stringResource(R.string.distance_converter_input),
+        footer = state.flyingDistance.localizedCaveat()
     ) {
         DropdownSelector(
-            label = "Distance",
+            label = stringResource(R.string.distance_converter_distance),
             selected = state.flyingDistance,
             options = FlyingSprintConverter.FlyingDistance.entries,
-            optionLabel = { it.displayName },
+            optionLabel = { it.localizedDisplayName() },
             onSelected = onFlyingDistanceChanged
         )
         TimeInputRow(
-            label = "Time",
+            label = stringResource(R.string.distance_converter_time),
             value = state.flyingTimeInput,
             placeholder = "2.70",
             suffix = "s",
@@ -293,20 +338,20 @@ private fun FlyingMode(
         velocityKmh = state.flyingResult?.velocityKmh
     )
 
-    ResultsCard(title = "Predicted Times") {
+    ResultsCard(title = stringResource(R.string.distance_converter_predicted_times)) {
         SprintDistance.entries.forEachIndexed { index, distance ->
-            ResultRow(label = distance.displayName, time = state.flyingResult?.conversions?.get(distance))
+            ResultRow(label = distance.localizedDisplayName(), time = state.flyingResult?.conversions?.get(distance))
             if (index < SprintDistance.entries.lastIndex) Divider()
         }
     }
 
     NotesCard(
-        title = "Important Notes",
+        title = stringResource(R.string.distance_converter_important_notes),
         notes = listOf(
-            "Assumes about 1.0s acceleration penalty, which varies by athlete.",
-            "Flying 10m and 20m are extrapolated to fly30 using constant velocity.",
-            "Flying 30m is the most reliable direct 100m potential estimate.",
-            "Predicted distances use 2025 World Athletics Scoring Tables."
+            stringResource(R.string.distance_converter_flying_note_penalty),
+            stringResource(R.string.distance_converter_flying_note_extrapolated),
+            stringResource(R.string.distance_converter_flying_note_reliability),
+            stringResource(R.string.distance_converter_flying_note_tables)
         )
     )
 }
@@ -320,32 +365,32 @@ private fun PredictorMode(
     onReactionTimeChanged: (String) -> Unit
 ) {
     InputCard(
-        title = "Input",
-        footer = "30m from standing start excluding reaction time. Flying 10m at max velocity. Wind uses + tailwind / - headwind."
+        title = stringResource(R.string.distance_converter_input),
+        footer = stringResource(R.string.distance_converter_predictor_footer)
     ) {
         TimeInputRow(
-            label = "30m Time",
+            label = stringResource(R.string.distance_converter_30m_time),
             value = state.block30Input,
             placeholder = "4.00",
             suffix = "s",
             onValueChange = onBlock30Changed
         )
         TimeInputRow(
-            label = "Flying 10m",
+            label = stringResource(R.string.distance_converter_flying_10m),
             value = state.fly10Input,
             placeholder = "1.00",
             suffix = "s",
             onValueChange = onFly10Changed
         )
         TimeInputRow(
-            label = "Reaction",
+            label = stringResource(R.string.distance_converter_reaction),
             value = state.reactionTimeInput,
             placeholder = "0.149",
             suffix = "s",
             onValueChange = onReactionTimeChanged
         )
         TimeInputRow(
-            label = "Wind",
+            label = stringResource(R.string.distance_converter_wind),
             value = state.predictorWindInput,
             placeholder = "0.0",
             suffix = "m/s",
@@ -359,20 +404,20 @@ private fun PredictorMode(
         velocityKmh = state.predictorResult?.velocityKmh
     )
 
-    ResultsCard(title = "Predicted Times") {
+    ResultsCard(title = stringResource(R.string.distance_converter_predicted_times)) {
         SprintDistance.entries.forEachIndexed { index, distance ->
-            ResultRow(label = distance.displayName, time = state.predictorResult?.conversions?.get(distance))
+            ResultRow(label = distance.localizedDisplayName(), time = state.predictorResult?.conversions?.get(distance))
             if (index < SprintDistance.entries.lastIndex) Divider()
         }
     }
 
     NotesCard(
-        title = "Important Notes",
+        title = stringResource(R.string.distance_converter_important_notes),
         notes = listOf(
-            "Model trained on men's 9.58-11.66s 100m range; less accurate outside that range.",
-            "Less reliable for women because the regression model was trained on men's data.",
-            "Uses published coefficients with wind-aware 100m correction.",
-            "Derived distances use WA quadratic-fit coefficients."
+            stringResource(R.string.distance_converter_predictor_note_range),
+            stringResource(R.string.distance_converter_predictor_note_women),
+            stringResource(R.string.distance_converter_predictor_note_wind),
+            stringResource(R.string.distance_converter_predictor_note_coefficients)
         )
     )
 }
@@ -384,26 +429,26 @@ private fun LaneMode(
     onSelectedLaneChanged: (Int) -> Unit
 ) {
     InputCard(
-        title = "Input",
-        footer = "Enter your 200m time and the lane you ran in."
+        title = stringResource(R.string.distance_converter_input),
+        footer = stringResource(R.string.distance_converter_lane_footer)
     ) {
         TimeInputRow(
-            label = "200m Time",
+            label = stringResource(R.string.distance_converter_200m_time),
             value = state.laneTimeInput,
             placeholder = "20.50",
             suffix = "s",
             onValueChange = onLaneTimeChanged
         )
         DropdownSelector(
-            label = "Lane",
+            label = stringResource(R.string.distance_converter_lane),
             selected = state.selectedLane,
             options = LaneDrawConverter.laneRange.toList(),
-            optionLabel = { "Lane $it" },
+            optionLabel = { stringResource(R.string.distance_converter_lane_number, it) },
             onSelected = onSelectedLaneChanged
         )
     }
 
-    ResultsCard(title = "Equivalent Times by Lane") {
+    ResultsCard(title = stringResource(R.string.distance_converter_equivalent_lane_times)) {
         val originalTime = state.laneTimeInput.toDoubleOrNull()
         LaneDrawConverter.laneRange.forEachIndexed { index, lane ->
             LaneResultRow(
@@ -417,12 +462,12 @@ private fun LaneMode(
     }
 
     NotesCard(
-        title = "Important Notes",
+        title = stringResource(R.string.distance_converter_important_notes),
         notes = listOf(
-            "Effect: 0.018s per lane; lane 9 is about 0.14s faster than lane 1.",
-            "Based on Diamond League data from 2015-2021 across 425 results.",
-            "Corrected for athlete ability using season-best times.",
-            "Trained on elite men's data, so the effect may differ for other levels."
+            stringResource(R.string.distance_converter_lane_note_effect),
+            stringResource(R.string.distance_converter_lane_note_data),
+            stringResource(R.string.distance_converter_lane_note_ability),
+            stringResource(R.string.distance_converter_lane_note_population)
         )
     )
 }
@@ -433,7 +478,7 @@ private fun <T> DropdownSelector(
     label: String,
     selected: T,
     options: List<T>,
-    optionLabel: (T) -> String,
+    optionLabel: @Composable (T) -> String,
     onSelected: (T) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -529,9 +574,9 @@ private fun VelocityCard(
     velocityMs: Double?,
     velocityKmh: Double?
 ) {
-    ResultsCard(title = "Top Speed") {
+    ResultsCard(title = stringResource(R.string.distance_converter_top_speed)) {
         MetricRow(
-            label = "Max Velocity",
+            label = stringResource(R.string.distance_converter_max_velocity),
             value = velocityMs?.let { "${formatNumber(it, 3)} m/s" } ?: "- m/s"
         )
         Spacer(modifier = Modifier.height(3.dp))
@@ -569,7 +614,7 @@ private fun SectionCard(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = title.uppercase(Locale.US),
+        text = title.uppercase(),
             style = MaterialTheme.typography.labelSmall,
             color = TextSecondary,
             fontWeight = FontWeight.SemiBold
@@ -593,7 +638,7 @@ private fun SectionCard(
 private fun ResultRow(label: String, time: Double?) {
     MetricRow(
         label = label,
-        value = time?.let { "${formatRaceTime(it)} s" } ?: "- s"
+        value = stringResource(R.string.common_seconds_value, time?.let(::formatRaceTime) ?: "-")
     )
 }
 
@@ -611,7 +656,7 @@ private fun LaneResultRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Lane $lane",
+            text = stringResource(R.string.distance_converter_lane_number, lane),
             style = MaterialTheme.typography.bodyMedium,
             color = TextPrimary,
             fontWeight = if (lane == selectedLane) FontWeight.SemiBold else FontWeight.Normal,
@@ -620,20 +665,24 @@ private fun LaneResultRow(
         if (adjustedTime != null && originalTime != null) {
             val delta = adjustedTime - originalTime
             Text(
-                text = if (lane == selectedLane) "ran" else formatDelta(delta),
+                text = if (lane == selectedLane) {
+                    stringResource(R.string.distance_converter_ran)
+                } else {
+                    formatDelta(delta)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = if (delta < 0.0) AccentBlue else TextSecondary,
                 modifier = Modifier.width(56.dp)
             )
             Text(
-                text = "${formatRaceTime(adjustedTime)} s",
+                text = stringResource(R.string.common_seconds_value, formatRaceTime(adjustedTime)),
                 style = MaterialTheme.typography.titleMedium,
                 color = if (lane == selectedLane) AccentBlue else TextPrimary,
                 fontWeight = FontWeight.SemiBold
             )
         } else {
             Text(
-                text = "- s",
+                text = stringResource(R.string.common_seconds_value, "-"),
                 style = MaterialTheme.typography.titleMedium,
                 color = TextTertiary,
                 fontWeight = FontWeight.SemiBold

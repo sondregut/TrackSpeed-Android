@@ -4,9 +4,11 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.cloud.AuthState
+import com.trackspeed.android.R
 import com.trackspeed.android.cloud.isRealAuthenticated
 import com.trackspeed.android.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +27,7 @@ data class AuthUiState(
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
@@ -36,7 +39,11 @@ class AuthViewModel @Inject constructor(
             authRepository.authState.collect { authState ->
                 _uiState.value = _uiState.value.copy(
                     isLoading = authState is AuthState.Loading,
-                    error = (authState as? AuthState.Error)?.message,
+                    error = if (authState is AuthState.Error) {
+                        context.getString(R.string.auth_error_authentication)
+                    } else {
+                        null
+                    },
                     isAuthenticated = authState.isRealAuthenticated()
                 )
             }
@@ -72,15 +79,15 @@ class AuthViewModel @Inject constructor(
     fun submitEmailAuth() {
         val state = _uiState.value
         if (state.email.isBlank() || state.password.isBlank()) {
-            _uiState.value = state.copy(error = "Please fill in all fields")
+            _uiState.value = state.copy(error = context.getString(R.string.auth_error_fill_fields))
             return
         }
         if (state.isSignUp && state.password != state.confirmPassword) {
-            _uiState.value = state.copy(error = "Passwords don't match")
+            _uiState.value = state.copy(error = context.getString(R.string.auth_error_passwords_mismatch))
             return
         }
         if (state.password.length < 6) {
-            _uiState.value = state.copy(error = "Password must be at least 6 characters")
+            _uiState.value = state.copy(error = context.getString(R.string.auth_error_password_short))
             return
         }
         viewModelScope.launch {

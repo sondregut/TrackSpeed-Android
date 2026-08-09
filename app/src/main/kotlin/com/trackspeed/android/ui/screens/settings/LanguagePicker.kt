@@ -6,8 +6,11 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -40,18 +43,35 @@ data class LanguageOption(
 val supportedLanguages = listOf(
     LanguageOption("system", ""),
     LanguageOption("en", "English"),
+    LanguageOption("ar", "العربية"),
+    LanguageOption("bn", "বাংলা"),
+    LanguageOption("cs", "Čeština"),
+    LanguageOption("da", "Dansk"),
     LanguageOption("de", "Deutsch"),
+    LanguageOption("el", "Ελληνικά"),
     LanguageOption("es", "Espa\u00f1ol"),
+    LanguageOption("fi", "Suomi"),
+    LanguageOption("fil", "Filipino"),
     LanguageOption("fr", "Fran\u00e7ais"),
     LanguageOption("hi", "\u0939\u093f\u0928\u094d\u0926\u0940"),
+    LanguageOption("hu", "Magyar"),
+    LanguageOption("in", "Bahasa Indonesia"),
     LanguageOption("it", "Italiano"),
     LanguageOption("ja", "\u65e5\u672c\u8a9e"),
     LanguageOption("ko", "\ud55c\uad6d\uc5b4"),
+    LanguageOption("ms", "Bahasa Melayu"),
     LanguageOption("nb", "Norsk bokm\u00e5l"),
     LanguageOption("nl", "Nederlands"),
+    LanguageOption("pl", "Polski"),
     LanguageOption("pt-BR", "Portugu\u00eas (Brasil)"),
+    LanguageOption("pt-PT", "Português (Portugal)"),
     LanguageOption("ro", "Rom\u00e2n\u0103"),
     LanguageOption("ru", "\u0420\u0443\u0441\u0441\u043a\u0438\u0439"),
+    LanguageOption("sv", "Svenska"),
+    LanguageOption("th", "ไทย"),
+    LanguageOption("tr", "Türkçe"),
+    LanguageOption("uk", "Українська"),
+    LanguageOption("vi", "Tiếng Việt"),
     LanguageOption("zh-Hans", "\u7b80\u4f53\u4e2d\u6587"),
     LanguageOption("zh-Hant", "\u7e41\u9ad4\u4e2d\u6587")
 )
@@ -103,8 +123,8 @@ fun LanguagePickerDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_language_title)) },
         text = {
-            Column {
-                supportedLanguages.forEach { lang ->
+            LazyColumn(modifier = Modifier.heightIn(max = 560.dp)) {
+                items(supportedLanguages, key = { it.tag }) { lang ->
                     val displayName = if (lang.tag == "system") {
                         stringResource(R.string.settings_language_system_default)
                     } else {

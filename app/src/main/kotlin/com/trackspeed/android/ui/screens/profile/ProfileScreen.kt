@@ -1048,9 +1048,13 @@ private fun SectionHeader(title: String) {
 
 // -- Helpers --
 
+@Composable
 private fun formatTime(seconds: Double): String {
     return when {
-        seconds < 60.0 -> String.format(java.util.Locale.getDefault(), "%.2fs", seconds)
+        seconds < 60.0 -> stringResource(
+            R.string.common_seconds_value,
+            String.format(java.util.Locale.getDefault(), "%.2f", seconds)
+        )
         else -> {
             val min = (seconds / 60).toInt()
             val sec = seconds % 60

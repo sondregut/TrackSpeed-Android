@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.net.Uri
+import android.content.Context
+import com.trackspeed.android.R
 import com.trackspeed.android.cloud.RaceEventService
 import com.trackspeed.android.data.export.CsvExporter
 import com.trackspeed.android.data.local.entities.RunEntity
@@ -13,6 +15,7 @@ import com.trackspeed.android.data.repository.SettingsRepository
 import com.trackspeed.android.diagnostics.DetectionReviewLogStore
 import com.trackspeed.android.ui.components.DetectionReviewSubmission
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -52,6 +55,7 @@ data class SessionDetailUiState(
 
 @HiltViewModel
 class SessionDetailViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
     private val sessionRepository: SessionRepository,
     private val csvExporter: CsvExporter,
@@ -94,7 +98,7 @@ class SessionDetailViewModel @Inject constructor(
                         } else {
                             athleteMap[run.athleteId] = AthleteChipBuilder(
                                 id = run.athleteId,
-                                name = run.athleteName ?: "Unknown",
+                                name = run.athleteName ?: context.getString(R.string.stats_unknown_athlete),
                                 color = run.athleteColor,
                                 count = 1
                             )

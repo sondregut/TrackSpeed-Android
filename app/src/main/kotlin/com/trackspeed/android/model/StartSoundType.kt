@@ -1,30 +1,33 @@
 package com.trackspeed.android.model
 
+import androidx.annotation.StringRes
+import com.trackspeed.android.R
+
 /**
  * Start signal sound options matching iOS StartSoundType.
  */
 enum class StartSoundType(
     val rawValue: String,
-    val displayName: String,
-    val subtitle: String,
+    @StringRes val displayNameRes: Int,
+    @StringRes val subtitleRes: Int,
     val isAvailable: Boolean
 ) {
     BEEP(
         rawValue = "beep",
-        displayName = "Beep",
-        subtitle = "Simple electronic beep",
+        displayNameRes = R.string.start_sound_beep,
+        subtitleRes = R.string.start_sound_beep_desc,
         isAvailable = true
     ),
     GUNSHOT(
         rawValue = "gunshot",
-        displayName = "Gunshot",
-        subtitle = "Realistic starting pistol",
+        displayNameRes = R.string.start_sound_gunshot,
+        subtitleRes = R.string.start_sound_gunshot_desc,
         isAvailable = true
     ),
     WHISTLE(
         rawValue = "whistle",
-        displayName = "Whistle",
-        subtitle = "Coach whistle",
+        displayNameRes = R.string.start_sound_whistle,
+        subtitleRes = R.string.start_sound_whistle_desc,
         isAvailable = false
     );
 

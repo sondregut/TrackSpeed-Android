@@ -25,6 +25,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.res.stringResource
+import com.trackspeed.android.R
 import com.trackspeed.android.cloud.RemoteConfigState
 import com.trackspeed.android.ui.theme.AccentBlue
 import com.trackspeed.android.ui.theme.BackgroundGradientTop
@@ -47,15 +49,15 @@ fun RemoteConfigGate(
     }
 
     val title = when {
-        state.isMaintenanceMode -> "Under maintenance"
-        needsUpdate -> "Update required"
-        else -> "TrackSpeed is unavailable"
+        state.isMaintenanceMode -> stringResource(R.string.remote_config_maintenance_title)
+        needsUpdate -> stringResource(R.string.remote_config_update_title)
+        else -> stringResource(R.string.remote_config_unavailable_title)
     }
 
     val body = when {
-        state.isMaintenanceMode -> "We're making improvements. Please check back in a few minutes."
-        needsUpdate -> "A newer version of TrackSpeed is required to continue."
-        else -> "We're temporarily unable to start. Please try again later."
+        state.isMaintenanceMode -> stringResource(R.string.remote_config_maintenance_body)
+        needsUpdate -> stringResource(R.string.remote_config_update_body)
+        else -> stringResource(R.string.remote_config_unavailable_body)
     }
 
     Box(
@@ -109,7 +111,7 @@ fun RemoteConfigGate(
                         .height(52.dp)
                 ) {
                     Text(
-                        text = "Update on Google Play",
+                        text = stringResource(R.string.remote_config_update_action),
                         fontWeight = FontWeight.SemiBold
                     )
                 }

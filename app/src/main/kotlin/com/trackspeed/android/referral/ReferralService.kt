@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.trackspeed.android.billing.PromoCodeService
+import com.trackspeed.android.R
 import com.trackspeed.android.cloud.DeviceIdProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -161,7 +162,13 @@ class ReferralService @Inject constructor(
     suspend fun getShareMessage(): String {
         val code = getOrCreateReferralCode()
         val link = getReferralLink()
-        return "Join me on TrackSpeed and use my code $code to get started!\n\nDownload for iOS: $APP_STORE_URL\nDownload for Android: $PLAY_STORE_URL\n\n$link"
+        return context.getString(
+            R.string.referral_share_message,
+            code,
+            APP_STORE_URL,
+            PLAY_STORE_URL,
+            link
+        )
     }
 
     /**

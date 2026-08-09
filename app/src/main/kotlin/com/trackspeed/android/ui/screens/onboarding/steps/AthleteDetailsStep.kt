@@ -24,6 +24,7 @@ import com.trackspeed.android.ui.theme.*
 import com.trackspeed.android.data.model.SportCategory
 import com.trackspeed.android.data.model.SportDiscipline
 import com.trackspeed.android.data.model.UserRole
+import com.trackspeed.android.ui.util.localizedDisplayName
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,12 +104,12 @@ fun AthleteDetailsStep(
                         if (selectedDiscipline != null) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    selectedDiscipline.displayName,
+                                    selectedDiscipline.localizedDisplayName(),
                                     color = TextPrimary,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
-                                    selectedDiscipline.category.displayName,
+                                    selectedDiscipline.category.localizedDisplayName(),
                                     color = TextMuted,
                                     fontSize = 12.sp
                                 )
@@ -153,7 +154,7 @@ fun AthleteDetailsStep(
                 SportDiscipline.byCategory().forEach { (category, disciplines) ->
                     item {
                         Text(
-                            category.displayName,
+                            category.localizedDisplayName(),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextSecondary,
@@ -173,7 +174,7 @@ fun AthleteDetailsStep(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    discipline.displayName,
+                                    discipline.localizedDisplayName(),
                                     color = if (selectedDiscipline == discipline) AccentBlue else TextPrimary,
                                     modifier = Modifier.weight(1f)
                                 )

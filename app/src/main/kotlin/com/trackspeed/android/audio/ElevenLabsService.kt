@@ -29,13 +29,13 @@ import javax.inject.Singleton
 /**
  * Available ElevenLabs voice IDs.
  */
-enum class ElevenLabsVoiceId(val id: String, val displayName: String, val gender: String) {
-    ADAM("pNInz6obpgDQGcFmaJgB", "Adam", "Male"),
-    JOSH("TxGEqnHWrfWFTfGW9XjX", "Josh", "Male"),
-    ARNOLD("VR6AewLTigWG4xSOukaG", "Arnold", "Male"),
-    RACHEL("21m00Tcm4TlvDq8ikWAM", "Rachel", "Female"),
-    BELLA("EXAVITQu4vr4xnSDxMaL", "Bella", "Female"),
-    ELLI("MF3mGyEYCl7XYWbV9V6O", "Elli", "Female");
+enum class ElevenLabsVoiceId(val id: String, val displayName: String) {
+    ADAM("pNInz6obpgDQGcFmaJgB", "Adam"),
+    JOSH("TxGEqnHWrfWFTfGW9XjX", "Josh"),
+    ARNOLD("VR6AewLTigWG4xSOukaG", "Arnold"),
+    RACHEL("21m00Tcm4TlvDq8ikWAM", "Rachel"),
+    BELLA("EXAVITQu4vr4xnSDxMaL", "Bella"),
+    ELLI("MF3mGyEYCl7XYWbV9V6O", "Elli");
 
     companion object {
         fun fromString(value: String): ElevenLabsVoiceId =
@@ -46,9 +46,9 @@ enum class ElevenLabsVoiceId(val id: String, val displayName: String, val gender
 /**
  * Voice provider selection.
  */
-enum class VoiceProvider(val displayName: String) {
-    ELEVEN_LABS("AI Voice (Premium)"),
-    SYSTEM("System Voice");
+enum class VoiceProvider {
+    ELEVEN_LABS,
+    SYSTEM;
 
     companion object {
         fun fromString(value: String): VoiceProvider =
@@ -244,7 +244,7 @@ class ElevenLabsService @Inject constructor(
         languageCode: String = "en",
         includeReadyCommand: Boolean = false
     ) {
-        val commands = VoiceCommandPhrases.forLanguage(languageCode)
+        val commands = VoiceCommandPhrases.forLanguage(context, languageCode)
         val phrases = buildList {
             add(commands.onYourMarks)
             if (includeReadyCommand) add(commands.ready)
@@ -262,7 +262,7 @@ class ElevenLabsService @Inject constructor(
      *      10.23 -> "10 Komma 23 Sekunden" (German)
      */
     fun formatTimeForSpeech(seconds: Double, languageCode: String = "en"): String {
-        val commands = VoiceCommandPhrases.forLanguage(languageCode)
+        val commands = VoiceCommandPhrases.forLanguage(context, languageCode)
         val wholePart = seconds.toInt()
         val fractionalPart = ((seconds - wholePart) * 100).toInt()
 

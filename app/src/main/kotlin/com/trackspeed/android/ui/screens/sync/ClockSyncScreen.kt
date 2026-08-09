@@ -297,7 +297,11 @@ private fun SyncSuccessDetails(uiState: ClockSyncUiState) {
 
             DetailRow(stringResource(R.string.sync_details_offset), String.format(stringResource(R.string.sync_details_ms_format), uiState.offsetMs))
             DetailRow(stringResource(R.string.sync_details_uncertainty), String.format(stringResource(R.string.sync_details_ms_format), uiState.uncertaintyMs))
-            DetailRow(stringResource(R.string.sync_details_quality), uiState.quality.name, getQualityColor(uiState.quality))
+            DetailRow(
+                stringResource(R.string.sync_details_quality),
+                stringResource(uiState.quality.labelResource()),
+                getQualityColor(uiState.quality)
+            )
         }
     }
 }
@@ -331,4 +335,12 @@ private fun getQualityColor(quality: SyncQuality): Color {
         SyncQuality.POOR -> Color(0xFFFF9800)       // Orange
         SyncQuality.BAD -> Color(0xFFF44336)        // Red
     }
+}
+
+private fun SyncQuality.labelResource(): Int = when (this) {
+    SyncQuality.EXCELLENT -> R.string.race_quality_excellent
+    SyncQuality.GOOD -> R.string.race_quality_good
+    SyncQuality.FAIR -> R.string.race_quality_fair
+    SyncQuality.POOR -> R.string.race_quality_poor
+    SyncQuality.BAD -> R.string.race_quality_bad
 }

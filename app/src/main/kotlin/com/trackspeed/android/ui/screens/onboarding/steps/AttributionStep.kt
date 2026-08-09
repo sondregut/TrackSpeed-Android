@@ -27,6 +27,7 @@ import com.trackspeed.android.R
 import com.trackspeed.android.ui.theme.*
 
 private data class AttributionSource(
+    val value: String,
     val label: String,
     val icon: ImageVector
 )
@@ -44,17 +45,17 @@ fun AttributionStep(
     var isAffiliateExpanded by remember { mutableStateOf(false) }
 
     val attributionSources = listOf(
-        AttributionSource(stringResource(R.string.onboarding_attribution_instagram), Icons.Default.CameraAlt),
-        AttributionSource("Facebook", Icons.Default.Person),
-        AttributionSource(stringResource(R.string.onboarding_attribution_tiktok), Icons.Default.MusicNote),
-        AttributionSource("X", Icons.Default.AlternateEmail),
-        AttributionSource("Reddit", Icons.Default.Forum),
-        AttributionSource(stringResource(R.string.onboarding_attribution_youtube), Icons.Default.PlayArrow),
-        AttributionSource(stringResource(R.string.onboarding_attribution_google), Icons.Default.Search),
-        AttributionSource(stringResource(R.string.onboarding_attribution_appstore), Icons.Default.Shop),
-        AttributionSource("Website", Icons.Default.Language),
-        AttributionSource("Friend or family", Icons.Default.People),
-        AttributionSource(stringResource(R.string.onboarding_attribution_other), Icons.Default.MoreHoriz)
+        AttributionSource("instagram", stringResource(R.string.onboarding_attribution_instagram), Icons.Default.CameraAlt),
+        AttributionSource("facebook", stringResource(R.string.onboarding_attribution_facebook), Icons.Default.Person),
+        AttributionSource("tiktok", stringResource(R.string.onboarding_attribution_tiktok), Icons.Default.MusicNote),
+        AttributionSource("x", stringResource(R.string.onboarding_attribution_x), Icons.Default.AlternateEmail),
+        AttributionSource("reddit", stringResource(R.string.onboarding_attribution_reddit), Icons.Default.Forum),
+        AttributionSource("youtube", stringResource(R.string.onboarding_attribution_youtube), Icons.Default.PlayArrow),
+        AttributionSource("google", stringResource(R.string.onboarding_attribution_google), Icons.Default.Search),
+        AttributionSource("google_play", stringResource(R.string.onboarding_attribution_appstore), Icons.Default.Shop),
+        AttributionSource("website", stringResource(R.string.onboarding_attribution_website), Icons.Default.Language),
+        AttributionSource("friend_family", stringResource(R.string.onboarding_attribution_friend_family), Icons.Default.People),
+        AttributionSource("other", stringResource(R.string.onboarding_attribution_other), Icons.Default.MoreHoriz)
     )
 
     Column(
@@ -63,7 +64,7 @@ fun AttributionStep(
     ) {
         // Title at top
         Text(
-            "Where did you hear about us?",
+            stringResource(R.string.onboarding_attribution_title),
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = TextPrimary,
@@ -96,11 +97,11 @@ fun AttributionStep(
             attributionSources.forEach { source ->
                 AttributionSourceRow(
                     source = source,
-                    isSelected = selected == source.label,
+                    isSelected = selected == source.value,
                     onClick = {
-                        selected = source.label
+                        selected = source.value
                         isAffiliateExpanded = false
-                        onAttributionSelected(source.label)
+                        onAttributionSelected(source.value)
                     }
                 )
             }
@@ -164,8 +165,8 @@ private fun AffiliateCodeRow(
                     tint = if (isActive) AccentBlue else TextSecondary
                 )
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Affiliate", fontSize = 16.sp, color = TextPrimary)
-                    Text("Let us know who sent you", fontSize = 12.sp, color = TextSecondary)
+                    Text(stringResource(R.string.onboarding_attribution_affiliate), fontSize = 16.sp, color = TextPrimary)
+                    Text(stringResource(R.string.onboarding_attribution_affiliate_body), fontSize = 12.sp, color = TextSecondary)
                 }
                 if (code.isNotBlank()) {
                     Icon(
@@ -192,7 +193,7 @@ private fun AffiliateCodeRow(
                 OutlinedTextField(
                     value = code,
                     onValueChange = onCodeChanged,
-                    placeholder = { Text("Enter affiliate code") },
+                    placeholder = { Text(stringResource(R.string.onboarding_attribution_affiliate_hint)) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 10.dp),

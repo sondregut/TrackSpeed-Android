@@ -1,6 +1,8 @@
 package com.trackspeed.android.ui.screens.videooverlay
 
 import android.net.Uri
+import android.content.Context
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,6 +10,10 @@ import androidx.media3.common.util.UnstableApi
 import com.trackspeed.android.data.local.entities.RunEntity
 import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.data.repository.SettingsRepository
+import com.trackspeed.android.R
+import com.trackspeed.android.model.StartType
+import com.trackspeed.android.ui.util.formatDistance
+import com.trackspeed.android.ui.util.shortNameResource
 import com.trackspeed.android.videooverlay.ImportedVideo
 import com.trackspeed.android.videooverlay.VideoOverlayExportService
 import com.trackspeed.android.videooverlay.VideoOverlaySnapshot
@@ -32,7 +38,7 @@ sealed interface VideoExportPhase {
     data object Idle : VideoExportPhase
     data class Exporting(val progress: Double) : VideoExportPhase
     data class Ready(val file: File) : VideoExportPhase
-    data class Error(val message: String) : VideoExportPhase
+    data class Error(@StringRes val messageRes: Int) : VideoExportPhase
 }
 
 data class VideoOverlayUiState(
@@ -44,9 +50,9 @@ data class VideoOverlayUiState(
     val startMarkerTimeSeconds: Double = 0.0,
     val showSpeed: Boolean = true,
     val showRunType: Boolean = true,
-    val importError: String? = null,
+    @StringRes val importErrorRes: Int? = null,
     val exportPhase: VideoExportPhase = VideoExportPhase.Idle,
-    val savedMessage: String? = null
+    @StringRes val savedMessageRes: Int? = null
 ) {
     val snapshot: VideoOverlaySnapshot?
         get() {
@@ -65,6 +71,7 @@ data class VideoOverlayUiState(
 @HiltViewModel
 @UnstableApi
 class VideoOverlayViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
     private val sessionRepository: SessionRepository,
     private val settingsRepository: SettingsRepository,
@@ -94,8 +101,8 @@ class VideoOverlayViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
-                    importError = null,
-                    savedMessage = null,
+                    importErrorRes = null,
+                    savedMessageRes = null,
                     exportPhase = VideoExportPhase.Idle
                 )
             }
@@ -107,13 +114,13 @@ class VideoOverlayViewModel @Inject constructor(
                             importedVideo = imported,
                             step = VideoOverlayStep.MARK_START,
                             startMarkerTimeSeconds = 0.0,
-                            importError = null
+                            importErrorRes = null
                         )
                     }
                 }
-                .onFailure { error ->
+                .onFailure {
                     _uiState.update {
-                        it.copy(importError = error.message ?: "Could not load that video. Try another clip.")
+                        it.copy(importErrorRes = R.string.video_overlay_import_failed)
                     }
                 }
         }
@@ -125,7 +132,7 @@ class VideoOverlayViewModel @Inject constructor(
                 startMarkerTimeSeconds = seconds.coerceIn(0.0, it.importedVideo?.durationSeconds ?: seconds),
                 step = VideoOverlayStep.PREVIEW,
                 exportPhase = VideoExportPhase.Idle,
-                savedMessage = null
+                savedMessageRes = null
             )
         }
     }
@@ -139,7 +146,7 @@ class VideoOverlayViewModel @Inject constructor(
             it.copy(
                 showSpeed = show,
                 exportPhase = VideoExportPhase.Idle,
-                savedMessage = null
+                savedMessageRes = null
             )
         }
     }
@@ -149,7 +156,7 @@ class VideoOverlayViewModel @Inject constructor(
             it.copy(
                 showRunType = show,
                 exportPhase = VideoExportPhase.Idle,
-                savedMessage = null
+                savedMessageRes = null
             )
         }
     }
@@ -157,9 +164,9 @@ class VideoOverlayViewModel @Inject constructor(
     fun exportVideo() {
         val snapshot = _uiState.value.snapshot ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(exportPhase = VideoExportPhase.Exporting(0.0), savedMessage = null) }
+            _uiState.update { it.copy(exportPhase = VideoExportPhase.Exporting(0.0), savedMessageRes = null) }
             runCatching {
-                exportService.export(snapshot) { progress ->
+                exportService.export(localizeSnapshot(snapshot)) { progress ->
                     _uiState.update { current ->
                         if (current.exportPhase is VideoExportPhase.Exporting) {
                             current.copy(exportPhase = VideoExportPhase.Exporting(progress))
@@ -170,9 +177,9 @@ class VideoOverlayViewModel @Inject constructor(
                 }
             }.onSuccess { file ->
                 _uiState.update { it.copy(exportPhase = VideoExportPhase.Ready(file)) }
-            }.onFailure { error ->
+            }.onFailure {
                 _uiState.update {
-                    it.copy(exportPhase = VideoExportPhase.Error(error.message ?: "Video export failed."))
+                    it.copy(exportPhase = VideoExportPhase.Error(R.string.video_overlay_export_failed))
                 }
             }
         }
@@ -187,11 +194,11 @@ class VideoOverlayViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { exportService.saveToMediaStore(file) }
                 .onSuccess {
-                    _uiState.update { it.copy(savedMessage = "Saved to Photos") }
+                    _uiState.update { it.copy(savedMessageRes = R.string.video_overlay_saved) }
                 }
-                .onFailure { error ->
+                .onFailure {
                     _uiState.update {
-                        it.copy(exportPhase = VideoExportPhase.Error(error.message ?: "Could not save the video."))
+                        it.copy(exportPhase = VideoExportPhase.Error(R.string.video_overlay_save_failed))
                     }
                 }
         }
@@ -200,6 +207,29 @@ class VideoOverlayViewModel @Inject constructor(
     fun shareUri(file: File): Uri = exportService.shareUri(file)
 
     fun clearSavedMessage() {
-        _uiState.update { it.copy(savedMessage = null) }
+        _uiState.update { it.copy(savedMessageRes = null) }
+    }
+
+    fun localizeSnapshot(snapshot: VideoOverlaySnapshot): VideoOverlaySnapshot {
+        val run = _uiState.value.run
+        val localizedRunType = run?.let {
+            val startType = context.getString(StartType.fromRawValue(it.startType).shortNameResource())
+            if (it.distance > 0.0) {
+                context.getString(R.string.video_overlay_run_type, startType, formatDistance(it.distance))
+            } else {
+                startType
+            }
+        }
+        return snapshot.copy(
+            splits = snapshot.splits.map { split ->
+                if (split.label == "FINISH") {
+                    split.copy(label = context.getString(R.string.video_overlay_finish))
+                } else {
+                    split
+                }
+            },
+            runTypeLabel = localizedRunType,
+            readyLabel = context.getString(R.string.video_overlay_ready)
+        )
     }
 }

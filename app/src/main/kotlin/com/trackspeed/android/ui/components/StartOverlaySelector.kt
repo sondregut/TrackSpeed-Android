@@ -1,5 +1,6 @@
 package com.trackspeed.android.ui.components
 
+import androidx.annotation.StringRes
 import com.trackspeed.android.model.StartType
 import com.trackspeed.android.ui.theme.*
 
@@ -46,38 +47,38 @@ import com.trackspeed.android.R
  * Start mode options matching the iOS start type selection.
  */
 enum class StartMode(
-    val displayName: String,
-    val description: String,
+    @StringRes val displayNameRes: Int,
+    @StringRes val descriptionRes: Int,
     val icon: ImageVector,
     val rawValue: String
 ) {
     FLYING(
-        displayName = "Flying",
-        description = "Gate-triggered start. Timer starts when athlete crosses the gate line.",
+        displayNameRes = R.string.setup_start_flying,
+        descriptionRes = R.string.start_selector_standard_desc,
         icon = Icons.AutoMirrored.Filled.DirectionsRun,
         rawValue = "flying"
     ),
     COUNTDOWN(
-        displayName = "Countdown",
-        description = "3... 2... 1... BEEP! Visual countdown with automatic start.",
+        displayNameRes = R.string.start_selector_countdown,
+        descriptionRes = R.string.start_selector_countdown_desc,
         icon = Icons.Default.Timer,
         rawValue = "countdown"
     ),
     VOICE(
-        displayName = "Voice Command",
-        description = "\"On your marks... Set... GO!\" Spoken commands like a real starter.",
+        displayNameRes = R.string.start_selector_voice,
+        descriptionRes = R.string.start_selector_voice_desc,
         icon = Icons.Default.Mic,
         rawValue = "voiceCommand"
     ),
     TOUCH(
-        displayName = "Touch Start",
-        description = "Touch screen, hold, then lift finger to start the timer.",
+        displayNameRes = R.string.start_selector_touch,
+        descriptionRes = R.string.start_selector_touch_desc,
         icon = Icons.Default.TouchApp,
         rawValue = "touchRelease"
     ),
     INFRAME(
-        displayName = "In-Frame",
-        description = "Stand in front of camera, step away to start.",
+        displayNameRes = R.string.start_selector_inframe,
+        descriptionRes = R.string.start_selector_inframe_desc,
         icon = Icons.Default.PersonOff,
         rawValue = "inFrame"
     );
@@ -210,14 +211,14 @@ private fun StartModeOption(
         // Text content
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = mode.displayName,
+                text = stringResource(mode.displayNameRes),
                 color = titleColor,
                 fontSize = 17.sp,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = mode.description,
+                text = stringResource(mode.descriptionRes),
                 color = TextSecondary,
                 fontSize = 13.sp,
                 lineHeight = 18.sp
