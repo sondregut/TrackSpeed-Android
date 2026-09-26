@@ -1,0 +1,76 @@
+ m .claude/worktrees/agent-a91d0ab8
+ M app/src/main/AndroidManifest.xml
+ M app/src/main/kotlin/com/trackspeed/android/audio/CrossingFeedback.kt
+ M app/src/main/kotlin/com/trackspeed/android/audio/VoiceStartService.kt
+ M app/src/main/kotlin/com/trackspeed/android/billing/SubscriptionManager.kt
+ M app/src/main/kotlin/com/trackspeed/android/detection/GateEngine.kt
+ M app/src/main/kotlin/com/trackspeed/android/model/StartType.kt
+ M app/src/main/kotlin/com/trackspeed/android/model/TestPreset.kt
+ M app/src/main/kotlin/com/trackspeed/android/protocol/TimingMessage.kt
+ M app/src/main/kotlin/com/trackspeed/android/sync/BleClockSyncService.kt
+ M app/src/main/kotlin/com/trackspeed/android/sync/BleMessageFramer.kt
+ M app/src/main/kotlin/com/trackspeed/android/sync/BleRoleElection.kt
+ M app/src/main/kotlin/com/trackspeed/android/sync/ClockSyncCalculator.kt
+ M app/src/main/kotlin/com/trackspeed/android/sync/ClockSyncConfig.kt
+ M app/src/main/kotlin/com/trackspeed/android/sync/ClockSyncManager.kt
+ M app/src/main/kotlin/com/trackspeed/android/sync/CriticalMessageRetryTracker.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/components/CameraPreview.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/components/CountdownOverlay.kt
+ D app/src/main/kotlin/com/trackspeed/android/ui/components/InFrameStartOverlay.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/components/StartOverlaySelector.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/components/TimingSessionEndOverlay.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/components/VoiceStartOverlay.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/navigation/NavGraph.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/onboarding/steps/StartTypesStep.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/paywall/PaywallScreen.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/paywall/PaywallViewModel.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/race/RaceModeScreen.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/race/RaceModeViewModel.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/race/RacePairingReadiness.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/settings/SettingsScreen.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/setup/SessionSetupScreen.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/setup/SessionSetupViewModel.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/sync/ClockSyncScreen.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/sync/ClockSyncViewModel.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/timing/BasicTimingScreen.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/screens/timing/BasicTimingViewModel.kt
+ M app/src/main/kotlin/com/trackspeed/android/ui/util/LocalizedLabels.kt
+ M app/src/main/res/values/strings.xml
+ M app/src/test/kotlin/com/trackspeed/android/protocol/TimingMessageCodecTest.kt
+ M app/src/test/kotlin/com/trackspeed/android/sync/BleMessageFramerTest.kt
+ M app/src/test/kotlin/com/trackspeed/android/sync/BleRoleElectionTest.kt
+ M app/src/test/kotlin/com/trackspeed/android/sync/ClockSyncCalculatorTest.kt
+ M app/src/test/kotlin/com/trackspeed/android/sync/CriticalMessageRetryTrackerTest.kt
+ M app/src/test/kotlin/com/trackspeed/android/ui/screens/race/RacePairingReadinessTest.kt
+ M docs/PARITY_VERIFICATION_2026-07-21.md
+ M docs/protocols/CLOCK_SYNC_DETAILS.md
+ M docs/protocols/CROSS_PLATFORM_PROTOCOL.md
+?? .codex/
+?? app/src/androidTest/
+?? app/src/debug/
+?? app/src/main/kotlin/com/trackspeed/android/billing/BillingInstallSource.kt
+?? app/src/main/kotlin/com/trackspeed/android/protocol/TimingBootstrapPolicy.kt
+?? app/src/main/kotlin/com/trackspeed/android/sync/ClockSyncFailureNotificationPolicy.kt
+?? app/src/main/kotlin/com/trackspeed/android/sync/ClockSyncHandshakeReplayPolicy.kt
+?? app/src/main/kotlin/com/trackspeed/android/sync/ClockSyncOneWayBound.kt
+?? app/src/main/kotlin/com/trackspeed/android/sync/ClockSyncSetupProgress.kt
+?? app/src/main/kotlin/com/trackspeed/android/sync/TimingTransportRoutePolicy.kt
+?? app/src/main/kotlin/com/trackspeed/android/sync/WifiAwareClockSyncService.kt
+?? app/src/main/kotlin/com/trackspeed/android/ui/components/CameraPreviewTransformPolicy.kt
+?? app/src/main/kotlin/com/trackspeed/android/ui/screens/race/RaceTimingEventPolicy.kt
+?? app/src/test/kotlin/com/trackspeed/android/billing/BillingInstallSourceTest.kt
+?? app/src/test/kotlin/com/trackspeed/android/model/
+?? app/src/test/kotlin/com/trackspeed/android/sync/ClockSyncFailureNotificationPolicyTest.kt
+?? app/src/test/kotlin/com/trackspeed/android/sync/ClockSyncHandshakeReplayPolicyTest.kt
+?? app/src/test/kotlin/com/trackspeed/android/sync/ClockSyncOneWayBoundTest.kt
+?? app/src/test/kotlin/com/trackspeed/android/sync/ClockSyncSetupProgressTest.kt
+?? app/src/test/kotlin/com/trackspeed/android/sync/TimingTransportRoutePolicyTest.kt
+?? app/src/test/kotlin/com/trackspeed/android/sync/WifiAwareClockSyncServiceTest.kt
+?? app/src/test/kotlin/com/trackspeed/android/ui/components/CameraPreviewTransformPolicyTest.kt
+?? app/src/test/kotlin/com/trackspeed/android/ui/screens/race/RaceTimingEventPolicyTest.kt
+?? docs/WIFI_AWARE_FIELD_LOG.md
+?? docs/reviews/
+?? outputs/
+?? play-assets/
+?? scripts/__pycache__/
+?? tmp/

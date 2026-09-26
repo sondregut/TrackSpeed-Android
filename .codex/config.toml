@@ -1,0 +1,5 @@
+[mcp_servers.revenuecat]
+url = "https://mcp.revenuecat.ai/mcp"
+
+[mcp_servers.revenuecat.http_headers]
+Authorization = "Bearer sk_dKTVaJFIIhoTOPeeEmYIvYWuwBKgr"

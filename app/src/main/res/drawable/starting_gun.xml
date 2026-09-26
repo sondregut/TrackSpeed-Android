@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+
+    <!-- Barrel -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M8,22 L34,22 C35.1,22 36,22.9 36,24 L36,28 C36,29.1 35.1,30 34,30 L8,30 C6.9,30 6,29.1 6,28 L6,24 C6,22.9 6.9,22 8,22 Z" />
+
+    <!-- Body/receiver -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M29,18 L39,18 C40.66,18 42,19.34 42,21 L42,31 C42,32.66 40.66,34 39,34 L29,34 C27.34,34 26,32.66 26,31 L26,21 C26,19.34 27.34,18 29,18 Z" />
+
+    <!-- Trigger guard -->
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M30,34 Q30,42 36,42 Q42,42 42,34" />
+
+    <!-- Grip -->
+    <group
+        android:pivotX="40"
+        android:pivotY="41"
+        android:rotation="8">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M39,32 L41,32 C42.66,32 44,33.34 44,35 L44,47 C44,48.66 42.66,50 41,50 L39,50 C37.34,50 36,48.66 36,47 L36,35 C36,33.34 37.34,32 39,32 Z" />
+    </group>
+
+    <!-- Muzzle flash / smoke puff -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M5,22 m-3.5,0 a3.5,3.5 0 1,1 7,0 a3.5,3.5 0 1,1 -7,0" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M3,17 m-2.5,0 a2.5,2.5 0 1,1 5,0 a2.5,2.5 0 1,1 -5,0" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M9,16 m-2.8,0 a2.8,2.8 0 1,1 5.6,0 a2.8,2.8 0 1,1 -5.6,0" />
+</vector>

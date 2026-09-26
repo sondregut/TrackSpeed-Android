@@ -1,0 +1,28 @@
+# Build output and caches
+.gradle/
+build/
+app/build/
+*.apk
+*.aab
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Local machine config and signing
+local.properties
+*.jks
+*.keystore
+*.p8
+*.p12
+.env
+
+# IDE / tooling
+.idea/
+*.iml
+.DS_Store
+__pycache__/
+.claude/
+
+# Scratch
+tmp/

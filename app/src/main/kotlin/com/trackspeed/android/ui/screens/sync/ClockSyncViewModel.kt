@@ -1,0 +1,152 @@
+package com.trackspeed.android.ui.screens.sync
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.R
+import com.trackspeed.android.data.repository.SettingsRepository
+import com.trackspeed.android.protocol.TimingRole
+import com.trackspeed.android.protocol.TimingSessionConfig
+import com.trackspeed.android.protocol.TimingProtocolCompatibility
+import com.trackspeed.android.sync.ClockSyncManager
+import com.trackspeed.android.sync.SyncQuality
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class ClockSyncViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val clockSyncManager: ClockSyncManager,
+    private val settingsRepository: SettingsRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(ClockSyncUiState())
+    val uiState: StateFlow<ClockSyncUiState> = _uiState.asStateFlow()
+
+    init {
+        // Observe sync state changes
+        viewModelScope.launch {
+            clockSyncManager.syncState.collect { state ->
+                _uiState.update { current ->
+                    when (state) {
+                        is ClockSyncManager.SyncState.NotSynced -> current.copy(
+                            status = SyncStatus.NOT_SYNCED,
+                            progress = 0f,
+                            errorMessage = null
+                        )
+                        is ClockSyncManager.SyncState.WaitingForPeer -> current.copy(
+                            status = SyncStatus.WAITING_FOR_PEER,
+                            progress = 0f,
+                            errorMessage = null
+                        )
+                        is ClockSyncManager.SyncState.Connecting -> current.copy(
+                            status = SyncStatus.CONNECTING,
+                            progress = 0f,
+                            errorMessage = null
+                        )
+                        is ClockSyncManager.SyncState.Syncing -> current.copy(
+                            status = SyncStatus.SYNCING,
+                            progress = state.progress,
+                            errorMessage = null
+                        )
+                        is ClockSyncManager.SyncState.Synced -> current.copy(
+                            status = SyncStatus.SYNCED,
+                            progress = 1f,
+                            offsetMs = state.offsetMs,
+                            quality = state.quality,
+                            uncertaintyMs = state.uncertaintyMs,
+                            errorMessage = null
+                        )
+                        is ClockSyncManager.SyncState.Error -> current.copy(
+                            status = SyncStatus.ERROR,
+                            progress = 0f,
+                            errorMessage = state.message.takeIf {
+                                it == TimingProtocolCompatibility.updateRequiredMessage
+                            } ?: context.getString(R.string.sync_error_message)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Observe server/client role
+        viewModelScope.launch {
+            clockSyncManager.isServer.collect { isServer ->
+                _uiState.update { it.copy(isServer = isServer) }
+            }
+        }
+    }
+
+    /**
+     * Start auto-sync in dual-mode: advertise + scan simultaneously.
+     * Role is resolved automatically when a peer connects.
+     */
+    fun startSync() {
+        viewModelScope.launch {
+            val distance = settingsRepository.defaultDistance.first()
+            val startType = settingsRepository.startType.first()
+            val config = TimingSessionConfig(
+                distance = distance,
+                startType = startType,
+                numberOfGates = 2,
+                hostRole = TimingRole.START_LINE
+            )
+            clockSyncManager.startAutoSync(config)
+        }
+    }
+
+    fun startAsServer() {
+        viewModelScope.launch {
+            val distance = settingsRepository.defaultDistance.first()
+            val startType = settingsRepository.startType.first()
+            val config = TimingSessionConfig(
+                distance = distance,
+                startType = startType,
+                numberOfGates = 2,
+                hostRole = TimingRole.START_LINE
+            )
+            clockSyncManager.startAsServer(config)
+            _uiState.update { it.copy(isServer = true) }
+        }
+    }
+
+    fun startAsClient() {
+        clockSyncManager.startAsClient()
+        _uiState.update { it.copy(isServer = false) }
+    }
+
+    fun stop() {
+        clockSyncManager.stop()
+    }
+
+    fun getSyncDetails(): ClockSyncManager.SyncDetails? {
+        return clockSyncManager.getSyncDetails()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        clockSyncManager.stop()
+    }
+}
+
+data class ClockSyncUiState(
+    val status: SyncStatus = SyncStatus.NOT_SYNCED,
+    val isServer: Boolean = false,
+    val progress: Float = 0f,
+    val offsetMs: Double = 0.0,
+    val quality: SyncQuality = SyncQuality.BAD,
+    val uncertaintyMs: Double = 0.0,
+    val errorMessage: String? = null
+)
+
+enum class SyncStatus {
+    NOT_SYNCED,
+    WAITING_FOR_PEER,
+    CONNECTING,
+    SYNCING,
+    SYNCED,
+    ERROR
+}

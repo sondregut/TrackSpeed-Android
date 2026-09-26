@@ -1,0 +1,206 @@
+278:    init {
+678:    private fun initializeCamera(useFrontCamera: Boolean) {
+692:    private fun updateCameraMetadata() {
+704:    private fun desiredFrontCamera(state: RaceModeUiState): Boolean {
+711:    private fun ensureDesiredCameraFacing() {
+733:    private fun pairingStatusForMode(
+748:    fun onBluetoothPermissionResult(granted: Boolean) {
+764:    fun startRaceMode() {
+815:    private fun observeActiveSessionRuns(targetSessionId: String) {
+829:    fun confirmPairing() {
+874:    fun onCameraPermissionGranted() {
+878:    fun onSurfaceReady(surface: Surface) {
+888:    fun onSurfaceDestroyed() {
+895:    private fun processFrame(frameData: CameraManager.FrameData) {
+933:    fun setGatePosition(position: Float) {
+947:    fun beginLocalGateCalibration() {
+1005:    private fun completeLocalGateCalibration(readiness: GateReadinessStatus) {
+1037:    private fun failLocalGateCalibration(readiness: GateReadinessStatus) {
+1068:    private fun gateStatusFromReadiness(
+1084:    private fun gateReadinessBlockedReason(readiness: GateReadinessStatus): String {
+1099:    private fun startSessionBlockedReason(state: RaceModeUiState): String {
+1117:    private fun publishLocalGateStatus(status: GateStatusInfo) {
+1126:    private fun maybeSendLocalArmedAck(status: GateStatusInfo = _uiState.value.localGateStatus) {
+1141:    private fun markLocalGateFrameEvent(crossingTimeNanos: Long) {
+1147:    private suspend fun localGateFramesForSave(runId: String): List<LocalGateFrameSnapshot> {
+1164:    private suspend fun selectedRaceAthleteForSave(): AthleteEntity? {
+1173:    private fun snapshotActiveStartForLateResult() {
+1200:    fun startSession() {
+1219:    private fun beginActiveSession(
+1299:    private fun prepareLocalStartForTimestamp(startTimestampNanos: Long): Boolean {
+1330:    fun startVoiceCountdown() {
+1347:    fun cancelVoiceCountdown() {
+1352:    fun setStartSoundType(rawValue: String) {
+1358:    fun setShowSpeedInResults(enabled: Boolean) {
+1364:    fun updateRunDistance(runId: String, newDistance: Double) {
+1377:    fun deleteRun(runId: String) {
+1390:    fun submitCrossingReview(submission: DetectionReviewSubmission) {
+1451:    private fun gateIndexFromGateLabel(gateLabel: String?): Int {
+1462:    fun setVoiceProvider(provider: String) {
+1468:    fun setElevenLabsVoice(voice: String) {
+1474:    fun setVoiceGender(gender: String) {
+1480:    fun setAppLanguage(language: String) {
+1486:    fun setPreStartDelayMin(value: Float) {
+1493:    fun setMarksSetDelayMin(value: Float) {
+1500:    fun setSetGoHoldMin(value: Float) {
+1507:    fun setIncludeReadyCommand(enabled: Boolean) {
+1513:    fun handleExternalStart(startTimestampNanos: Long) {
+1590:    private fun CrossingEvent.toLocalGateCalibration(
+1606:    private fun CrossingEvent.toGateThumbnailDebugJson(gatePosition: Float): JsonElement {
+1626:    private fun broadcastCalibrationUpdate(calibration: LocalGateCalibration) {
+1642:    private fun sendThumbnailWireUpdates(
+1705:    private fun handleLocalCrossing(event: CrossingEvent) {
+1877:    private fun handleLocalMultiGateCrossing(
+1968:    private fun handleRemoteCrossingEvent(
+2010:    private fun recordGateCrossing(crossing: RecordedGateCrossing): Boolean {
+2045:    private fun recordSyncableCrossingEvent(
+2071:    private fun recordSyncableStartEvent(runId: String, startTimestampNanos: Long) {
+2094:    private fun recordSyncableFinishResult(
+2117:    private fun scheduleStartEventWaitTimeout() {
+2168:    private fun cancelStartEventWaitTimeout() {
+2173:    private fun startEventWaitPolicy(): StartEventWaitPolicy {
+2205:    private fun hasValidatedInternetConnection(): Boolean {
+2214:    private fun isWaitingForStartEvent(): Boolean {
+2220:    private fun attemptAdaptiveStartEventRecovery(reason: String) {
+2234:    private fun discardBufferedFinishAfterStartEventTimeout(reason: String) {
+2259:    private fun tryCalculateMultiGateResult(requireAllGates: Boolean = true) {
+2372:    private fun startMultiGateTimeoutIfNeeded() {
+2385:    private fun cancelMultiGateTimeout() {
+2390:    private fun handleMultiGateTimeout() {
+2408:    private fun cancelInvalidMultiGateRun(reason: String) {
+2449:    private fun multiGateTimeoutMillis(distanceMeters: Double): Long {
+2464:    private fun handleRemoteMessage(message: com.trackspeed.android.protocol.TimingMessage) {
+2684:    private fun shouldRelayRemoteCrossing(payload: TimingPayload.CrossingEvent): Boolean {
+2691:    private fun relayCriticalFromHost(
+2727:    private fun handleStartTiming() {
+2742:    private fun maybeEnterJoinTiming(trigger: String) {
+2775:    private fun handleGateStatus(payload: TimingPayload.GateStatus) {
+2797:    private fun handleArmedAck(payload: TimingPayload.ArmedAck) {
+2831:    private fun handleCalibrationStatus(payload: TimingPayload.CalibrationStatus) {
+2857:    private fun handleDisarmAll() {
+2873:    private fun handleSessionEnded(reason: String) {
+2949:    private fun preRaceConnectionFailureMessage(reason: String): String {
+2956:    private fun handleDistanceConfigChanged(gateDistances: Map<Int, Double>) {
+2966:    private fun handleStartTypeChanged(startTypeRaw: String) {
+2982:    fun toggleDetectionPause() {
+2990:    fun onAppBackgrounded() {
+3016:    fun onAppForegrounded() {
+3041:    private fun isRunTimingInProgress(): Boolean {
+3050:    private fun isStartTypeChangeLocked(): Boolean {
+3056:    private fun recoverClockSyncAfterForeground() {
+3084:    private fun invalidateGateReadinessForForegroundRecovery() {
+3112:    private fun handlePeerSyncRequest() {
+3134:    private fun rememberPeerDevice(senderId: String) {
+3140:    private fun markKnownPeersPendingReconnectAfterBackground() {
+3155:    private fun handleBleConnectionEvent(event: BleClockSyncService.ConnectionEvent) {
+3175:    private fun retryPendingReconnectReplays(reason: String) {
+3181:    private fun schedulePendingReconnectReplayIfNeeded(peerId: String, reason: String) {
+3196:    private fun replayStateToReconnectedPeer(peerId: String, reason: String): Boolean {
+3204:    private fun replayHostStateToPeer(peerId: String, reason: String): Boolean {
+3255:    private fun rebroadcastLocalStateForReconnect(peerId: String, reason: String): Boolean {
+3272:    private fun sendLocalArmedAckBroadcast(): Boolean {
+3286:    private fun sendLocalArmedAckToPeer(peerId: String, peerAddress: String): Boolean {
+3303:    private fun localTimingRole(): TimingRole? {
+3308:    private fun expectedRemoteArmedGateIds(state: RaceModeUiState = _uiState.value): Set<String> {
+3329:    private fun allGateReadinessBarrierSatisfied(state: RaceModeUiState = _uiState.value): Boolean {
+3345:    private fun tryCompleteGateReadinessRecovery(reason: String): Boolean {
+3366:    private fun clearForegroundGateReadinessRecovery() {
+3374:    private fun armGateReadinessRecoveryWatchdog() {
+3382:    private fun handleGateReadinessRecoveryTimeout() {
+3412:    private fun missingRemoteArmedGateDescription(state: RaceModeUiState = _uiState.value): String {
+3430:    private fun pauseDetection(
+3461:    private fun resumeDetection(
+3523:    private fun handleRemotePauseDetection(eventId: String?, senderId: String) {
+3550:    private fun handleRemoteResumeDetection(eventId: String?, senderId: String) {
+3596:    private fun automaticDetectionPauseRemains(): Boolean =
+3601:    private fun enforceAutomaticDetectionPause() {
+3611:    private fun handleAdjustGateLine(gateId: String, position: Double) {
+3619:    private fun canonicalRunId(runId: String?): String =
+3622:    private fun adoptCanonicalRunId(incomingRunId: String?, reason: String) {
+3640:    private fun registerRunAlias(aliasRunId: String?, canonicalRunId: String, reason: String) {
+3647:    private fun canonicalizePendingRunUpdates(canonicalRunId: String) {
+3674:    private fun handleThumbnailUpdate(payload: TimingPayload.ThumbnailUpdate, runId: String?) {
+3726:    private fun clearResultDedupeState() {
+3731:    private fun shouldDropStaleSessionEnvelope(message: com.trackspeed.android.protocol.TimingMessage): Boolean {
+3777:    private fun shouldAdoptIncomingSessionId(message: com.trackspeed.android.protocol.TimingMessage): Boolean {
+3788:    private fun shouldDropDuplicateEnvelope(message: com.trackspeed.android.protocol.TimingMessage): Boolean {
+3818:    private fun cleanupProcessedMessageIdsIfNeeded() {
+3825:    private fun clearEnvelopeDedupeState() {
+3831:    private fun isMessageTargetedToLocalDevice(message: com.trackspeed.android.protocol.TimingMessage): Boolean {
+3848:    private fun targetDescription(message: com.trackspeed.android.protocol.TimingMessage): String {
+3857:    private fun decodeBase64Bitmap(base64Data: String?, label: String): Bitmap? {
+3868:    private fun handleThumbnailMetadata(payload: TimingPayload.ThumbnailMetadata, runId: String?) {
+3899:    private fun handleEventSyncRequest(
+3944:    private fun handleEventSyncResponse(
+3997:    private fun handleCalibrationUpdate(payload: TimingPayload.CalibrationUpdate, runId: String?) {
+4019:    private fun handleAdjustmentUpdate(payload: TimingPayload.AdjustmentUpdate) {
+4063:    private fun adjustedLocalGatePosition(
+4084:    private fun applyOrBufferRemoteCalibration(
+4109:    private suspend fun applyPendingRemoteRunUpdates(runId: String) {
+4151:    private fun onRemoteStartReceived(
+4213:    private fun applyLateReplacementStart(
+4295:    private fun handleRemoteMultiGateResult(payload: TimingPayload.MultiGateResult) {
+4320:    private fun handleRemoteFinishResult(payload: TimingPayload.FinishResult, runId: String?) {
+4400:    private fun handleRemoteTimingResult(
+4512:    private fun handleHistoricalTimingResult(
+4569:    private fun calculateResult() {
+4688:    private fun buildSegmentSplits(
+4705:    private fun calculateTimingUncertaintyMs(eventCount: Int): Double {
+4712:    private fun timestampOrderingToleranceNanos(): Long {
+4717:    private fun distanceForGateIndex(
+4728:    private fun fallbackGateAssignment(role: DeviceRole?, gateCount: Int): GateAssignment? {
+4751:    private fun gateRoleString(role: TimingRole, gateIndex: Int): String {
+4760:    private fun thumbnailRoleString(role: TimingRole): String {
+4769:    private fun referenceTimestampFromLocal(localTimestampNanos: Long): Long {
+4780:    private fun uploadRaceEvent(eventType: String, crossingTimeNanos: Long) {
+4805:    private fun uploadFinishResultEvent(
+4835:    private fun startRaceEventSubscription(effectiveSessionId: String) {
+4862:    private fun startCrossingSubscription(effectiveSessionId: String) {
+4889:    private fun scheduleCloudSubscriptionRecovery(effectiveSessionId: String, reason: String) {
+4909:    private fun prepareCloudSubscriptionSession(effectiveSessionId: String) {
+4919:    private fun rememberCloudRaceEventCursor(createdAt: String?) {
+4926:    private fun rememberCloudCrossingCursor(createdAt: String?) {
+4933:    private fun handleCloudRaceEvent(event: RaceEventDto) {
+4978:    private fun scheduleFinishEventImageDownload(event: RaceEventDto) {
+4996:    private suspend fun handleCloudCrossingEvent(crossing: CrossingDto) {
+5005:    private fun scheduleCrossingThumbnailPoll(crossing: CrossingDto) {
+5021:    private suspend fun handleCloudCrossing(crossing: CrossingDto) {
+5071:    private suspend fun applyRemoteCloudThumbnail(
+5099:    private fun bufferRemoteThumbnail(
+5121:    private fun parseCloudGateRole(gateRole: String, gateCount: Int): Pair<TimingRole, Int>? {
+5136:    private fun restartCloudSubscriptions(supabaseId: String) {
+5143:    private fun uploadCrossingWithThumbnail(gateRole: String, crossingTimeNanos: Long, thumbnail: Bitmap?) {
+5191:    private suspend fun enqueueCrossingThumbnailRetry(
+5213:    private suspend fun downloadThumbnail(url: String): Bitmap? {
+5233:    private fun startTimerTick() {
+5247:    private fun stopTimerTick() {
+5252:    private fun scheduleAutoResetForNewRun() {
+5271:    private fun trackRaceSessionCreatedIfNeeded() {
+5291:    private fun trackRaceSessionCompletedIfNeeded(reason: String) {
+5310:    private fun beginLiveTimingWorkloadIfNeeded() {
+5316:    private fun endLiveTimingWorkloadIfNeeded() {
+5325:    fun endSessionAndReset(reason: String = "userExit") {
+5331:    fun presentSessionEndConfirmation() {
+5362:    fun cancelSessionEndConfirmation() {
+5397:    fun confirmSessionEnd() {
+5424:    fun dismissSessionEndSummary() {
+5428:    private fun buildSessionEndConfirmation(
+5449:    private suspend fun awaitSessionEndSummary(
+5487:    private fun isDetectionEffectivelyPaused(state: RaceModeUiState = _uiState.value): Boolean =
+5492:    fun resetToStart() {
+5567:    fun startNewRace() {
+5577:    fun cancelCurrentRun() {
+5581:    private fun cancelCurrentRun(broadcast: Boolean) {
+5640:    private suspend fun processUploadQueuesIfIdle() {
+5647:    private fun beginNextActiveRun(
+5669:    private fun returnToRaceReadyForNewRun() {
+5708:    fun dismissError() {
+5712:    fun saveActiveSessionSnapshot() {
+5742:    fun setActiveAthlete(athleteId: String) {
+5756:    fun applySessionSettings(
+5841:    fun setStartType(startTypeRaw: String) {
+5862:    fun setDistance(distance: Double) {
+5878:    fun setSegmentDistance(fromGateIndex: Int, toGateIndex: Int, segmentDistanceMeters: Double) {
+5909:    private fun applyGateDistances(
+5947:    override fun onCleared() {
+6267:    fun distance(gateIndex: Int): Double = gateDistances[gateIndex]
