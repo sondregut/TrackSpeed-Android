@@ -705,7 +705,7 @@ class ClockSyncManager @Inject constructor(
 
             // ── Host receives SyncComplete from joiner ──
             is TimingPayload.SyncComplete -> {
-                if (payload.uncertaintyMs >= ClockSyncConfig.SETUP_MAX_UNCERTAINTY_MS) {
+                if (!ClockSyncConfig.isSetupUncertaintyAcceptable(payload.uncertaintyMs)) {
                     _syncState.value = SyncState.Error(
                         "Clock sync stayed above ±${ClockSyncConfig.SETUP_MAX_UNCERTAINTY_MS.toInt()} ms. " +
                             "Keep the phones close and retry."

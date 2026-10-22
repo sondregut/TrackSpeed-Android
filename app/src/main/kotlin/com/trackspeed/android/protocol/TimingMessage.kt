@@ -846,12 +846,17 @@ data class TimingMessage(
 // TimingMessageCodec – encode/decode helpers
 // ---------------------------------------------------------------------------
 
+internal interface ClockSyncTimestampTemplate {
+    val encodedSize: Int
+    fun stamp(timestampNanos: Long): ByteArray
+}
+
 internal class SyncPingTimestampTemplate(
     private val encoded: ByteArray,
     private val timestampOffset: Int,
     private val timestampWidth: Int
-) {
-    val encodedSize: Int
+) : ClockSyncTimestampTemplate {
+    override val encodedSize: Int
         get() = encoded.size
 
     /**
@@ -859,7 +864,7 @@ internal class SyncPingTimestampTemplate(
      * a fixed-width field lets the caller capture t1 after the BLE write lane
      * is acquired without running JSON serialization inside the timed region.
      */
-    fun stamp(timestampNanos: Long): ByteArray {
+    override fun stamp(timestampNanos: Long): ByteArray {
         require(timestampNanos >= 0L) { "A monotonic timestamp cannot be negative" }
         val digits = timestampNanos.toString().toByteArray(Charsets.US_ASCII)
         require(digits.size <= timestampWidth) { "Timestamp exceeds reserved JSON field width" }
@@ -880,12 +885,12 @@ internal class SyncPongTimestampTemplate(
     private val encoded: ByteArray,
     private val timestampOffset: Int,
     private val timestampWidth: Int
-) {
-    val encodedSize: Int
+) : ClockSyncTimestampTemplate {
+    override val encodedSize: Int
         get() = encoded.size
 
     /** Stamp t3 after JSON serialization, immediately before BLE submission. */
-    fun stamp(timestampNanos: Long): ByteArray {
+    override fun stamp(timestampNanos: Long): ByteArray {
         require(timestampNanos >= 0L) { "A monotonic timestamp cannot be negative" }
         val digits = timestampNanos.toString().toByteArray(Charsets.US_ASCII)
         require(digits.size <= timestampWidth) { "Timestamp exceeds reserved JSON field width" }

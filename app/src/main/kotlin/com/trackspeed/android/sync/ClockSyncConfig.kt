@@ -49,6 +49,10 @@ object ClockSyncConfig {
     /** Setup fails closed unless the measured clock uncertainty is below ±10 ms. */
     const val SETUP_MAX_UNCERTAINTY_MS = 10.0
 
+    fun isSetupUncertaintyAcceptable(uncertaintyMs: Double): Boolean =
+        uncertaintyMs.isFinite() && uncertaintyMs >= 0.0 &&
+            uncertaintyMs < SETUP_MAX_UNCERTAINTY_MS
+
     // Maximum BLE ATT MTU. Android's characteristic APIs still cap each value
     // at 512 bytes, so BleMessageFramer splits the 514-byte nominal payload.
     const val PREFERRED_MTU = 517
