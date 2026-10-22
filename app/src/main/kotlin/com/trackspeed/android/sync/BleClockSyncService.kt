@@ -14,6 +14,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.trackspeed.android.cloud.DeviceIdProvider
+import com.trackspeed.android.protocol.ClockSyncTimestampTemplate
 import com.trackspeed.android.protocol.TimingMessage
 import com.trackspeed.android.protocol.TimingMessageCodec
 import com.trackspeed.android.protocol.TimingBootstrapPolicy
@@ -181,7 +182,11 @@ class BleClockSyncService @Inject constructor(
 
     // BLE allows one acknowledged client write and one server notification at
     // a time. Queues contain already-framed ATT packets, not whole messages.
-    private data class ClientWritePacket(val data: ByteArray, val writeType: Int)
+    private data class ClientWritePacket(
+        val data: ByteArray,
+        val writeType: Int,
+        val retryAfterBond: Boolean = true
+    )
 
     private val clientWriteQueue = ConcurrentLinkedDeque<ClientWritePacket>()
     private val isClientWritePending = AtomicBoolean(false)
@@ -1535,7 +1540,9 @@ class BleClockSyncService @Inject constructor(
                 drainClientWriteQueue()
             } else if (isAuthenticationFailure(status) && inFlight != null) {
                 Log.w(TAG, "Client: Encrypted write requires bonding; retrying after bond")
-                clientWriteQueue.addFirst(inFlight)
+                // A clock packet's captured t1/t3 must never survive a bond
+                // retry delay. The requester will sample again with a new ID.
+                if (inFlight.retryAfterBond) clientWriteQueue.addFirst(inFlight)
                 runCatching { gatt.device.createBond() }
                 handler.postDelayed({ drainClientWriteQueue() }, BOND_RETRY_DELAY_MS)
             } else {
@@ -1886,15 +1893,6 @@ class BleClockSyncService @Inject constructor(
         targetDeviceAddress: String?,
         trackResponse: Boolean
     ): Boolean {
-        val address = targetDeviceAddress ?: return false
-        if (!protocolReadyDevices.contains(address) ||
-            !clientNotificationsReady.contains(address)
-        ) {
-            return false
-        }
-        val device = connectedDevices[address] ?: return false
-        val server = gattServer ?: return false
-        val characteristic = txCharacteristic ?: return false
         val message = TimingMessage.create(
             seq = sequenceNumber.incrementAndGet(),
             senderId = deviceId,
@@ -1905,7 +1903,29 @@ class BleClockSyncService @Inject constructor(
                 requesterId = deviceId
             )
         )
-        val template = TimingMessageCodec.prepareSyncPingTimestampTemplate(message)
+        return tryNotifyTimestampedServerPayloadAtBoundary(
+            template = TimingMessageCodec.prepareSyncPingTimestampTemplate(message),
+            targetDeviceAddress = targetDeviceAddress,
+            onTimestampCaptured = { if (trackResponse) pendingPings[pingId] = it }
+        )
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun tryNotifyTimestampedServerPayloadAtBoundary(
+        template: ClockSyncTimestampTemplate,
+        targetDeviceAddress: String?,
+        pongReceivedAtNanos: Long? = null,
+        onTimestampCaptured: (Long) -> Unit = {}
+    ): Boolean {
+        val address = targetDeviceAddress ?: return false
+        if (!protocolReadyDevices.contains(address) ||
+            !clientNotificationsReady.contains(address)
+        ) {
+            return false
+        }
+        val device = connectedDevices[address] ?: return false
+        val server = gattServer ?: return false
+        val characteristic = txCharacteristic ?: return false
         val maximumPacketBytes = serverMaximumPacketBytes[address]
             ?: DEFAULT_ATT_PAYLOAD_BYTES
         if (!ClockSyncTransmitBoundaryPolicy.canSubmitServerNotificationDirectly(
@@ -1913,40 +1933,44 @@ class BleClockSyncService @Inject constructor(
                 maximumPacketBytes = maximumPacketBytes,
                 queueIsEmpty = serverNotificationQueue.isEmpty(),
                 notificationPending = isServerNotificationPending.get()
-            )
-        ) {
+            ) || !isServerNotificationPending.compareAndSet(false, true)
+        ) return false
+
+        // Preserve the order of any ordinary writer that raced lane acquisition.
+        if (serverNotificationQueue.isNotEmpty()) {
+            isServerNotificationPending.set(false)
+            drainServerNotificationQueue()
             return false
         }
-        if (!isServerNotificationPending.compareAndSet(false, true)) return false
-
-        val t1Nanos = SystemClock.elapsedRealtimeNanos()
-        if (trackResponse) pendingPings[pingId] = t1Nanos
-        val packet = template.stamp(t1Nanos)
+        val sentAtNanos = SystemClock.elapsedRealtimeNanos()
+        if (pongReceivedAtNanos != null &&
+            !ClockSyncPongSubmissionPolicy.isFresh(pongReceivedAtNanos, sentAtNanos)
+        ) {
+            isServerNotificationPending.set(false)
+            drainServerNotificationQueue()
+            Log.d(TAG, "Server: Skipped stale pong before submission")
+            return false
+        }
+        onTimestampCaptured(sentAtNanos)
+        val packet = template.stamp(sentAtNanos)
         val queued = try {
-            notifyCharacteristicChangedCompat(
-                server = server,
-                device = device,
-                characteristic = characteristic,
-                value = packet
-            )
+            notifyCharacteristicChangedCompat(server, device, characteristic, packet)
         } catch (e: SecurityException) {
-            Log.w(TAG, "Server: Missing permission while submitting boundary sync ping", e)
+            Log.w(TAG, "Server: Missing permission while submitting boundary clock packet", e)
             false
         } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "Server: Rejected boundary sync ping", e)
+            Log.w(TAG, "Server: Rejected boundary clock packet", e)
             false
         }
         if (!queued) {
-            if (trackResponse) pendingPings.remove(pingId)
             isServerNotificationPending.set(false)
             drainServerNotificationQueue()
             return false
         }
         Log.d(
             TAG,
-            "Server: requester ping submitted ${
-                (SystemClock.elapsedRealtimeNanos() - t1Nanos) / 1_000L
-            }us after t1 capture"
+            "Server: ${if (pongReceivedAtNanos == null) "ping" else "pong"} submitted " +
+                "${(SystemClock.elapsedRealtimeNanos() - sentAtNanos) / 1_000L}us after capture"
         )
         return true
     }
@@ -2103,19 +2127,9 @@ class BleClockSyncService @Inject constructor(
         senderAddress: String?
     ) {
         if (localIsClockReference) {
-            val t3Nanos = SystemClock.elapsedRealtimeNanos()
-            val sent = sendSyncPayload(
-                payload = TimingPayload.SyncPong(
-                    pingId = payload.pingId,
-                    t1Nanos = payload.t1Nanos,
-                    t2Nanos = receivedAtNanos,
-                    t3Nanos = t3Nanos,
-                    requesterId = payload.requesterId
-                ),
-                targetDeviceAddress = senderAddress
-            )
+            val sent = sendPongAtTransmitBoundary(payload, receivedAtNanos, senderAddress)
+            lastForwardPingReceivedAtNanos.set(receivedAtNanos)
             if (sent) {
-                lastForwardPingReceivedAtNanos.set(receivedAtNanos)
                 val receivedSamples = referenceSyncPingCount.incrementAndGet()
                 val measuredProgress = ClockSyncSetupProgress.fromCompletedSamples(receivedSamples)
                 val currentProgress = (_state.value as? State.Syncing)?.progress ?: 0f
@@ -2134,8 +2148,10 @@ class BleClockSyncService @Inject constructor(
                         )
                     }
                 }
-                scheduleReverseProbeBurst(senderAddress)
             }
+            // Independent reverse observations remain useful even when this
+            // particular pong was busy/stale. They use their own idle-lane check.
+            scheduleReverseProbeBurst(senderAddress)
             Log.d(
                 TAG,
                 "Reference: responded to syncPing ${payload.pingId.take(8)} from ${message.senderId.take(8)} sent=$sent"
@@ -2273,29 +2289,39 @@ class BleClockSyncService @Inject constructor(
         )
     }
 
-    private fun sendSyncPayload(
-        payload: TimingPayload,
+    /**
+     * Serialize before capturing t3, and never queue a timestamped pong behind
+     * unrelated ATT traffic. Queued/fragmented pongs include local waiting in
+     * the peer's radio-delay bound. A busy or >5 ms turnaround is skipped so
+     * the requester can use its remaining samples, with the same safety gates.
+     */
+    private fun sendPongAtTransmitBoundary(
+        ping: TimingPayload.SyncPing,
+        receivedAtNanos: Long,
         targetDeviceAddress: String?
     ): Boolean {
         val message = TimingMessage.create(
             seq = sequenceNumber.incrementAndGet(),
             senderId = deviceId,
             sessionId = sessionId,
-            payload = payload
+            payload = TimingPayload.SyncPong(
+                pingId = ping.pingId,
+                t1Nanos = ping.t1Nanos,
+                t2Nanos = receivedAtNanos,
+                t3Nanos = 0L,
+                requesterId = ping.requesterId
+            )
         )
-        val data = TimingMessageCodec.encodeToBytes(message)
+        val template = TimingMessageCodec.prepareSyncPongTimestampTemplate(message)
         return when (role) {
-            Role.Server -> {
-                val address = targetDeviceAddress ?: return false
-                if (!protocolReadyDevices.contains(address)) return false
-                val device = connectedDevices[address] ?: return false
-                enqueueServerPayload(device, data)
-            }
-            Role.Client -> {
-                if (gattClient == null || rxCharacteristic == null) return false
-                writeToServer(data, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
-                true
-            }
+            Role.Server -> tryNotifyTimestampedServerPayloadAtBoundary(
+                template, targetDeviceAddress, receivedAtNanos
+            )
+            Role.Client -> tryWriteTimestampedClientPayloadAtBoundary(
+                template = template,
+                writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE,
+                pongReceivedAtNanos = receivedAtNanos
+            )
             null -> false
         }
     }
@@ -2508,17 +2534,20 @@ class BleClockSyncService @Inject constructor(
      * Starts a single-packet write immediately if no older ATT write is queued
      * or in flight. The sync payloads fit in one negotiated 517-byte MTU packet
      * on the physical iPhone/Pixel route. If that is not true, fail closed and
-     * let the next reverse-probe interval retry without exposing a stale t1.
+     * let the next sample/probe retry without exposing a stale t1 or t3.
      */
     @SuppressLint("MissingPermission")
     private fun tryWriteTimestampedClientPayloadAtBoundary(
-        template: com.trackspeed.android.protocol.SyncPingTimestampTemplate,
+        template: ClockSyncTimestampTemplate,
         writeType: Int,
+        pongReceivedAtNanos: Long? = null,
         onTimestampCaptured: (Long) -> Unit = {}
     ): Boolean {
-        if (!ClockSyncTransmitBoundaryPolicy.canSubmitDirectly(
+        if (!ClockSyncTransmitBoundaryPolicy.canSubmitServerNotificationDirectly(
+                encodedSize = template.encodedSize,
+                maximumPacketBytes = clientMaximumPacketBytes,
                 queueIsEmpty = clientWriteQueue.isEmpty(),
-                writePending = isClientWritePending.get()
+                notificationPending = isClientWritePending.get()
             ) || !isClientWritePending.compareAndSet(false, true)
         ) {
             return false
@@ -2539,29 +2568,19 @@ class BleClockSyncService @Inject constructor(
             return false
         }
 
-        val t1Nanos = SystemClock.elapsedRealtimeNanos()
-        onTimestampCaptured(t1Nanos)
-        val data = template.stamp(t1Nanos)
-        val packets = try {
-            BleMessageFramer.packets(data, clientMaximumPacketBytes)
-        } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "Client: Failed to frame boundary BLE payload: ${e.message}")
+        val sentAtNanos = SystemClock.elapsedRealtimeNanos()
+        if (pongReceivedAtNanos != null &&
+            !ClockSyncPongSubmissionPolicy.isFresh(pongReceivedAtNanos, sentAtNanos)
+        ) {
             isClientWritePending.set(false)
             drainClientWriteQueue()
+            Log.d(TAG, "Client: Skipped stale pong before submission")
             return false
         }
-        if (packets.size != 1) {
-            Log.d(
-                TAG,
-                "Client: Skipping ${template.encodedSize}-byte boundary probe " +
-                    "requiring ${packets.size} ATT packets"
-            )
-            isClientWritePending.set(false)
-            drainClientWriteQueue()
-            return false
-        }
-
-        val packet = ClientWritePacket(packets.single(), writeType)
+        onTimestampCaptured(sentAtNanos)
+        // Size was checked before acquiring the lane: one raw JSON ATT value,
+        // with no JSON serialization or fragmentation after the timestamp.
+        val packet = ClientWritePacket(template.stamp(sentAtNanos), writeType, retryAfterBond = false)
         clientWriteInFlight = packet
         if (!writeCharacteristicCompat(
                 client,
@@ -2572,13 +2591,13 @@ class BleClockSyncService @Inject constructor(
         ) {
             clientWriteInFlight = null
             isClientWritePending.set(false)
+            drainClientWriteQueue()
             return false
         }
         Log.d(
             TAG,
-            "Client: reverse probe submitted ${
-                (SystemClock.elapsedRealtimeNanos() - t1Nanos) / 1_000L
-            }us after t1 capture"
+            "Client: ${if (pongReceivedAtNanos == null) "ping" else "pong"} submitted " +
+                "${(SystemClock.elapsedRealtimeNanos() - sentAtNanos) / 1_000L}us after capture"
         )
         return true
     }

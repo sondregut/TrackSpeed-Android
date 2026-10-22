@@ -524,7 +524,7 @@ class RaceModeViewModel @Inject constructor(
                     !_uiState.value.isHostingSession
                 ) {
                     joinHasAcceptableClockSync =
-                        syncState.uncertaintyMs < ClockSyncConfig.SETUP_MAX_UNCERTAINTY_MS
+                        ClockSyncConfig.isSetupUncertaintyAcceptable(syncState.uncertaintyMs)
                     maybeEnterJoinTiming("clock sync manager")
                 }
             }
@@ -3068,7 +3068,7 @@ class RaceModeViewModel @Inject constructor(
 
         val hasValidatedClockSync = joinHasAcceptableClockSync ||
             (state.syncProgress >= 1f &&
-                state.syncUncertaintyMs < ClockSyncConfig.SETUP_MAX_UNCERTAINTY_MS)
+                ClockSyncConfig.isSetupUncertaintyAcceptable(state.syncUncertaintyMs))
         val completedRunCount = state.completedRuns.count { it.timeSeconds > 0.0 }
         val hasCurrentResult = state.resultTimeSeconds?.let { it > 0.0 } == true
         Log.i(

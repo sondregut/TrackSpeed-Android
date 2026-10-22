@@ -80,8 +80,8 @@ class ClockSyncCalculator(
          */
         fun isAcceptable(): Boolean = quality != SyncQuality.BAD
 
-        /** The setup screen uses the same strict ±10 ms gate as iOS. */
-        fun isSetupAcceptable(): Boolean = uncertaintyMs < ClockSyncConfig.SETUP_MAX_UNCERTAINTY_MS
+        /** Android setup requires finite, nonnegative uncertainty below ±10 ms. */
+        fun isSetupAcceptable(): Boolean = ClockSyncConfig.isSetupUncertaintyAcceptable(uncertaintyMs)
 
         /**
          * Check if sync passes validation gate for precision mode.
