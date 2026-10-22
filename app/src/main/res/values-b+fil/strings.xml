@@ -1313,7 +1313,6 @@
         <item quantity="other">+%d higit pang mga split</item>
     </plurals>
     <string name="start_selector_inframe">In-Frame</string>
-    <string name="start_selector_inframe_desc">Tumayo sa harap ng camera, pagkatapos ay lumayo upang magsimula.</string>
     <string name="start_sound_beep">Beep</string>
     <string name="start_sound_beep_desc">Simpleng electronic beep</string>
     <string name="start_sound_gunshot">Putok ng baril</string>
@@ -1530,7 +1529,6 @@
     <string name="start_type_touch_release_desc">Hawakan ang screen, pagkatapos ay iangat ang iyong daliri upang magsimula</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, BEEP! Nagsisimula ang timer sa beep</string>
     <string name="start_type_voice_command_desc">Ang boses ng AI ay tumatawag ng mga utos, magsisimula ang timer sa GO!</string>
-    <string name="start_type_inframe_desc">Magsisimula ang timer kapag nalampasan mo ang front camera</string>
     <string name="preset_category_acceleration">Pagpapabilis</string>
     <string name="preset_category_max_speed">Max Bilis</string>
     <string name="preset_category_agility">Liksi</string>

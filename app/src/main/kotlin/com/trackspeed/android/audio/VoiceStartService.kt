@@ -425,9 +425,12 @@ class VoiceStartService @Inject constructor(
         onStart?.invoke(startTimestamp)
     }
 
-    /**
-     * Speak a single command text and wait for completion.
-     */
+    /** Informational cue only: camera onset owns the clock. Always local; never requests cloud speech. */
+    suspend fun speakCameraReady() {
+        if (_isTtsReady.value && !_isRunning.value) speakWithSystemTts(currentCommands.ready)
+    }
+
+    /** Speak a single command text and wait for completion. */
     suspend fun speakCommand(text: String) {
         if (voiceProvider == VoiceProvider.SYSTEM && !_isTtsReady.value) {
             Log.w(TAG, "System TTS not ready, cannot speak command")

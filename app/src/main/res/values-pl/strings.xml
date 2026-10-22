@@ -1335,7 +1335,6 @@
         <item quantity="other">+%d więcej podziałów</item>
     </plurals>
     <string name="start_selector_inframe">W ramce</string>
-    <string name="start_selector_inframe_desc">Stań przed kamerą, a następnie odsuń się, aby rozpocząć.</string>
     <string name="start_sound_beep">Sygnał dźwiękowy</string>
     <string name="start_sound_beep_desc">Prosty elektroniczny sygnał dźwiękowy</string>
     <string name="start_sound_gunshot">Strzał</string>
@@ -1570,7 +1569,6 @@
     <string name="start_type_touch_release_desc">Przytrzymaj ekran, a następnie unieś palec, aby rozpocząć</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, sygnał dźwiękowy! Timer uruchamia się po sygnale dźwiękowym</string>
     <string name="start_type_voice_command_desc">Głos AI wydaje polecenia, timer zaczyna działać!</string>
-    <string name="start_type_inframe_desc">Minutnik uruchamia się, gdy przebiegniesz obok przedniego aparatu</string>
     <string name="preset_category_acceleration">Przyspieszenie</string>
     <string name="preset_category_max_speed">Maksymalna prędkość</string>
     <string name="preset_category_agility">Zwinność</string>

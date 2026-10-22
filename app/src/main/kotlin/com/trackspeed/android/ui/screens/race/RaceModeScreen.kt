@@ -68,6 +68,7 @@ import com.trackspeed.android.protocol.SegmentSplit
 import com.trackspeed.android.protocol.TimingRole
 import com.trackspeed.android.sync.SyncQuality
 import com.trackspeed.android.ui.components.CameraPreview
+import com.trackspeed.android.ui.components.CameraStartStatus
 import com.trackspeed.android.ui.components.CameraPreviewPlaceholder
 import com.trackspeed.android.ui.components.CountdownOverlay
 import com.trackspeed.android.ui.components.DetectionReviewSubmission
@@ -1493,13 +1494,15 @@ private fun RaceReadyCameraAlignment(
     val cameraCapturing = uiState.cameraState is CameraManager.CameraState.Capturing
     val cameraAvailable = uiState.hasPermission &&
         uiState.cameraState !is CameraManager.CameraState.Error
-    val isSteady = uiState.detectionState != PhotoFinishDetector.State.UNSTABLE
+    val isSteady = if (uiState.usesLocalPoseStart) uiState.cameraStartPoseAvailable
+        else uiState.detectionState != PhotoFinishDetector.State.UNSTABLE
     val instructionColor = when {
         uiState.isLocalGateCalibrating -> AccentOrange
         isSteady -> AccentGreen
         else -> AccentRed
     }
     val instruction = when {
+        uiState.usesLocalPoseStart -> stringResource(R.string.camera_start_setup)
         uiState.isLocalGateCalibrating -> stringResource(R.string.race_alignment_checking)
         isSteady -> stringResource(R.string.race_align_camera_confirm)
         else -> stringResource(R.string.race_align_camera_hold)
@@ -1515,6 +1518,7 @@ private fun RaceReadyCameraAlignment(
                 gatePosition = uiState.gatePosition,
                 onGatePositionChanged = {},
                 gateLineDraggable = false,
+                showGateLine = !uiState.usesLocalPoseStart,
                 showDiagnostics = false,
                 fps = uiState.fps,
                 detectionState = uiState.detectionState,
@@ -1594,6 +1598,7 @@ private fun RaceReadyCameraAlignment(
                     Text(
                         text = when {
                             uiState.isLocalGateCalibrating -> stringResource(R.string.race_alignment_checking)
+                            cameraCapturing && uiState.usesLocalPoseStart -> stringResource(R.string.camera_start_confirm_camera)
                             cameraCapturing -> stringResource(R.string.race_alignment_confirm_action)
                             else -> stringResource(R.string.race_alignment_preparing)
                         },
@@ -2168,7 +2173,8 @@ private fun joinReadyRoleDetail(role: DeviceRole?, startType: StartType): String
                     StartType.TOUCH_RELEASE -> R.string.race_touch_start_hint
                     StartType.COUNTDOWN -> R.string.race_countdown_start_hint
                     StartType.VOICE_COMMAND -> R.string.race_voice_start_hint
-                    StartType.FLYING, StartType.IN_FRAME, StartType.MOTION_START, StartType.REACTION_START -> R.string.race_role_start_line_detail
+                    StartType.IN_FRAME, StartType.MOTION_START -> R.string.camera_start_setup
+                    StartType.FLYING, StartType.REACTION_START -> R.string.race_role_start_line_detail
                 }
             )
         } else {
@@ -2880,6 +2886,11 @@ private fun ActiveRaceContent(
                 }
             }
 
+            if (uiState.usesLocalPoseStart && uiState.raceStatus != "paused") {
+                CameraStartStatus(uiState.cameraStartPhase, uiState.cameraStartProgress,
+                    uiState.cameraStartPoseAvailable, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+
             if (uiState.numberOfGates > 2) {
                 GateCollectionStatus(
                     receivedGateCount = uiState.receivedGateCount,
@@ -3319,6 +3330,7 @@ private fun ActiveRaceCameraSurface(
                 gatePosition = uiState.gatePosition,
                 onGatePositionChanged = {},
                 gateLineDraggable = false,
+                showGateLine = !uiState.usesLocalPoseStart,
                 fps = uiState.fps,
                 detectionState = uiState.detectionState,
                 sensorOrientation = uiState.sensorOrientation,
@@ -3337,7 +3349,7 @@ private fun ActiveRaceCameraSurface(
             )
         }
 
-        ActiveRaceCameraStatusPill(
+        if (!uiState.usesLocalPoseStart) ActiveRaceCameraStatusPill(
             detectionState = uiState.detectionState,
             raceStatus = uiState.raceStatus,
             modifier = Modifier

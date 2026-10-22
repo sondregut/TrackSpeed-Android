@@ -1324,7 +1324,6 @@
         <item quantity="other">+%d mais divisões</item>
     </plurals>
     <string name="start_selector_inframe">No quadro</string>
-    <string name="start_selector_inframe_desc">Coloque-se em frente da câmara e afaste-se para começar.</string>
     <string name="start_sound_beep">Bip</string>
     <string name="start_sound_beep_desc">Bipe eletrónico simples</string>
     <string name="start_sound_gunshot">Tiro</string>
@@ -1550,7 +1549,6 @@
     <string name="start_type_touch_release_desc">Segure o ecrã e levante o dedo para começar</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, BIP! O cronómetro inicia com um sinal sonoro</string>
     <string name="start_type_voice_command_desc">A voz da IA chama comandos, o cronómetro inicia no GO!</string>
-    <string name="start_type_inframe_desc">O temporizador começa quando passa pela câmara frontal</string>
     <string name="preset_category_acceleration">Aceleração</string>
     <string name="preset_category_max_speed">Velocidade máxima</string>
     <string name="preset_category_agility">Agilidade</string>

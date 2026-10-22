@@ -1304,7 +1304,6 @@
         <item quantity="other">+%d 更多分割</item>
     </plurals>
     <string name="start_selector_inframe">画面内</string>
-    <string name="start_selector_inframe_desc">站在镜头前，然后走开开始拍摄。</string>
     <string name="start_sound_beep">蜂鸣</string>
     <string name="start_sound_beep_desc">简单电子蜂鸣声</string>
     <string name="start_sound_gunshot">枪声</string>
@@ -1512,7 +1511,6 @@
     <string name="start_type_touch_release_desc">按住屏幕，抬起手指即可开始</string>
     <string name="start_type_countdown_full_desc">3、2、1，哔！计时器在哔声时启动</string>
     <string name="start_type_voice_command_desc">AI语音播报指令，GO!时开始计时！</string>
-    <string name="start_type_inframe_desc">当您跑过前置摄像头时计时器开始</string>
     <string name="preset_category_acceleration">加速</string>
     <string name="preset_category_max_speed">最大速度</string>
     <string name="preset_category_agility">敏捷</string>

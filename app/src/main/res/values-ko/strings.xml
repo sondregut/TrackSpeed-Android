@@ -1304,7 +1304,6 @@
         <item quantity="other">+%d 추가 분할</item>
     </plurals>
     <string name="start_selector_inframe">프레임 내</string>
-    <string name="start_selector_inframe_desc">카메라 앞에 섰다가 한 걸음 물러나서 시작하세요.</string>
     <string name="start_sound_beep">비프음</string>
     <string name="start_sound_beep_desc">간단한 전자 비프음</string>
     <string name="start_sound_gunshot">총성</string>
@@ -1512,7 +1511,6 @@
     <string name="start_type_touch_release_desc">화면을 길게 누른 후 손가락을 떼면 시작</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, 삐! 신호음에 타이머 시작</string>
     <string name="start_type_voice_command_desc">AI 음성이 명령을 외치고, GO!에서 타이머 시작!</string>
-    <string name="start_type_inframe_desc">전면 카메라를 지나치면 타이머가 시작됩니다.</string>
     <string name="preset_category_acceleration">가속</string>
     <string name="preset_category_max_speed">최대 속도</string>
     <string name="preset_category_agility">민첩성</string>

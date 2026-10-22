@@ -42,7 +42,7 @@ fun StartType.descriptionResource(): Int = when (this) {
     StartType.COUNTDOWN -> R.string.start_type_countdown_full_desc
     StartType.VOICE_COMMAND -> R.string.start_selector_voice_desc
     StartType.IN_FRAME -> R.string.start_type_inframe_gate_desc
-    StartType.MOTION_START -> R.string.start_type_motion
+    StartType.MOTION_START -> R.string.camera_start_motion_description
     StartType.REACTION_START -> R.string.start_type_reaction
 }
 

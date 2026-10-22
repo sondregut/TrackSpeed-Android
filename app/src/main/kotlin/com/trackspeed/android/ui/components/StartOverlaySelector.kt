@@ -84,7 +84,7 @@ enum class StartMode(
         icon = Icons.Default.CenterFocusStrong,
         rawValue = "inFrame"
     ),
-    MOTION(R.string.start_type_motion, R.string.race_remote_start_required, Icons.Default.CenterFocusStrong, "motionStart"),
+    MOTION(R.string.start_type_motion, R.string.camera_start_motion_description, Icons.Default.CenterFocusStrong, "motionStart"),
     REACTION(R.string.start_type_reaction, R.string.race_remote_start_required, Icons.Default.Timer, "reactionStart");
 
     companion object {

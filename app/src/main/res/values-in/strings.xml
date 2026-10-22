@@ -1302,7 +1302,6 @@
         <item quantity="other">+%d lebih banyak perpecahan</item>
     </plurals>
     <string name="start_selector_inframe">Dalam Bingkai</string>
-    <string name="start_selector_inframe_desc">Berdirilah di depan kamera, lalu menjauh untuk memulai.</string>
     <string name="start_sound_beep">Bip</string>
     <string name="start_sound_beep_desc">Bunyi bip elektronik sederhana</string>
     <string name="start_sound_gunshot">Tembakan</string>
@@ -1510,7 +1509,6 @@
     <string name="start_type_touch_release_desc">Tahan layar, lalu angkat jari Anda untuk memulai</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, BIP! Timer dimulai dengan bunyi bip</string>
     <string name="start_type_voice_command_desc">Suara AI memanggil perintah, pengatur waktu dimulai di GO!</string>
-    <string name="start_type_inframe_desc">Timer dimulai ketika Anda berlari melewati kamera depan</string>
     <string name="preset_category_acceleration">Akselerasi</string>
     <string name="preset_category_max_speed">Kecepatan Maks</string>
     <string name="preset_category_agility">Ketangkasan</string>

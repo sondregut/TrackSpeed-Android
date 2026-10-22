@@ -1508,8 +1508,8 @@
     </plurals>
 
     <string name="start_selector_inframe">In-Frame</string>
-    <string name="start_selector_inframe_desc">Stand at the front-camera gate, then cross the on-screen line to start.</string>
-    <string name="start_selector_inframe_gate_desc">Stand at the front-camera gate, then cross the on-screen line to start.</string>
+    <string name="start_selector_inframe_desc">Hold still in front of the camera, then run to start from your first movement</string>
+    <string name="start_selector_inframe_gate_desc">Hold still in front of the camera, then run to start from your first movement</string>
     <string name="start_sound_beep">Beep</string>
     <string name="start_sound_beep_desc">Simple electronic beep</string>
     <string name="start_sound_gunshot">Gunshot</string>
@@ -1747,8 +1747,8 @@
     <string name="start_type_touch_release_desc">Hold the start phone’s screen, then lift your finger to start</string>
     <string name="start_type_countdown_full_desc">Starts automatically on the beep after 3, 2, 1</string>
     <string name="start_type_voice_command_desc">Spoken start commands; the timer starts on GO</string>
-    <string name="start_type_inframe_desc">Stand at the front-camera gate, then cross the on-screen line to start</string>
-    <string name="start_type_inframe_gate_desc">Stand at the front-camera gate, then cross the on-screen line to start</string>
+    <string name="start_type_inframe_desc">Hold still in front of the camera, then run to start from your first movement</string>
+    <string name="start_type_inframe_gate_desc">Hold still in front of the camera, then run to start from your first movement</string>
 
     <string name="preset_category_acceleration">Acceleration</string>
     <string name="preset_category_max_speed">Max Speed</string>
@@ -2472,4 +2472,15 @@
     <string name="overlay_canvas">Video format</string>
     <string name="overlay_canvas_social">9:16 social</string>
     <string name="overlay_canvas_original">Original</string>
+    <string name="camera_start_motion_description">Hold still in the front camera. Your first confirmed body movement starts the timer.</string>
+    <string name="camera_start_wait_camera">Waiting for camera pose analysis. Keep this app open.</string>
+    <string name="camera_start_setup">Place the phone securely with one athlete’s upper body, hips and legs visible.</string>
+    <string name="camera_start_confirm_camera">Use this camera position</string>
+    <string name="camera_start_step_in">Step into the camera view</string>
+    <string name="camera_start_hold_still">Hold still · %1$d%%</string>
+    <string name="camera_start_wait_session">Athlete ready · waiting for the session</string>
+    <string name="camera_start_ready">Ready · move to start</string>
+    <string name="camera_start_confirming">Confirming your departure…</string>
+    <string name="camera_start_started">Started from your first movement</string>
+    <string name="camera_start_one_athlete">One athlete in frame. Keep the phone still.</string>
 </resources>
