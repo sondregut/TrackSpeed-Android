@@ -1,5 +1,5 @@
+# Supply an owner-approved key only through the launching process environment.
+# Never store bearer credentials in tracked configuration.
 [mcp_servers.revenuecat]
 url = "https://mcp.revenuecat.ai/mcp"
-
-[mcp_servers.revenuecat.http_headers]
-Authorization = "Bearer sk_dKTVaJFIIhoTOPeeEmYIvYWuwBKgr"
+bearer_token_env_var = "TRACKSPEED_REVENUECAT_API_V2_SECRET_KEY"

@@ -1313,7 +1313,6 @@
         <item quantity="other">+%d daha fazla bölünme</item>
     </plurals>
     <string name="start_selector_inframe">Çerçeve İçi</string>
-    <string name="start_selector_inframe_desc">Kameranın önünde durun ve başlamak için bir adım uzaklaşın.</string>
     <string name="start_sound_beep">Bip sesi</string>
     <string name="start_sound_beep_desc">Basit elektronik bip sesi</string>
     <string name="start_sound_gunshot">Ateşli silah</string>
@@ -1530,7 +1529,6 @@
     <string name="start_type_touch_release_desc">Ekranı basılı tutun, ardından başlamak için parmağınızı kaldırın</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, BİP! Zamanlayıcı bip sesiyle başlar</string>
     <string name="start_type_voice_command_desc">AI sesi komutları çağırır, zamanlayıcı GO\'da başlar!</string>
-    <string name="start_type_inframe_desc">Ön kameranın yanından koşarak geçtiğinizde zamanlayıcı başlar</string>
     <string name="preset_category_acceleration">Hızlanma</string>
     <string name="preset_category_max_speed">Maksimum Hız</string>
     <string name="preset_category_agility">Çeviklik</string>

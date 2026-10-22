@@ -39,6 +39,7 @@ class SettingsRepository @Inject constructor(
         val DEFAULT_DISTANCE = doublePreferencesKey("default_distance")
         val START_TYPE = stringPreferencesKey("start_type")
         val DETECTION_SENSITIVITY = floatPreferencesKey("detection_sensitivity")
+        val VIDEO_OVERLAY_OPTIONS = stringPreferencesKey("video_overlay_options")
         val SPEED_UNIT = stringPreferencesKey("speed_unit")
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
@@ -172,6 +173,9 @@ class SettingsRepository @Inject constructor(
     val detectionSensitivity: Flow<Float> = preferences.map { prefs ->
         prefs[Keys.DETECTION_SENSITIVITY] ?: Defaults.SENSITIVITY
     }
+
+    val videoOverlayOptions: Flow<String> = preferences.map { it[Keys.VIDEO_OVERLAY_OPTIONS] ?: "" }
+    suspend fun setVideoOverlayOptions(value: String) { dataStore.edit { it[Keys.VIDEO_OVERLAY_OPTIONS] = value } }
 
     val speedUnit: Flow<String> = preferences.map { prefs ->
         prefs[Keys.SPEED_UNIT] ?: Defaults.SPEED_UNIT

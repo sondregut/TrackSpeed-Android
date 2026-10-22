@@ -28,7 +28,7 @@ private fun StartType.onboardingIcon(): ImageVector = when (this) {
     StartType.TOUCH_RELEASE -> Icons.Default.TouchApp
     StartType.COUNTDOWN -> Icons.Default.Timer
     StartType.VOICE_COMMAND -> Icons.Default.Mic
-    StartType.IN_FRAME -> Icons.Default.CenterFocusStrong
+    StartType.IN_FRAME, StartType.MOTION_START, StartType.REACTION_START -> Icons.Default.CenterFocusStrong
 }
 
 @Composable
@@ -44,7 +44,7 @@ fun StartTypesStep(onContinue: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(StartType.entries, key = { it.rawValue }) { type ->
+            items(StartType.localStartTypes, key = { it.rawValue }) { type ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = SurfaceDark),

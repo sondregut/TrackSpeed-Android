@@ -3,225 +3,130 @@ package com.trackspeed.android.videooverlay
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PorterDuff
 import android.graphics.RectF
+import android.graphics.Typeface
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.CanvasOverlay
-import java.util.Locale
-import kotlin.math.max
-import kotlin.math.min
 
 @UnstableApi
-class RaceOverlayCanvasOverlay(
-    private val snapshot: VideoOverlaySnapshot
-) : CanvasOverlay(true) {
-
+class RaceOverlayCanvasOverlay(private val snapshot: VideoOverlaySnapshot) : CanvasOverlay(true) {
     private val renderer = RaceOverlayCanvasRenderer()
-
     override fun onDraw(canvas: Canvas, presentationTimeUs: Long) {
-        val timeSeconds = presentationTimeUs / 1_000_000.0
-        renderer.draw(canvas, snapshot, timeSeconds)
+        // Media3 reuses this transparent bitmap between frames. Clear the overlay
+        // layer only; clearing the shared renderer would erase preview footage.
+        canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+        renderer.draw(canvas, snapshot, presentationTimeUs / 1_000_000.0)
     }
 }
 
-private class RaceOverlayCanvasRenderer {
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textAlign = Paint.Align.CENTER
-        typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-    }
-    private val rect = RectF()
+/** One renderer for the in-app preview, Media3 export, and native render tests. */
+class RaceOverlayCanvasRenderer {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val bold = Typeface.create("sans-serif", Typeface.BOLD)
+    private val mono = Typeface.create("monospace", Typeface.BOLD)
 
-    fun draw(canvas: Canvas, snapshot: VideoOverlaySnapshot, currentTimeSeconds: Double) {
-        val width = canvas.width.toFloat()
-        val height = canvas.height.toFloat()
-        if (width <= 0f || height <= 0f) return
-
-        val scale = min(width, height) / 390f
-        val margin = max(16f * scale, 10f)
+    fun draw(canvas: Canvas, snapshot: VideoOverlaySnapshot, currentTimeSeconds: Double, guides: Boolean = false,
+        width: Float = canvas.width.toFloat(), height: Float = canvas.height.toFloat()) {
+        if (width <= 0 || height <= 0) return
         val state = snapshot.frameState(currentTimeSeconds)
-
-        drawTopStack(canvas, width, margin, scale, state, snapshot.readyLabel)
-        drawBottomLeft(canvas, height, margin, scale, state)
-        drawWatermark(canvas, width, height, margin, scale)
+        val prefs = snapshot.preferences
+        val rows = state.visibleSplits
+        // Reserve speed height before the finish to avoid jumping over the athlete.
+        val speedRow = snapshot.showSpeed && snapshot.speedDisplay != null
+        val layout = overlayCardLayout(width, height, prefs,
+            speedRow, rows.size, !state.runTypeLabel.isNullOrBlank(), snapshot.sourceAspectRatio)
+        val r = layout.card
+        val scale = layout.scale
+        if (guides) drawGuides(canvas, overlaySafeRect(width,height,prefs.socialSafe), width, height)
+        canvas.save()
+        canvas.translate(r.left, r.top)
+        canvas.scale(scale, scale)
+        val h = r.height / scale
+        paint.style = Paint.Style.FILL
+        paint.color = Color.argb(224, 12, 18, 29)
+        canvas.drawRoundRect(RectF(0f, 0f, r.width / scale, h), 16f, 16f, paint)
+        paint.color = Color.rgb(66, 168, 255)
+        canvas.drawRoundRect(RectF(0f, 16f, 3f, h - 16f), 1.5f, 1.5f, paint)
+        if (layout.compactHeader) {
+            drawCompactHeader(canvas, snapshot, state, speedRow)
+            canvas.restore()
+            return
+        }
+        text(canvas, "TRACKSPEED", 16f, 23f, 10f, Color.rgb(160, 200, 237), maxWidth = 218f)
+        var y = 34f
+        if (prefs.showTime) {
+            val time = if (state.phase == RaceOverlayPhase.READY) snapshot.readyLabel
+                else formatOverlayTime(state.displayedTimeSeconds) + " s"
+            text(canvas, time, 16f, y + 36f, 36f, Color.WHITE, typeface = mono, maxWidth = 218f)
+            y += 51f
+        }
+        state.runTypeLabel?.takeIf { it.isNotBlank() }?.let {
+            text(canvas, it, 16f, y + 13f, 12f, Color.rgb(204, 216, 230), maxWidth = 218f)
+            y += 20f
+        }
+        if (speedRow) {
+            text(canvas, snapshot.averageSpeedLabel, 16f, y + 17f, 9f, Color.rgb(160, 177, 197), maxWidth = 86f)
+            text(canvas, state.speedDisplay ?: "—", 234f, y + 19f, 19f, Color.WHITE,
+                align = Paint.Align.RIGHT, typeface = mono, maxWidth = 120f)
+            y += 30f
+        }
+        rows.forEach { split ->
+            val segment = prefs.splitMode == OverlaySplitMode.SEGMENTS
+            val label = if (segment) split.segmentLabel else split.label
+            val seconds = if (segment) split.segmentTimeSeconds else split.raceTimeSeconds
+            text(canvas, label, 16f, y + 15f, 10f, Color.rgb(160, 177, 197), maxWidth = 112f)
+            text(canvas, formatOverlayTime(seconds) + " s", 234f, y + 15f, 13f, Color.WHITE,
+                align = Paint.Align.RIGHT, typeface = mono, maxWidth = 98f)
+            y += 21f
+        }
+        canvas.restore()
     }
 
-    private fun drawTopStack(
-        canvas: Canvas,
-        width: Float,
-        margin: Float,
-        scale: Float,
-        state: RaceOverlayFrameState,
-        readyLabel: String
-    ) {
-        val timerText = when (state.phase) {
-            RaceOverlayPhase.READY -> readyLabel
-            RaceOverlayPhase.RUNNING,
-            RaceOverlayPhase.FINISHED -> formatOverlayTime(state.displayedTimeSeconds)
+    private fun drawCompactHeader(canvas: Canvas, snapshot: VideoOverlaySnapshot, state: RaceOverlayFrameState, speedRow: Boolean) {
+        text(canvas, "TRACKSPEED", 16f, 21f, 9f, Color.rgb(160,200,237), maxWidth=298f)
+        var y=28f
+        if (snapshot.preferences.showTime) {
+            val time=if(state.phase==RaceOverlayPhase.READY) snapshot.readyLabel else formatOverlayTime(state.displayedTimeSeconds)+" s"
+            text(canvas,time,16f,y+34f,34f,Color.WHITE,typeface=mono,maxWidth=if(speedRow) 172f else 298f)
         }
-        val timerColor = when (state.phase) {
-            RaceOverlayPhase.READY -> Color.argb(132, 20, 24, 32)
-            RaceOverlayPhase.RUNNING -> Color.argb(216, 10, 132, 255)
-            RaceOverlayPhase.FINISHED -> Color.argb(216, 34, 197, 94)
+        if(speedRow) {
+            text(canvas,snapshot.averageSpeedLabel,314f,y+11f,9f,Color.rgb(160,177,197),align=Paint.Align.RIGHT,maxWidth=116f)
+            text(canvas,state.speedDisplay ?: "—",314f,y+33f,18f,Color.WHITE,align=Paint.Align.RIGHT,typeface=mono,maxWidth=116f)
         }
-
-        val timerHeight = drawPill(
-            canvas = canvas,
-            text = timerText,
-            centerX = width / 2f,
-            top = margin,
-            textSize = if (state.phase == RaceOverlayPhase.READY) 18f * scale else 28f * scale,
-            backgroundColor = timerColor,
-            textColor = Color.WHITE,
-            horizontalPadding = 18f * scale,
-            verticalPadding = 7f * scale,
-            uppercase = false
-        )
-
-        val speed = state.speedDisplay
-        if (state.phase != RaceOverlayPhase.READY && !speed.isNullOrBlank()) {
-            drawPill(
-                canvas = canvas,
-                text = speed,
-                centerX = width / 2f,
-                top = margin + timerHeight + 8f * scale,
-                textSize = 16f * scale,
-                backgroundColor = Color.argb(132, 20, 24, 32),
-                textColor = Color.WHITE,
-                horizontalPadding = 14f * scale,
-                verticalPadding = 5f * scale,
-                uppercase = false
-            )
+        if(snapshot.preferences.showTime || speedRow) y+=45f
+        state.runTypeLabel?.takeIf{it.isNotBlank()}?.let {
+            text(canvas,it,16f,y+12f,11f,Color.rgb(204,216,230),maxWidth=298f);y+=17f
         }
-    }
-
-    private fun drawBottomLeft(
-        canvas: Canvas,
-        height: Float,
-        margin: Float,
-        scale: Float,
-        state: RaceOverlayFrameState
-    ) {
-        var bottom = height - margin
-        state.runTypeLabel?.takeIf { it.isNotBlank() }?.let { label ->
-            bottom -= drawPillFromBottom(
-                canvas = canvas,
-                text = label,
-                left = margin,
-                bottom = bottom,
-                textSize = 12f * scale,
-                backgroundColor = Color.argb(132, 20, 24, 32),
-                textColor = Color.WHITE,
-                horizontalPadding = 10f * scale,
-                verticalPadding = 5f * scale
-            ) + 7f * scale
-        }
-
-        state.visibleSplits.asReversed().forEach { split ->
-            bottom -= drawPillFromBottom(
-                canvas = canvas,
-                text = "${split.label}: ${formatOverlayTime(split.raceTimeSeconds)}",
-                left = margin,
-                bottom = bottom,
-                textSize = 12f * scale,
-                backgroundColor = Color.argb(216, 10, 132, 255),
-                textColor = Color.WHITE,
-                horizontalPadding = 10f * scale,
-                verticalPadding = 5f * scale
-            ) + 7f * scale
+        val rows=state.visibleSplits
+        val cellWidth=298f/rows.size.coerceAtLeast(1)
+        rows.forEachIndexed { index, split ->
+            val segment=snapshot.preferences.splitMode==OverlaySplitMode.SEGMENTS
+            val label=if(segment) split.segmentLabel else split.label
+            val seconds=if(segment) split.segmentTimeSeconds else split.raceTimeSeconds
+            val x=16f+index*cellWidth
+            text(canvas,label,x,y+10f,9f,Color.rgb(160,177,197),maxWidth=cellWidth-6)
+            text(canvas,formatOverlayTime(seconds)+" s",x,y+29f,13f,Color.WHITE,typeface=mono,maxWidth=cellWidth-6)
         }
     }
 
-    private fun drawWatermark(canvas: Canvas, width: Float, height: Float, margin: Float, scale: Float) {
-        val text = "TrackSpeed"
-        val icon = max(22f * scale, 16f)
-        val textSize = max(14f * scale, 10f)
-        textPaint.textSize = textSize
-        textPaint.color = Color.argb(242, 255, 255, 255)
-        textPaint.textAlign = Paint.Align.LEFT
-        val textWidth = textPaint.measureText(text)
-        val gap = 7f * scale
-        val totalWidth = icon + gap + textWidth
-        val left = width - margin - totalWidth
-        val top = height - margin - icon
-
-        fillPaint.color = Color.argb(220, 10, 132, 255)
-        rect.set(left, top, left + icon, top + icon)
-        canvas.drawRoundRect(rect, 5f * scale, 5f * scale, fillPaint)
-
-        textPaint.textAlign = Paint.Align.CENTER
-        textPaint.textSize = icon * 0.55f
-        canvas.drawText("T", left + icon / 2f, top + icon * 0.68f, textPaint)
-
-        textPaint.textAlign = Paint.Align.LEFT
-        textPaint.textSize = textSize
-        canvas.drawText(text, left + icon + gap, top + icon * 0.68f, textPaint)
+    private fun text(canvas: Canvas, value: String, x: Float, baseline: Float, size: Float, color: Int,
+        align: Paint.Align = Paint.Align.LEFT, typeface: Typeface = bold, maxWidth: Float) {
+        paint.color = color; paint.style = Paint.Style.FILL; paint.textAlign = align
+        paint.typeface = typeface; paint.textSize = size
+        val width = paint.measureText(value)
+        if (width > maxWidth) paint.textSize *= maxWidth / width
+        canvas.drawText(value, x, baseline, paint)
     }
 
-    private fun drawPill(
-        canvas: Canvas,
-        text: String,
-        centerX: Float,
-        top: Float,
-        textSize: Float,
-        backgroundColor: Int,
-        textColor: Int,
-        horizontalPadding: Float,
-        verticalPadding: Float,
-        uppercase: Boolean
-    ): Float {
-        textPaint.textSize = max(textSize, 8f)
-        textPaint.color = textColor
-        textPaint.textAlign = Paint.Align.CENTER
-        val metrics = textPaint.fontMetrics
-        val textHeight = metrics.descent - metrics.ascent
-        val pillWidth = textPaint.measureText(text) + horizontalPadding * 2f
-        val pillHeight = textHeight + verticalPadding * 2f
-        val left = centerX - pillWidth / 2f
-
-        fillPaint.color = backgroundColor
-        rect.set(left, top, left + pillWidth, top + pillHeight)
-        canvas.drawRoundRect(rect, pillHeight / 2f, pillHeight / 2f, fillPaint)
-        strokePaint.color = Color.argb(44, 255, 255, 255)
-        strokePaint.strokeWidth = max(1f, textSize * 0.04f)
-        canvas.drawRoundRect(rect, pillHeight / 2f, pillHeight / 2f, strokePaint)
-        canvas.drawText(
-            if (uppercase) text.uppercase(Locale.US) else text,
-            centerX,
-            top + verticalPadding - metrics.ascent,
-            textPaint
-        )
-        return pillHeight
-    }
-
-    private fun drawPillFromBottom(
-        canvas: Canvas,
-        text: String,
-        left: Float,
-        bottom: Float,
-        textSize: Float,
-        backgroundColor: Int,
-        textColor: Int,
-        horizontalPadding: Float,
-        verticalPadding: Float
-    ): Float {
-        textPaint.textSize = max(textSize, 8f)
-        textPaint.color = textColor
-        textPaint.textAlign = Paint.Align.LEFT
-        val metrics = textPaint.fontMetrics
-        val textHeight = metrics.descent - metrics.ascent
-        val pillWidth = textPaint.measureText(text) + horizontalPadding * 2f
-        val pillHeight = textHeight + verticalPadding * 2f
-        val top = bottom - pillHeight
-
-        fillPaint.color = backgroundColor
-        rect.set(left, top, left + pillWidth, bottom)
-        canvas.drawRoundRect(rect, pillHeight / 2f, pillHeight / 2f, fillPaint)
-        strokePaint.color = Color.argb(44, 255, 255, 255)
-        strokePaint.strokeWidth = max(1f, textSize * 0.04f)
-        canvas.drawRoundRect(rect, pillHeight / 2f, pillHeight / 2f, strokePaint)
-        canvas.drawText(text, left + horizontalPadding, top + verticalPadding - metrics.ascent, textPaint)
-        return pillHeight
+    private fun drawGuides(canvas: Canvas, safe: OverlayRect, width: Float, height: Float) {
+        paint.style = Paint.Style.FILL; paint.color = Color.argb(70, 255, 40, 80)
+        canvas.drawRect(0f, 0f, width, safe.top, paint)
+        canvas.drawRect(0f, safe.bottom, width, height, paint)
+        canvas.drawRect(0f, safe.top, safe.left, safe.bottom, paint)
+        canvas.drawRect(safe.right, safe.top, width, safe.bottom, paint)
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = 2f; paint.color = Color.rgb(77, 232, 171)
+        canvas.drawRect(safe.left, safe.top, safe.right, safe.bottom, paint)
+        paint.style = Paint.Style.FILL
     }
 }

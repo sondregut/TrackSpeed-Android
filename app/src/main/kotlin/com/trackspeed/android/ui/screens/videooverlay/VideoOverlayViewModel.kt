@@ -1,6 +1,10 @@
 package com.trackspeed.android.ui.screens.videooverlay
 
 import android.net.Uri
+import com.trackspeed.android.videooverlay.OverlayPreferences
+import com.trackspeed.android.videooverlay.OverlaySpeedUnit
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import android.content.Context
 import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
@@ -50,6 +54,7 @@ data class VideoOverlayUiState(
     val startMarkerTimeSeconds: Double = 0.0,
     val showSpeed: Boolean = true,
     val showRunType: Boolean = true,
+    val overlayPreferences: OverlayPreferences = OverlayPreferences(),
     @StringRes val importErrorRes: Int? = null,
     val exportPhase: VideoExportPhase = VideoExportPhase.Idle,
     @StringRes val savedMessageRes: Int? = null
@@ -63,8 +68,9 @@ data class VideoOverlayUiState(
                 speedUnit = speedUnit,
                 startMarkerTimeSeconds = startMarkerTimeSeconds,
                 showSpeed = showSpeed,
-                showRunType = showRunType
-            )
+                showRunType = showRunType,
+                preferences = overlayPreferences
+            ).copy(sourceAspectRatio = video.displayAspectRatio)
         }
 }
 
@@ -87,11 +93,18 @@ class VideoOverlayViewModel @Inject constructor(
         viewModelScope.launch {
             val run = sessionRepository.getRunById(runId)
             val speedUnit = settingsRepository.speedUnit.first()
+            val stored = settingsRepository.videoOverlayOptions.first()
+            val options = runCatching { Json.decodeFromString<OverlayPreferences>(stored) }.getOrElse {
+                OverlayPreferences(speedUnit = OverlaySpeedUnit.fromRaw(speedUnit))
+            }
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     run = run,
-                    speedUnit = speedUnit
+                    speedUnit = options.speedUnit.label,
+                    showSpeed = options.showSpeed,
+                    showRunType = options.showRunType,
+                    overlayPreferences = options
                 )
             }
         }
@@ -141,24 +154,15 @@ class VideoOverlayViewModel @Inject constructor(
         _uiState.update { it.copy(step = step) }
     }
 
-    fun setShowSpeed(show: Boolean) {
-        _uiState.update {
-            it.copy(
-                showSpeed = show,
-                exportPhase = VideoExportPhase.Idle,
-                savedMessageRes = null
-            )
-        }
-    }
+    fun setShowSpeed(show: Boolean) = setOverlayPreferences(_uiState.value.overlayPreferences.copy(showSpeed = show))
+    fun setShowRunType(show: Boolean) = setOverlayPreferences(_uiState.value.overlayPreferences.copy(showRunType = show))
 
-    fun setShowRunType(show: Boolean) {
-        _uiState.update {
-            it.copy(
-                showRunType = show,
-                exportPhase = VideoExportPhase.Idle,
-                savedMessageRes = null
-            )
-        }
+    fun setOverlayPreferences(options: OverlayPreferences) {
+        if (_uiState.value.exportPhase is VideoExportPhase.Exporting) return
+        _uiState.update { it.copy(overlayPreferences = options, speedUnit = options.speedUnit.label,
+            showSpeed = options.showSpeed, showRunType = options.showRunType,
+            exportPhase = VideoExportPhase.Idle, savedMessageRes = null) }
+        viewModelScope.launch { settingsRepository.setVideoOverlayOptions(Json.encodeToString(options)) }
     }
 
     fun exportVideo() {
@@ -229,7 +233,8 @@ class VideoOverlayViewModel @Inject constructor(
                 }
             },
             runTypeLabel = localizedRunType,
-            readyLabel = context.getString(R.string.video_overlay_ready)
+            readyLabel = context.getString(R.string.video_overlay_ready),
+            averageSpeedLabel = context.getString(R.string.overlay_average_speed)
         )
     }
 }

@@ -1,0 +1,23 @@
+[
+  {
+    "case": "portrait",
+    "display_width": 720,
+    "display_height": 1280,
+    "mean_channel_error": 3.056,
+    "worst_tile_channel_error": 5.266
+  },
+  {
+    "case": "landscape",
+    "display_width": 1280,
+    "display_height": 720,
+    "mean_channel_error": 3.113,
+    "worst_tile_channel_error": 5.324
+  },
+  {
+    "case": "social-landscape",
+    "display_width": 1080,
+    "display_height": 1920,
+    "mean_channel_error": 1.451,
+    "worst_tile_channel_error": 4.711
+  }
+]

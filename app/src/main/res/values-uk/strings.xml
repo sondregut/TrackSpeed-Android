@@ -1335,7 +1335,6 @@
         <item quantity="other">+%d більше розколів</item>
     </plurals>
     <string name="start_selector_inframe">В кадрі</string>
-    <string name="start_selector_inframe_desc">Встаньте перед камерою, потім відійдіть, щоб почати.</string>
     <string name="start_sound_beep">Звуковий сигнал</string>
     <string name="start_sound_beep_desc">Простий електронний звуковий сигнал</string>
     <string name="start_sound_gunshot">вогнепальний постріл</string>
@@ -1570,7 +1569,6 @@
     <string name="start_type_touch_release_desc">Тримайте екран, а потім підніміть палець, щоб почати</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, БІП! Таймер запускається звуковим сигналом</string>
     <string name="start_type_voice_command_desc">AI голос видає команди, таймер запускається на GO!</string>
-    <string name="start_type_inframe_desc">Таймер запускається, коли ви пробігаєте повз фронтальну камеру</string>
     <string name="preset_category_acceleration">Прискорення</string>
     <string name="preset_category_max_speed">Максимальна швидкість</string>
     <string name="preset_category_agility">Спритність</string>

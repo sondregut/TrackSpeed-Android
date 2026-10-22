@@ -1313,7 +1313,6 @@
         <item quantity="other">+%d flere splits</item>
     </plurals>
     <string name="start_selector_inframe">In-Frame</string>
-    <string name="start_selector_inframe_desc">Stil dig foran kameraet, og gå derefter væk for at starte.</string>
     <string name="start_sound_beep">Bip</string>
     <string name="start_sound_beep_desc">Simpel elektronisk bip</string>
     <string name="start_sound_gunshot">Geværskud</string>
@@ -1530,7 +1529,6 @@
     <string name="start_type_touch_release_desc">Hold skærmen, og løft derefter fingeren for at starte</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, BIP! Timeren starter på bip</string>
     <string name="start_type_voice_command_desc">AI-stemme kalder kommandoer, timeren starter på GO!</string>
-    <string name="start_type_inframe_desc">Timeren starter, når du løber forbi frontkameraet</string>
     <string name="preset_category_acceleration">Acceleration</string>
     <string name="preset_category_max_speed">Max hastighed</string>
     <string name="preset_category_agility">Agility</string>

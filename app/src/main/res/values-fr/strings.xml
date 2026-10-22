@@ -1326,7 +1326,6 @@ Nous avons des offres pour tous.</string>
         <item quantity="other">+%d plus de divisions</item>
     </plurals>
     <string name="start_selector_inframe">Dans le cadre</string>
-    <string name="start_selector_inframe_desc">Tenez-vous devant la caméra, puis éloignez-vous pour commencer.</string>
     <string name="start_sound_beep">Bip</string>
     <string name="start_sound_beep_desc">Bip electronique simple</string>
     <string name="start_sound_gunshot">Coup de feu</string>
@@ -1552,7 +1551,6 @@ Nous avons des offres pour tous.</string>
     <string name="start_type_touch_release_desc">Maintiens l\'écran appuyé, puis lève le doigt pour démarrer</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, BIP ! Le chronomètre démarre au bip</string>
     <string name="start_type_voice_command_desc">La voix IA donne les commandes, le chrono démarre au GO !</string>
-    <string name="start_type_inframe_desc">Le chronomètre démarre lorsque vous passez devant la caméra frontale</string>
     <string name="preset_category_acceleration">Accélération</string>
     <string name="preset_category_max_speed">Vitesse maximale</string>
     <string name="preset_category_agility">Agilité</string>

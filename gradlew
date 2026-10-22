@@ -127,15 +127,11 @@ then
     die "xargs is not available"
 fi
 
-# Use "xargs" to parse quoted args.
-#
-# With -n://g://  -e://g://
-#   Input:  " '528)
-#   Output: ' \n 528)
+# Parse JVM options, shell-escape each token, and preserve Gradle arguments.
 eval "set -- $(
         printf '%s\n' "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" |
         xargs -n1 |
-        sed ' s~528 '\'') ' '\''~g; s~528)~g; ' |
+        sed ' s~[^-[:alnum:]+,./:=@_]~\\&~g; ' |
         tr '\n' ' '
     )" '"$@"'
 

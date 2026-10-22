@@ -7,6 +7,7 @@ import com.trackspeed.android.protocol.SegmentSplit
 import com.trackspeed.android.ui.util.parseSegmentSplits
 import java.io.File
 import java.util.Locale
+import kotlin.math.roundToLong
 
 data class ImportedVideo(
     val uri: Uri,
@@ -27,7 +28,9 @@ data class ImportedVideo(
 
 data class SplitMark(
     val label: String,
-    val raceTimeSeconds: Double
+    val raceTimeSeconds: Double,
+    val segmentTimeSeconds: Double = raceTimeSeconds,
+    val segmentLabel: String = label
 )
 
 data class VideoOverlaySnapshot(
@@ -39,7 +42,10 @@ data class VideoOverlaySnapshot(
     val speedDisplay: String?,
     val startMarkerTimeSeconds: Double,
     val showSpeed: Boolean,
-    val showRunType: Boolean
+    val showRunType: Boolean,
+    val preferences: OverlayPreferences = OverlayPreferences(),
+    val averageSpeedLabel: String = "AVG SPEED",
+    val sourceAspectRatio: Float? = null
 ) {
     fun frameState(currentTimeSeconds: Double): RaceOverlayFrameState {
         val raceTime = (currentTimeSeconds - startMarkerTimeSeconds).coerceAtLeast(0.0)
@@ -56,9 +62,11 @@ data class VideoOverlaySnapshot(
         return RaceOverlayFrameState(
             phase = phase,
             displayedTimeSeconds = displayTime,
-            visibleSplits = splits.filter { currentTimeSeconds >= startMarkerTimeSeconds + it.raceTimeSeconds },
+            visibleSplits = if (preferences.splitMode == OverlaySplitMode.OFF) emptyList() else
+                splits.filter { it.raceTimeSeconds.isFinite() && it.raceTimeSeconds > 0 &&
+                    currentTimeSeconds >= startMarkerTimeSeconds + it.raceTimeSeconds }.takeLast(3),
             runTypeLabel = if (showRunType) runTypeLabel else null,
-            speedDisplay = if (showSpeed) speedDisplay else null
+            speedDisplay = if (showSpeed && phase == RaceOverlayPhase.FINISHED) speedDisplay else null
         )
     }
 }
@@ -82,7 +90,8 @@ fun RunEntity.toVideoOverlaySnapshot(
     speedUnit: String,
     startMarkerTimeSeconds: Double,
     showSpeed: Boolean,
-    showRunType: Boolean
+    showRunType: Boolean,
+    preferences: OverlayPreferences = OverlayPreferences()
 ): VideoOverlaySnapshot {
     return VideoOverlaySnapshot(
         sourceUri = sourceUri,
@@ -93,13 +102,14 @@ fun RunEntity.toVideoOverlaySnapshot(
         speedDisplay = buildSpeedDisplay(this, speedUnit),
         startMarkerTimeSeconds = startMarkerTimeSeconds,
         showSpeed = showSpeed,
-        showRunType = showRunType
+        showRunType = showRunType,
+        preferences = preferences
     )
 }
 
 fun formatOverlayTime(seconds: Double): String {
-    val clamped = seconds.coerceAtLeast(0.0)
-    val totalHundredths = (clamped * 100.0).toLong()
+    val clamped = if (seconds.isFinite()) seconds.coerceIn(0.0, 359999.99) else 0.0
+    val totalHundredths = (clamped * 100.0).roundToLong()
     val minutes = totalHundredths / 6000
     val wholeSeconds = (totalHundredths % 6000) / 100
     val hundredths = totalHundredths % 100
@@ -113,18 +123,23 @@ fun formatOverlayTime(seconds: Double): String {
 private fun buildSplitMarks(run: RunEntity): List<SplitMark> {
     val raw = parseSegmentSplits(run.splitsJson)
     if (raw.isEmpty()) {
-        return if (run.timeSeconds > 0.0) {
+        return if (run.timeSeconds.isFinite() && run.timeSeconds > 0.0) {
             listOf(SplitMark(label = "FINISH", raceTimeSeconds = run.timeSeconds))
         } else {
             emptyList()
         }
     }
 
-    return raw.mapIndexed { index, split ->
-        val isLast = index == raw.lastIndex
+    val valid = raw.filter { it.cumulativeSplitNanos > 0 && it.splitNanos > 0 &&
+        it.splitNanos <= it.cumulativeSplitNanos && it.distanceMeters.isFinite() &&
+        it.cumulativeDistanceMeters.isFinite() }.sortedBy { it.cumulativeSplitNanos }
+    return valid.mapIndexed { index, split ->
+        val isLast = index == valid.lastIndex
         SplitMark(
             label = if (isLast) "FINISH" else split.distanceLabel(),
-            raceTimeSeconds = split.cumulativeSplitNanos / 1_000_000_000.0
+            raceTimeSeconds = split.cumulativeSplitNanos / 1_000_000_000.0,
+            segmentTimeSeconds = split.splitNanos / 1_000_000_000.0,
+            segmentLabel = "${formatDistanceLabel((split.cumulativeDistanceMeters - split.distanceMeters).coerceAtLeast(0.0))}–${split.distanceLabel()}"
         )
     }
 }
@@ -147,15 +162,8 @@ private fun buildRunTypeLabel(run: RunEntity): String {
     }
 }
 
-private fun buildSpeedDisplay(run: RunEntity, speedUnit: String): String? {
-    if (run.distance <= 0.0 || run.timeSeconds <= 0.0) return null
-    val metersPerSecond = run.distance / run.timeSeconds
-    return when (speedUnit) {
-        "km/h" -> String.format(Locale.US, "%.1f km/h", metersPerSecond * 3.6)
-        "mph" -> String.format(Locale.US, "%.1f mph", metersPerSecond * 2.23694)
-        else -> String.format(Locale.US, "%.1f m/s", metersPerSecond)
-    }
-}
+private fun buildSpeedDisplay(run: RunEntity, speedUnit: String): String? =
+    measuredAverageSpeed(run.distance, run.timeSeconds)?.let { OverlaySpeedUnit.fromRaw(speedUnit).format(it) }
 
 private fun formatDistanceLabel(distance: Double): String {
     return if (kotlin.math.abs(distance - distance.toInt()) < 0.05) {

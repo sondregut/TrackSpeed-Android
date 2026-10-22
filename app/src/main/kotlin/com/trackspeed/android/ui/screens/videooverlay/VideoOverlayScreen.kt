@@ -93,6 +93,16 @@ import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.math.roundToInt
 import com.trackspeed.android.R
+import com.trackspeed.android.videooverlay.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.AlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -174,6 +184,7 @@ fun VideoOverlayScreen(
                             exportPhase = uiState.exportPhase,
                             onShowSpeedChange = viewModel::setShowSpeed,
                             onShowRunTypeChange = viewModel::setShowRunType,
+                            onPreferencesChange = viewModel::setOverlayPreferences,
                             onBack = { viewModel.setStep(VideoOverlayStep.MARK_START) },
                             onExport = viewModel::exportVideo,
                             onRetry = viewModel::retryExport,
@@ -389,6 +400,7 @@ private fun PreviewStep(
     exportPhase: VideoExportPhase,
     onShowSpeedChange: (Boolean) -> Unit,
     onShowRunTypeChange: (Boolean) -> Unit,
+    onPreferencesChange: (OverlayPreferences) -> Unit,
     onBack: () -> Unit,
     onExport: () -> Unit,
     onRetry: () -> Unit,
@@ -400,6 +412,10 @@ private fun PreviewStep(
         return
     }
 
+    var showOptions by remember { mutableStateOf(false) }
+    var showGuides by remember { mutableStateOf(false) }
+    if (showOptions) OverlayOptionsDialog(snapshot.preferences,
+        onChange = onPreferencesChange, onDismiss = { showOptions = false })
     val player = rememberVideoPlayer(video = video, playWhenReady = true)
     var currentTime by remember(video.uri) { mutableDoubleStateOf(0.0) }
 
@@ -417,23 +433,16 @@ private fun PreviewStep(
                 .fillMaxWidth()
                 .background(Color.Black)
         ) {
-            PlayerSurface(
-                player = player,
-                useController = true,
-                modifier = Modifier.fillMaxSize()
-            )
-            // PlayerView uses FIT. Keep the preview graphics inside the same
-            // displayed video rectangle when a landscape clip is letterboxed.
-            val displayAspect = video.displayAspectRatio
+            // The preview and exporter use the same output canvas. FIT preserves the
+            // whole athlete when landscape footage is shared on a portrait canvas.
+            val displayAspect = if (snapshot.preferences.canvas == OverlayCanvas.SOCIAL_9_16) 9f / 16f else video.displayAspectRatio
             val fittedWidth = minOf(maxWidth, maxHeight * displayAspect)
             val fittedHeight = fittedWidth / displayAspect
-            RaceOverlayView(
-                snapshot = snapshot,
-                currentTimeSeconds = currentTime,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(fittedWidth, fittedHeight)
-            )
+            Box(Modifier.align(Alignment.Center).size(fittedWidth, fittedHeight).background(Color.Black)) {
+                PlayerSurface(player = player, useController = true, modifier = Modifier.fillMaxSize())
+                RaceOverlayView(snapshot = snapshot, currentTimeSeconds = currentTime,
+                    guides = showGuides, modifier = Modifier.fillMaxSize())
+            }
         }
 
         Column(
@@ -453,20 +462,13 @@ private fun PreviewStep(
                 )
             }
 
-            if (snapshot.speedDisplay != null) {
-                ToggleRow(
-                    title = stringResource(R.string.video_overlay_show_speed),
-                    checked = showSpeed,
-                    enabled = exportPhase !is VideoExportPhase.Exporting,
-                    onCheckedChange = onShowSpeedChange
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { showOptions = true }, enabled = exportPhase !is VideoExportPhase.Exporting,
+                    modifier = Modifier.weight(1f)) { Text(stringResource(R.string.overlay_edit_metrics)) }
+                OutlinedButton(onClick = { showGuides = !showGuides }, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(if (showGuides) R.string.overlay_hide_guides else R.string.overlay_safe_guides))
+                }
             }
-            ToggleRow(
-                title = stringResource(R.string.video_overlay_show_run_type),
-                checked = showRunType,
-                enabled = exportPhase !is VideoExportPhase.Exporting,
-                onCheckedChange = onShowRunTypeChange
-            )
 
             HorizontalDivider(color = DividerColor)
 
@@ -667,122 +669,59 @@ private fun PlayerSurface(
 }
 
 @Composable
-private fun RaceOverlayView(
-    snapshot: VideoOverlaySnapshot,
-    currentTimeSeconds: Double,
-    modifier: Modifier = Modifier
-) {
-    val state = snapshot.frameState(currentTimeSeconds)
-    Box(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            TimerPill(state)
-            if (state.phase != RaceOverlayPhase.READY && !state.speedDisplay.isNullOrBlank()) {
-                OverlayPill(
-                    text = state.speedDisplay,
-                    background = Color.Black.copy(alpha = 0.46f),
-                    textColor = Color.White,
-                    fontSize = 16
-                )
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            state.visibleSplits.forEach { split ->
-                OverlayPill(
-                    text = "${split.label}: ${formatOverlayTime(split.raceTimeSeconds)}",
-                    background = AccentBlue.copy(alpha = 0.84f),
-                    textColor = Color.White,
-                    fontSize = 12
-                )
-            }
-            state.runTypeLabel?.let { label ->
-                OverlayPill(
-                    text = label,
-                    background = Color.Black.copy(alpha = 0.46f),
-                    textColor = Color.White,
-                    fontSize = 12
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(AccentBlue),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("T", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-            Text(
-                text = stringResource(R.string.app_name),
-                color = Color.White.copy(alpha = 0.95f),
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
-            )
-        }
+private fun RaceOverlayView(snapshot: VideoOverlaySnapshot, currentTimeSeconds: Double,
+    modifier: Modifier = Modifier, guides: Boolean = false) {
+    val renderer = remember { RaceOverlayCanvasRenderer() }
+    Canvas(modifier) {
+        drawIntoCanvas { renderer.draw(it.nativeCanvas, snapshot, currentTimeSeconds, guides, size.width, size.height) }
     }
 }
 
 @Composable
-private fun TimerPill(state: RaceOverlayFrameState) {
-    val text = when (state.phase) {
-        RaceOverlayPhase.READY -> stringResource(R.string.video_overlay_ready)
-        RaceOverlayPhase.RUNNING,
-        RaceOverlayPhase.FINISHED -> formatOverlayTime(state.displayedTimeSeconds)
-    }
-    val background = when (state.phase) {
-        RaceOverlayPhase.READY -> Color.Black.copy(alpha = 0.46f)
-        RaceOverlayPhase.RUNNING -> AccentBlue.copy(alpha = 0.84f)
-        RaceOverlayPhase.FINISHED -> AccentGreen.copy(alpha = 0.84f)
-    }
-    OverlayPill(
-        text = text,
-        background = background,
-        textColor = Color.White,
-        fontSize = if (state.phase == RaceOverlayPhase.READY) 18 else 28,
-        monospaced = state.phase != RaceOverlayPhase.READY
-    )
-}
-
-@Composable
-private fun OverlayPill(
-    text: String,
-    background: Color,
-    textColor: Color,
-    fontSize: Int,
-    monospaced: Boolean = false
-) {
-    Text(
-        text = text,
-        color = textColor,
-        maxLines = 1,
-        style = MaterialTheme.typography.labelLarge.copy(
-            fontSize = fontSize.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = if (monospaced) FontFamily.Monospace else FontFamily.Default
-        ),
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(background)
-            .border(0.5.dp, Color.White.copy(alpha = 0.18f), CircleShape)
-            .padding(horizontal = if (fontSize >= 18) 18.dp else 11.dp, vertical = if (fontSize >= 18) 7.dp else 5.dp)
-    )
+private fun OverlayOptionsDialog(options: OverlayPreferences, onChange: (OverlayPreferences) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.overlay_edit_metrics)) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) } },
+        text = {
+            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.overlay_canvas))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OverlayCanvas.entries.forEach { canvas ->
+                        FilterChip(selected = options.canvas == canvas, onClick = { onChange(options.copy(canvas = canvas)) },
+                            label = { Text(stringResource(if (canvas == OverlayCanvas.SOCIAL_9_16) R.string.overlay_canvas_social else R.string.overlay_canvas_original)) })
+                    }
+                }
+                Text(stringResource(R.string.overlay_speed_units))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OverlaySpeedUnit.entries.forEach { unit ->
+                        FilterChip(selected = options.speedUnit == unit, onClick = { onChange(options.copy(speedUnit = unit)) }, label = { Text(unit.label) })
+                    }
+                }
+                ToggleRow(stringResource(R.string.overlay_show_time), options.showTime, true) { onChange(options.copy(showTime = it)) }
+                ToggleRow(stringResource(R.string.overlay_average_speed), options.showSpeed, true) { onChange(options.copy(showSpeed = it)) }
+                ToggleRow(stringResource(R.string.video_overlay_show_run_type), options.showRunType, true) { onChange(options.copy(showRunType = it)) }
+                Text(stringResource(R.string.overlay_splits))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OverlaySplitMode.entries.forEach { mode ->
+                        val label = when (mode) { OverlaySplitMode.OFF -> R.string.overlay_splits_off
+                            OverlaySplitMode.CUMULATIVE -> R.string.overlay_splits_cumulative
+                            OverlaySplitMode.SEGMENTS -> R.string.overlay_splits_segments }
+                        FilterChip(selected = options.splitMode == mode, onClick = { onChange(options.copy(splitMode = mode)) }, label = { Text(stringResource(label)) })
+                    }
+                }
+                Text(stringResource(R.string.overlay_position))
+                OverlayPosition.entries.chunked(2).forEach { positions ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        positions.forEach { position ->
+                            val label = when (position) {
+                                OverlayPosition.TOP_LEFT -> R.string.overlay_top_left; OverlayPosition.TOP_RIGHT -> R.string.overlay_top_right
+                                OverlayPosition.BOTTOM_LEFT -> R.string.overlay_bottom_left; OverlayPosition.BOTTOM_RIGHT -> R.string.overlay_bottom_right }
+                            FilterChip(selected = options.position == position, onClick = { onChange(options.copy(position = position)) }, label = { Text(stringResource(label)) })
+                        }
+                    }
+                }
+                ToggleRow(stringResource(R.string.overlay_social_safe), options.socialSafe, true) { onChange(options.copy(socialSafe = it)) }
+                Text(stringResource(R.string.overlay_safe_help), style = MaterialTheme.typography.bodySmall)
+            }
+        })
 }

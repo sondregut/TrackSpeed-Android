@@ -525,7 +525,7 @@ fun BasicTimingScreen(
                 },
                 onCancel = { activeStartOverlay = null }
             )
-            StartMode.FLYING, StartMode.INFRAME -> {
+            StartMode.FLYING, StartMode.INFRAME, StartMode.MOTION, StartMode.REACTION -> {
                 // Camera-gate modes arm directly and never use a synthetic UI timestamp.
                 activeStartOverlay = null
             }
@@ -633,7 +633,7 @@ private fun SessionSettingsSheet(
             }
 
             SessionSheetSection(title = stringResource(R.string.session_settings_start_type)) {
-                StartType.entries.chunked(2).forEach { row ->
+                StartType.localStartTypes.chunked(2).forEach { row ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1906,11 +1906,14 @@ private fun LapCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Thumbnail
+        // Preserve the full crossing frame and grow only when vertical space allows.
+        val thumbSize = com.trackspeed.android.ui.components.liveThumbnailSize(
+            lap.thumbnail?.width, lap.thumbnail?.height,
+            androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 700)
         Box(
             modifier = Modifier
-                .width(50.dp)
-                .height(66.dp)
+                .width(thumbSize.width.dp)
+                .height(thumbSize.height.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .border(
                     width = 1.dp,
@@ -1935,7 +1938,7 @@ private fun LapCard(
                 Image(
                     bitmap = lap.thumbnail.asImageBitmap(),
                     contentDescription = stringResource(R.string.timing_crossing_frame),
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
                 // Gate line overlay on thumbnail (live session — two-layer style matching iOS)

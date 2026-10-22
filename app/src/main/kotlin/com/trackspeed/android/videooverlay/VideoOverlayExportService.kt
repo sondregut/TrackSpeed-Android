@@ -11,6 +11,8 @@ import androidx.core.content.FileProvider
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.Presentation
+import androidx.media3.common.Effect
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
@@ -71,7 +73,12 @@ class VideoOverlayExportService @Inject constructor(
                 .setEffects(
                     Effects(
                         emptyList(),
-                        listOf(OverlayEffect(listOf(overlay)))
+                        buildList<Effect> {
+                            if (snapshot.preferences.canvas == OverlayCanvas.SOCIAL_9_16) {
+                                add(Presentation.createForWidthAndHeight(1080, 1920, Presentation.LAYOUT_SCALE_TO_FIT))
+                            }
+                            add(OverlayEffect(listOf(overlay)))
+                        }
                     )
                 )
                 .setFrameRate(30)

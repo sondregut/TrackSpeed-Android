@@ -1313,7 +1313,6 @@
         <item quantity="other">+%d további felosztások</item>
     </plurals>
     <string name="start_selector_inframe">In-Frame</string>
-    <string name="start_selector_inframe_desc">Álljon a kamera elé, majd lépjen távolabb a kezdéshez.</string>
     <string name="start_sound_beep">Hangjelzés</string>
     <string name="start_sound_beep_desc">Egyszerű elektronikus hangjelzés</string>
     <string name="start_sound_gunshot">Lövés</string>
@@ -1530,7 +1529,6 @@
     <string name="start_type_touch_release_desc">Tartsa a képernyőt, majd az indításhoz emelje fel az ujját</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, BÍP! Az időzítő sípolással indul</string>
     <string name="start_type_voice_command_desc">A mesterséges intelligencia hangja parancsokat hív ki, az időzítő elindul a GO-n!</string>
-    <string name="start_type_inframe_desc">Az időzítő akkor indul el, amikor elhalad az előlapi kamera mellett</string>
     <string name="preset_category_acceleration">Gyorsulás</string>
     <string name="preset_category_max_speed">Max sebesség</string>
     <string name="preset_category_agility">Agility</string>

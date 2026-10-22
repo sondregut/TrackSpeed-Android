@@ -31,74 +31,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Locale
 import javax.inject.Inject
-
-enum class OnboardingStep {
-    WELCOME,               // 0
-    REFERRAL_WELCOME,      // 1  - conditional for users who arrived from an invite link
-    VALUE_PROPOSITION,     // 2
-    FLYING_TIME,           // 3
-    GOAL_TIME,             // 4
-    GOAL_MOTIVATION,       // 5  - personalized chart + research
-    PAIN_POINTS,           // 6
-    PAIN_SWIPE,            // 7
-    HOW_IT_WORKS,          // 8
-    ATTRIBUTION,           // 9
-    CAMERA_PERMISSION,     // 10
-    SOLO_DEMO,             // 11
-    RATING,                // 12
-    TRIAL_INTRO,           // 13
-    TRIAL_REMINDER,        // 14
-    NOTIFICATION,          // 15
-    COMPETITOR_COMPARISON, // 16
-    PAYWALL,               // 17
-    PAYWALL_RECOVERY,      // 18
-    SPIN_WHEEL,            // 19
-    COMPLETION,            // 20
-    AUTH,                  // 21
-    PROFILE_SETUP,         // 22
-    START_TYPES,           // 23
-    MULTI_DEVICE;          // 24
-
-    val progress: Float
-        get() {
-            if (this == WELCOME) return 0f
-            val first = REFERRAL_WELCOME.ordinal
-            val last = PAYWALL.ordinal
-            val clamped = ordinal.coerceIn(first, last)
-            return (clamped - first).toFloat() / (last - first).toFloat()
-        }
-    val showsProgressBar: Boolean get() = this != WELCOME && this != AUTH && this != PAYWALL_RECOVERY && this != COMPLETION
-    val showsBackButton: Boolean get() = showsProgressBar && ordinal > 0
-
-    val analyticsName: String
-        get() = when (this) {
-            WELCOME -> "getStarted"
-            REFERRAL_WELCOME -> "referralWelcome"
-            VALUE_PROPOSITION -> "valueProposition"
-            FLYING_TIME -> "flyingPB"
-            GOAL_TIME -> "goalTime"
-            GOAL_MOTIVATION -> "goalValidation"
-            PAIN_POINTS -> "painPoints"
-            PAIN_SWIPE -> "painSwipe"
-            HOW_IT_WORKS -> "howItWorks"
-            ATTRIBUTION -> "referralCodeEntry"
-            CAMERA_PERMISSION -> "cameraPermission"
-            SOLO_DEMO -> "soloDemo"
-            RATING -> "rating"
-            TRIAL_INTRO -> "trialIntro"
-            TRIAL_REMINDER -> "trialReminder"
-            NOTIFICATION -> "notification"
-            COMPETITOR_COMPARISON -> "competitorComparison"
-            PAYWALL -> "paywall"
-            PAYWALL_RECOVERY -> "paywallRecovery"
-            SPIN_WHEEL -> "spinWheel"
-            COMPLETION -> "completion"
-            AUTH -> "auth"
-            PROFILE_SETUP -> "profileSetup"
-            START_TYPES -> "startTypes"
-            MULTI_DEVICE -> "multiDevice"
-        }
-}
+import androidx.lifecycle.SavedStateHandle
 
 sealed interface PromoRedemptionState {
     data object Idle : PromoRedemptionState
@@ -135,6 +68,7 @@ data class OnboardingUiState(
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     private val application: Application,
+    private val savedStateHandle: SavedStateHandle,
     private val settingsRepository: SettingsRepository,
     private val subscriptionManager: SubscriptionManager,
     private val referralService: ReferralService,
@@ -148,7 +82,15 @@ class OnboardingViewModel @Inject constructor(
 
     val onboardingCompletedFlow: Flow<Boolean> = settingsRepository.onboardingCompleted
 
-    private val _uiState = MutableStateFlow(OnboardingUiState())
+    private val _uiState = MutableStateFlow(OnboardingUiState(
+        currentStep = savedStateHandle.get<String>("onboardingStep")?.let { raw ->
+            OnboardingStep.entries.firstOrNull { it.name == raw }
+        } ?: OnboardingStep.WELCOME,
+        profile = OnboardingProfile(
+            role = savedStateHandle.get<String>("onboardingRole")?.let(UserRole::fromRawValue),
+            discipline = savedStateHandle.get<String>("onboardingSport")?.let { raw -> SportDiscipline.entries.firstOrNull { it.rawValue == raw } }
+        )
+    ))
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
     init {
@@ -195,6 +137,14 @@ class OnboardingViewModel @Inject constructor(
             }
         )
 
+        viewModelScope.launch {
+            uiState.collect { state ->
+                savedStateHandle["onboardingStep"] = state.currentStep.name
+                savedStateHandle["onboardingRole"] = state.profile.role?.rawValue
+                savedStateHandle["onboardingSport"] = state.profile.discipline?.rawValue
+            }
+        }
+
         // Load referral code on init
         viewModelScope.launch {
             try {
@@ -234,61 +184,18 @@ class OnboardingViewModel @Inject constructor(
         return settingsRepository.onboardingCompleted.first()
     }
 
-    fun goForward() {
-        val state = _uiState.value
-        val steps = OnboardingStep.entries
-        var nextIndex = (state.currentStep.ordinal + 1).coerceAtMost(steps.size - 1)
-        while (nextIndex < steps.lastIndex && shouldSkipStep(steps[nextIndex], state.annualFreeTrialDays)) {
-            nextIndex++
-        }
-        val nextStep = steps[nextIndex]
-        trackStepCompleted(state.currentStep, nextStep)
-        _uiState.update { state ->
-            state.copy(currentStep = nextStep)
-        }
-    }
+    private fun route() = OnboardingRoute(_uiState.value.isReferred, EarlyReleaseAccess.isEnabled)
+
+    fun goForward() = goToStep(route().next(_uiState.value.currentStep))
 
     fun goBack() {
-        val state = _uiState.value
-        val steps = OnboardingStep.entries
-        var previousIndex = (state.currentStep.ordinal - 1).coerceAtLeast(0)
-        while (previousIndex > 0 && shouldSkipStep(steps[previousIndex], state.annualFreeTrialDays)) {
-            previousIndex--
-        }
-        val previousStep = steps[previousIndex]
-        val isReferred = isReferredUser()
-        val targetStep = if (previousStep == OnboardingStep.REFERRAL_WELCOME && !isReferred) {
-            OnboardingStep.WELCOME
-        } else {
-            previousStep
-        }
-        analyticsService.track(
-            AnalyticsEvent.ONBOARDING_BACK_PRESSED,
-            mapOf(
-                "from_step" to state.currentStep.analyticsName,
-                "to_step" to targetStep.analyticsName,
-                "progress" to targetStep.progress
-            )
-        )
-        _uiState.update { current ->
-            current.copy(
-                isReferred = isReferred,
-                currentStep = targetStep
-            )
-        }
-    }
-
-    private fun shouldSkipStep(step: OnboardingStep, annualFreeTrialDays: Int?): Boolean {
-        if (EarlyReleaseAccess.isEnabled) {
-            return step in setOf(
-                OnboardingStep.TRIAL_INTRO,
-                OnboardingStep.TRIAL_REMINDER,
-                OnboardingStep.NOTIFICATION,
-                OnboardingStep.COMPETITOR_COMPARISON
-            )
-        }
-        return annualFreeTrialDays == null &&
-            step in setOf(OnboardingStep.TRIAL_INTRO, OnboardingStep.TRIAL_REMINDER)
+        val current = _uiState.value.currentStep
+        val previous = route().previous(current)
+        analyticsService.track(AnalyticsEvent.ONBOARDING_BACK_PRESSED, mapOf(
+            "from_step" to current.analyticsName, "to_step" to previous.analyticsName,
+            "flow_version" to "android_streamlined_20261022"
+        ))
+        _uiState.update { it.copy(currentStep = previous) }
     }
 
     fun goToStep(step: OnboardingStep) {
@@ -309,13 +216,13 @@ class OnboardingViewModel @Inject constructor(
             return false
         }
 
-        completeOnboarding()
-        return true
+        // All first-time completion paths share the same short guide.
+        goToStep(OnboardingStep.GETTING_STARTED)
+        return false
     }
 
-    fun completeOnboarding() {
+    fun completeOnboarding(onCompleted: () -> Unit = {}) {
         viewModelScope.launch {
-            settingsRepository.setOnboardingCompleted(true)
             if (!authRepository.isAuthenticated) {
                 settingsRepository.setHasSkippedLogin(true)
             }
@@ -332,6 +239,8 @@ class OnboardingViewModel @Inject constructor(
                 profile.promoCode?.let { settingsRepository.setPromoCode(it) }
                 profile.referralCode?.let { settingsRepository.setReferralCode(it) }
             }
+            settingsRepository.setOnboardingCompleted(true)
+            onCompleted()
             settingsRepository.setPendingProfileSync(true)
             authRepository.processPendingProfileSync()
 
@@ -572,11 +481,10 @@ class OnboardingViewModel @Inject constructor(
      * submit it first (async) and then decide whether to skip the paywall.
      * Matches iOS: free promo codes skip all remaining paywall steps.
      */
-    fun handleAttributionContinue(onSkipToComplete: () -> Unit) {
+    fun handleAttributionContinue() {
         // Already pro (e.g. from deeplink redemption) → skip immediately
         if (!EarlyReleaseAccess.isEnabled && shouldSkipPaywall()) {
-            completeOnboarding()
-            onSkipToComplete()
+            goToStep(OnboardingStep.GETTING_STARTED)
             return
         }
 
@@ -607,8 +515,7 @@ class OnboardingViewModel @Inject constructor(
 
             // After redemption attempt, check if user now has pro
             if (!EarlyReleaseAccess.isEnabled && shouldSkipPaywall()) {
-                completeOnboarding()
-                onSkipToComplete()
+                goToStep(OnboardingStep.GETTING_STARTED)
             } else {
                 goForward()
             }

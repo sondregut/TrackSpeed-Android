@@ -83,9 +83,12 @@ enum class StartMode(
         descriptionRes = R.string.start_type_inframe_gate_desc,
         icon = Icons.Default.CenterFocusStrong,
         rawValue = "inFrame"
-    );
+    ),
+    MOTION(R.string.start_type_motion, R.string.camera_start_motion_description, Icons.Default.CenterFocusStrong, "motionStart"),
+    REACTION(R.string.start_type_reaction, R.string.race_remote_start_required, Icons.Default.Timer, "reactionStart");
 
     companion object {
+        val localModes get() = entries.filter { StartType.fromRawValue(it.rawValue).supportsLocalStart }
         fun fromString(value: String): StartMode {
             val startType = StartType.fromRawValue(value)
             return entries.firstOrNull { it.rawValue == startType.rawValue } ?: FLYING
@@ -107,7 +110,7 @@ enum class StartMode(
 @Composable
 fun StartOverlaySelector(
     currentMode: StartMode,
-    availableModes: List<StartMode> = StartMode.entries,
+    availableModes: List<StartMode> = StartMode.localModes,
     showProBadges: Boolean = false,
     onModeSelected: (StartMode) -> Unit,
     onDismiss: () -> Unit

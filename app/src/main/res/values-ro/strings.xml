@@ -1326,7 +1326,6 @@ Avem planuri pentru toata lumea.</string>
         <item quantity="other">+%d mai multe diviziuni</item>
     </plurals>
     <string name="start_selector_inframe">În cadru</string>
-    <string name="start_selector_inframe_desc">Stai în fața camerei, apoi îndepărtează-te pentru a începe.</string>
     <string name="start_sound_beep">Bip</string>
     <string name="start_sound_beep_desc">Semnal electronic simplu</string>
     <string name="start_sound_gunshot">Foc de pistol</string>
@@ -1552,7 +1551,6 @@ Avem planuri pentru toata lumea.</string>
     <string name="start_type_touch_release_desc">Tine apasat pe ecran, apoi ridica degetul pentru a incepe</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, BIP! Cronometrul pornește la semnal</string>
     <string name="start_type_voice_command_desc">Vocea AI anunță comenzile, cronometrul pornește la START!</string>
-    <string name="start_type_inframe_desc">Temporizatorul pornește când treceți pe lângă camera frontală</string>
     <string name="preset_category_acceleration">Accelerare</string>
     <string name="preset_category_max_speed">Viteza maxima</string>
     <string name="preset_category_agility">Agilitate</string>

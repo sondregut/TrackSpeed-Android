@@ -360,7 +360,7 @@ private fun SettingsScreenContent(
                         onDismissRequest = { startTypeDropdownExpanded = false },
                         containerColor = CardBackground
                     ) {
-                        StartType.entries.forEach { type ->
+                        StartType.localStartTypes.forEach { type ->
                             DropdownMenuItem(
                                 text = {
                                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

@@ -1326,7 +1326,6 @@ Tenemos planes para todos.</string>
         <item quantity="other">+%d más divisiones</item>
     </plurals>
     <string name="start_selector_inframe">En cuadro</string>
-    <string name="start_selector_inframe_desc">Párese frente a la cámara y luego aléjese para comenzar.</string>
     <string name="start_sound_beep">Pitido</string>
     <string name="start_sound_beep_desc">Pitido electrónico simple</string>
     <string name="start_sound_gunshot">Disparo de salida</string>
@@ -1552,7 +1551,6 @@ Tenemos planes para todos.</string>
     <string name="start_type_touch_release_desc">Mantén la pantalla pulsada, luego levanta el dedo para iniciar</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, ¡BIP! El cronómetro inicia con el pitido</string>
     <string name="start_type_voice_command_desc">La voz IA dicta los comandos, el cronómetro inicia con ¡YA!</string>
-    <string name="start_type_inframe_desc">El cronómetro comienza cuando pasas por delante de la cámara frontal</string>
     <string name="preset_category_acceleration">Aceleración</string>
     <string name="preset_category_max_speed">Velocidad máxima</string>
     <string name="preset_category_agility">Agilidad</string>

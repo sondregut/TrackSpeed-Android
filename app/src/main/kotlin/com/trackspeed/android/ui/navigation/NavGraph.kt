@@ -226,6 +226,13 @@ fun TrackSpeedNavHost(
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 },
+                onStartSession = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                    navController.navigate(Screen.SessionSetup.createRoute(allowsSolo = true))
+                },
                 onGuestJoinSession = {
                     navController.navigate(
                         Screen.RaceMode.createRoute(mode = "join", guestJoin = true)

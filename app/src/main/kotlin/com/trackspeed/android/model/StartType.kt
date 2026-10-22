@@ -43,18 +43,25 @@ enum class StartType(
         rawValue = "inFrame",
         displayName = "In-Frame Start",
         shortName = "In-Frame",
-        description = "Stand at the front-camera gate, then cross the on-screen line to start"
-    );
+        description = "Hold still in front of the camera, then run to start from your first movement"
+    ),
+    MOTION_START("motionStart", "Motion Start", "Motion", "First movement from the start phone"),
+    REACTION_START("reactionStart", "Reaction Start", "Reaction", "Reaction to the start phone’s cue");
+
+    /** Reaction needs a measured audible-cue onset contract; remote reaction starts remain supported. */
+    val supportsLocalStart: Boolean get() = this != REACTION_START
+
+    val usesPoseStart: Boolean get() = this == MOTION_START || this == IN_FRAME
 
     val usesStartTrigger: Boolean
-        get() = this == TOUCH_RELEASE || this == COUNTDOWN || this == VOICE_COMMAND
+        get() = this == TOUCH_RELEASE || this == COUNTDOWN || this == VOICE_COMMAND || usesPoseStart || !supportsLocalStart
 
     val startTriggerRoleName: String
         get() = when (this) {
             TOUCH_RELEASE -> "Touch Start"
             COUNTDOWN -> "Countdown Start"
             VOICE_COMMAND -> "Voice Start"
-            FLYING, IN_FRAME -> displayName
+            FLYING, IN_FRAME, MOTION_START, REACTION_START -> displayName
         }
 
     val startTriggerStatusText: String
@@ -62,7 +69,7 @@ enum class StartType(
             TOUCH_RELEASE -> "Touch start"
             COUNTDOWN -> "Countdown start"
             VOICE_COMMAND -> "Voice start"
-            FLYING, IN_FRAME -> displayName
+            FLYING, IN_FRAME, MOTION_START, REACTION_START -> displayName
         }
 
     val startTriggerHint: String
@@ -70,18 +77,18 @@ enum class StartType(
             TOUCH_RELEASE -> "You'll trigger the start by releasing your finger"
             COUNTDOWN -> "You'll trigger the start with the countdown"
             VOICE_COMMAND -> "You'll trigger the start with voice commands"
-            FLYING, IN_FRAME -> description
+            FLYING, IN_FRAME, MOTION_START, REACTION_START -> description
         }
 
     val requiresStartGate: Boolean
         get() = this == FLYING
 
     val usesFrontCamera: Boolean
-        get() = this == IN_FRAME
+        get() = usesPoseStart || this == REACTION_START
 
     /** Trigger-based modes bypass the camera only on the assigned start gate. */
     fun requiresCameraAtGate(isStartGate: Boolean): Boolean {
-        return !isStartGate || !usesStartTrigger
+        return !isStartGate || usesPoseStart || !usesStartTrigger
     }
 
     fun shouldUseFrontCameraAtGate(isStartGate: Boolean): Boolean {
@@ -89,6 +96,7 @@ enum class StartType(
     }
 
     companion object {
+        val localStartTypes: List<StartType> get() = entries.filter { it.supportsLocalStart }
         /**
          * Parse any legacy or current raw value into the canonical StartType.
          * Handles all historical values that may exist in Room DB, DataStore, or nav args.
@@ -103,6 +111,8 @@ enum class StartType(
             "voicecommand" -> VOICE_COMMAND
             "voice" -> VOICE_COMMAND
             "inframe" -> IN_FRAME
+            "motionstart" -> MOTION_START
+            "reactionstart" -> REACTION_START
             else -> FLYING
         }
     }

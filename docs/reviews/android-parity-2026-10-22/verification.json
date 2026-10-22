@@ -1,0 +1,14 @@
+{
+  "tests": 236,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "lint": {
+    "Error": 0,
+    "Warning": 869,
+    "Fatal": 0
+  },
+  "local_debug_apk_sha256": "1ea9a248feb3fd4989cca6ad02f47a2c1a4a57a4ecfceba337068800511eceb9",
+  "native_acceptance_tests": 10,
+  "native_device": "Headless API 36.1 arm64; 360x640 dp; offline; not physical timing validation"
+}

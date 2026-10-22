@@ -6,11 +6,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StartTypeTest {
+    @Test fun `remote movement starts preserve identity and never become flying`() {
+        assertEquals(StartType.MOTION_START, StartType.fromRawValue("motionStart"))
+        assertEquals(StartType.REACTION_START, StartType.fromRawValue("reactionStart"))
+        for (type in listOf(StartType.MOTION_START,StartType.REACTION_START)) {
+            assertEquals(type != StartType.REACTION_START, type.supportsLocalStart)
+            assertEquals(type != StartType.REACTION_START, type in StartType.localStartTypes)
+            assertTrue(type.requiresCameraAtGate(false))
+            assertTrue(type.usesStartTrigger)
+        }
+    }
+
 
     @Test
     fun `canonical start types preserve iOS wire values and order`() {
         assertEquals(
-            listOf("flying", "touchRelease", "countdown", "voiceCommand", "inFrame"),
+            listOf("flying", "touchRelease", "countdown", "voiceCommand", "inFrame", "motionStart", "reactionStart"),
             StartType.entries.map { it.rawValue }
         )
     }
@@ -24,20 +35,24 @@ class StartTypeTest {
     }
 
     @Test
-    fun `only touch countdown and voice bypass a start gate crossing`() {
+    fun `pose starts and deliberate triggers bypass line crossing`() {
         assertFalse(StartType.FLYING.usesStartTrigger)
         assertTrue(StartType.TOUCH_RELEASE.usesStartTrigger)
         assertTrue(StartType.COUNTDOWN.usesStartTrigger)
         assertTrue(StartType.VOICE_COMMAND.usesStartTrigger)
-        assertFalse(StartType.IN_FRAME.usesStartTrigger)
+        assertTrue(StartType.IN_FRAME.usesStartTrigger)
+        assertTrue(StartType.MOTION_START.usesStartTrigger)
     }
 
     @Test
-    fun `only in frame requests the front camera`() {
-        StartType.entries.filterNot { it == StartType.IN_FRAME }.forEach {
+    fun `pose start modes request front camera only on start phone`() {
+        StartType.entries.filterNot { it in listOf(StartType.IN_FRAME, StartType.MOTION_START, StartType.REACTION_START) }.forEach {
             assertFalse(it.usesFrontCamera)
         }
         assertTrue(StartType.IN_FRAME.usesFrontCamera)
+        assertTrue(StartType.MOTION_START.usesFrontCamera)
+        assertTrue(StartType.MOTION_START.requiresCameraAtGate(true))
+        assertFalse(StartType.REACTION_START.supportsLocalStart)
         assertTrue(StartType.IN_FRAME.shouldUseFrontCameraAtGate(isStartGate = true))
         assertFalse(StartType.IN_FRAME.shouldUseFrontCameraAtGate(isStartGate = false))
     }

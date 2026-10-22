@@ -1313,7 +1313,6 @@
         <item quantity="other">+%d fler delar</item>
     </plurals>
     <string name="start_selector_inframe">In-Frame</string>
-    <string name="start_selector_inframe_desc">Stå framför kameran och gå sedan bort för att börja.</string>
     <string name="start_sound_beep">Pip</string>
     <string name="start_sound_beep_desc">Enkel elektronisk pip</string>
     <string name="start_sound_gunshot">Vapenskott</string>
@@ -1530,7 +1529,6 @@
     <string name="start_type_touch_release_desc">Håll i skärmen och lyft sedan fingret för att starta</string>
     <string name="start_type_countdown_full_desc">3, 2, 1, PIP! Timern startar på pip</string>
     <string name="start_type_voice_command_desc">AI-röst ropar ut kommandon, timern startar på GO!</string>
-    <string name="start_type_inframe_desc">Timern startar när du springer förbi den främre kameran</string>
     <string name="preset_category_acceleration">Acceleration</string>
     <string name="preset_category_max_speed">Max hastighet</string>
     <string name="preset_category_agility">Agility</string>

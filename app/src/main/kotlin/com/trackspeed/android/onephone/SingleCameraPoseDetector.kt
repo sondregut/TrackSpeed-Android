@@ -1,5 +1,8 @@
 package com.trackspeed.android.onephone
 
+import com.trackspeed.android.camerastart.CameraStartJoint
+import com.trackspeed.android.camerastart.CameraStartPoint
+import com.trackspeed.android.camerastart.CameraStartPoseSample
 import android.util.Log
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
@@ -57,6 +60,29 @@ class SingleCameraPoseDetector {
             frame.timestampNanos / 1_000_000_000.0
         )
         return listOfNotNull(observation)
+    }
+
+    /** Null means inference failed, not that the athlete left the frame. Never turn failures into starts. */
+    fun detectStartSample(frame: CameraManager.FrameData, rotationDegrees: Int): CameraStartPoseSample? {
+        val image = InputImage.fromByteArray(toNv21(frame), frame.width, frame.height,
+            rotationDegrees, InputImage.IMAGE_FORMAT_NV21)
+        val pose = try {
+            Tasks.await(detector.process(image), 2, TimeUnit.SECONDS)
+        } catch (error: Exception) {
+            Log.w(TAG, "[CAMERA_START_POSE_FAILED] ${error.javaClass.simpleName}")
+            return null
+        }
+        // ML Kit reports upright pixels. Dividing both axes by height preserves Euclidean distances.
+        val height = (if (rotationDegrees % 180 == 0) frame.height else frame.width).toDouble()
+        if (height <= 0) return null
+        val joints = (LANDMARKS.map { CameraStartJoint.valueOf(it.first.name) to it.second } +
+            (CameraStartJoint.NOSE to PoseLandmark.NOSE)).mapNotNull { (name, type) ->
+            pose.getPoseLandmark(type)?.let { point -> name to CameraStartPoint(
+                point.position.x / height, point.position.y / height, point.inFrameLikelihood.toDouble()) }
+        }.toMap()
+        // ML Kit has no independent neck landmark. Do not synthesize it: one bad shoulder
+        // would otherwise move both shoulder and neck and defeat the two-joint noise guard.
+        return CameraStartPoseSample(frame.timestampNanos, joints)
     }
 
     fun close() {
