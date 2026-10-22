@@ -19,9 +19,9 @@ val localProperties = Properties().also { props ->
 fun localProp(key: String): String = localProperties.getProperty(key) ?: ""
 
 val sourceFingerprint = MessageDigest.getInstance("SHA-256").let { digest ->
-    fileTree("src/main") {
-        include("**/*.kt", "**/*.xml")
-    }.files.sortedBy { it.relativeTo(projectDir).path }.forEach { source ->
+    // Include owned imagery and other packaged assets so runtime attribution
+    // distinguishes visual-only updates as well as Kotlin/XML changes.
+    fileTree("src/main").files.sortedBy { it.relativeTo(projectDir).path }.forEach { source ->
         digest.update(source.relativeTo(projectDir).path.toByteArray())
         digest.update(source.readBytes())
     }
@@ -44,7 +44,7 @@ android {
         targetSdk = 36
         versionCode = 11
         versionName = "1.0.10"
-        buildConfigField("String", "BUILD_MARKER", "\"android-parity-2026-09-26-onephone\"")
+        buildConfigField("String", "BUILD_MARKER", "\"android-iphone-visual-parity-2026-10-22\"")
         buildConfigField("String", "SOURCE_FINGERPRINT", "\"$sourceFingerprint\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

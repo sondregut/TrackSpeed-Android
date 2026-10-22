@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <instrumentation
+        android:name="com.trackspeed.android.ui.UiParityTestRunner"
+        android:targetPackage="com.trackspeed.android"
+        android:functionalTest="true"
+        android:handleProfiling="false" />
+</manifest>

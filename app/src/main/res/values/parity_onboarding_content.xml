@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Current-iPhone copy; localized counterparts are in each existing locale directory. -->
+    <string name="parity_onboarding_welcome_title">Sprint timing with your phone</string>
+    <string name="parity_onboarding_build_setup">Build My Setup</string>
+    <string name="parity_onboarding_other_sport">Other sport</string>
+    <string name="parity_onboarding_benefits_title">Built for your training</string>
+    <string name="parity_onboarding_benefit_timing">Automatic camera timing</string>
+    <string name="parity_onboarding_benefit_progress">See your progress</string>
+    <string name="parity_onboarding_benefit_phone">Use the phone you have</string>
+    <string name="parity_onboarding_benefit_solo">Time yourself with Solo</string>
+    <string name="parity_onboarding_benefit_saved">Every rep saved</string>
+    <string name="parity_onboarding_benefit_splits">See every split</string>
+    <string name="parity_onboarding_camera_needed">Camera access needed</string>
+    <string name="parity_onboarding_camera_granted">Camera access granted</string>
+    <string name="parity_onboarding_camera_off">Camera access is off</string>
+    <string name="parity_onboarding_camera_explanation">Your camera detects each crossing of the timing line.</string>
+    <string name="parity_onboarding_camera_ready">Ready to detect your crossings.</string>
+    <string name="parity_onboarding_camera_unavailable">You can continue without camera access. Camera timing will be unavailable.</string>
+</resources>

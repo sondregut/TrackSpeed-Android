@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="parity_session_timing_gates">Timing gates</string>
+    <string name="parity_session_timing_phones">2–6 phones</string>
+    <string name="parity_session_one_phone">1 phone</string>
+    <string name="parity_session_your_devices">Your devices</string>
+    <string name="parity_session_your_course">Your course</string>
+    <string name="parity_session_start">Start</string>
+    <string name="parity_session_optional_athletes">Athletes · optional</string>
+    <string name="parity_session_results_hint">Completed runs, splits and crossing photos appear here.</string>
+    <string name="parity_session_go_record">Go to Record</string>
+    <string name="parity_session_camera_attention">Check camera</string>
+    <string name="parity_session_paused">Paused</string>
+    <string name="parity_session_finished">Finished</string>
+    <string name="parity_session_calculating">Calculating</string>
+    <string name="parity_session_hold_still">Hold still</string>
+    <string name="parity_session_running">Running</string>
+    <string name="parity_session_calibrating">Calibrating</string>
+    <string name="parity_session_ready">Ready</string>
+    <string name="parity_session_waiting">Waiting</string>
+    <string name="parity_overlay_guide_note">Guides are not exported. Check placement against the athlete and your social app’s controls.</string>
+    <string name="parity_replay_previous_frame">Previous frame</string>
+    <string name="parity_replay_next_frame">Next frame</string>
+    <string name="parity_replay_frame_position">Frame %1$d of %2$d</string>
+    <string name="parity_replay_missing_hint">This run may have been removed. Return to the session to choose another run.</string>
+    <string name="parity_replay_share">Share result</string>
+    <string name="parity_replay_video">Create video</string>
+    <string name="parity_replay_image_missing">The saved image is not available on this phone.</string>
+    <string name="parity_session_speed_placeholder">— %1$s</string>
+</resources>

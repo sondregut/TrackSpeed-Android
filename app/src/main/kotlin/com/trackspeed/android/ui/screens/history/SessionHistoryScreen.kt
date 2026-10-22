@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SearchOff
@@ -74,6 +75,7 @@ private val DeleteRed = Color(0xFFFF3B30)
 fun SessionHistoryScreen(
     onSessionClick: (String) -> Unit = {},
     onStatsClick: () -> Unit = {},
+    onStartSessionClick: (() -> Unit)? = null,
     viewModel: SessionHistoryViewModel = hiltViewModel()
 ) {
     val dateGroups by viewModel.dateGroups.collectAsState()
@@ -153,9 +155,9 @@ fun SessionHistoryScreen(
         modifier = Modifier
             .fillMaxSize()
             .gradientBackground()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 16.dp)
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -311,21 +313,28 @@ fun SessionHistoryScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.DirectionsRun,
+                        imageVector = Icons.Outlined.History,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
                         tint = TextSecondary.copy(alpha = 0.4f)
                     )
                     Text(
                         text = stringResource(R.string.session_history_no_sessions),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextSecondary
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
                     )
                     Text(
-                        text = stringResource(R.string.session_history_no_sessions_subtitle),
+                        text = stringResource(R.string.parity_history_empty_description),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary.copy(alpha = 0.7f)
+                        color = TextSecondary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
+                    onStartSessionClick?.let { startSession ->
+                        Button(onClick = startSession, modifier = Modifier.heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.home_start_session))
+                        }
+                    }
                 }
             }
         } else {
@@ -355,10 +364,10 @@ fun SessionHistoryScreen(
                         }
                         Text(
                             text = groupLabel,
-                            style = MaterialTheme.typography.titleSmall.copy(
+                            style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            color = TextMuted,
+                            color = TextPrimary,
                             modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                         )
                     }

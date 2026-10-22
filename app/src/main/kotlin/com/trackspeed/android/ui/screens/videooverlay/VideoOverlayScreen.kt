@@ -56,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -412,8 +413,8 @@ private fun PreviewStep(
         return
     }
 
-    var showOptions by remember { mutableStateOf(false) }
-    var showGuides by remember { mutableStateOf(false) }
+    var showOptions by rememberSaveable { mutableStateOf(false) }
+    var showGuides by rememberSaveable { mutableStateOf(false) }
     if (showOptions) OverlayOptionsDialog(snapshot.preferences,
         onChange = onPreferencesChange, onDismiss = { showOptions = false })
     val player = rememberVideoPlayer(video = video, playWhenReady = true)
@@ -426,66 +427,87 @@ private fun PreviewStep(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(Color.Black)
-        ) {
-            // The preview and exporter use the same output canvas. FIT preserves the
-            // whole athlete when landscape footage is shared on a portrait canvas.
-            val displayAspect = if (snapshot.preferences.canvas == OverlayCanvas.SOCIAL_9_16) 9f / 16f else video.displayAspectRatio
-            val fittedWidth = minOf(maxWidth, maxHeight * displayAspect)
-            val fittedHeight = fittedWidth / displayAspect
-            Box(Modifier.align(Alignment.Center).size(fittedWidth, fittedHeight).background(Color.Black)) {
-                PlayerSurface(player = player, useController = true, modifier = Modifier.fillMaxSize())
-                RaceOverlayView(snapshot = snapshot, currentTimeSeconds = currentTime,
-                    guides = showGuides, modifier = Modifier.fillMaxSize())
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(SurfaceDark)
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Tune, contentDescription = null, tint = TextSecondary)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = stringResource(R.string.video_overlay_options),
-                    color = TextPrimary,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
-                )
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { showOptions = true }, enabled = exportPhase !is VideoExportPhase.Exporting,
-                    modifier = Modifier.weight(1f)) { Text(stringResource(R.string.overlay_edit_metrics)) }
-                OutlinedButton(onClick = { showGuides = !showGuides }, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(if (showGuides) R.string.overlay_hide_guides else R.string.overlay_safe_guides))
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val controlsMaxHeight = maxHeight * 0.54f
+        Column(Modifier.fillMaxSize()) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(Color.Black)
+            ) {
+                // The preview and exporter use the same output canvas. FIT preserves the
+                // whole athlete when landscape footage is shared on a portrait canvas.
+                val displayAspect = if (snapshot.preferences.canvas == OverlayCanvas.SOCIAL_9_16) 9f / 16f else video.displayAspectRatio
+                val fittedWidth = minOf(maxWidth, maxHeight * displayAspect)
+                val fittedHeight = fittedWidth / displayAspect
+                Box(Modifier.align(Alignment.Center).size(fittedWidth, fittedHeight).background(Color.Black)) {
+                    PlayerSurface(player = player, useController = true, modifier = Modifier.fillMaxSize())
+                    RaceOverlayView(snapshot = snapshot, currentTimeSeconds = currentTime,
+                        guides = showGuides, modifier = Modifier.fillMaxSize())
                 }
             }
 
-            HorizontalDivider(color = DividerColor)
-
-            ExportActions(
-                phase = exportPhase,
-                onExport = onExport,
-                onRetry = onRetry,
-                onSave = onSave,
-                onShare = onShare
-            )
-
-            TextButton(
-                onClick = onBack,
-                enabled = exportPhase !is VideoExportPhase.Exporting,
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceDark)
+                    .heightIn(max = controlsMaxHeight)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(stringResource(R.string.video_overlay_back_to_marker), color = TextSecondary)
+                OverlayChoiceSection(title = stringResource(R.string.overlay_canvas)) {
+                    OverlayCanvas.entries.forEach { canvas ->
+                        FilterChip(
+                            selected = snapshot.preferences.canvas == canvas,
+                            onClick = { onPreferencesChange(snapshot.preferences.copy(canvas = canvas)) },
+                            enabled = exportPhase !is VideoExportPhase.Exporting,
+                            label = { Text(stringResource(if (canvas == OverlayCanvas.SOCIAL_9_16)
+                                R.string.overlay_canvas_social else R.string.overlay_canvas_original)) }
+                        )
+                    }
+                }
+                OverlayChoiceSection(title = stringResource(R.string.overlay_speed_units)) {
+                    OverlaySpeedUnit.entries.forEach { unit ->
+                        FilterChip(
+                            selected = snapshot.preferences.speedUnit == unit,
+                            onClick = { onPreferencesChange(snapshot.preferences.copy(speedUnit = unit)) },
+                            enabled = exportPhase !is VideoExportPhase.Exporting,
+                            label = { Text(unit.label) }
+                        )
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { showOptions = true }, enabled = exportPhase !is VideoExportPhase.Exporting,
+                        modifier = Modifier.weight(1f)) { Text(stringResource(R.string.overlay_edit_metrics)) }
+                    OutlinedButton(onClick = { showGuides = !showGuides }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(if (showGuides) R.string.overlay_hide_guides else R.string.overlay_safe_guides))
+                    }
+                }
+
+                if (showGuides) {
+                    Text(stringResource(R.string.parity_overlay_guide_note), color = TextMuted,
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                HorizontalDivider(color = DividerColor)
+
+                ExportActions(
+                    phase = exportPhase,
+                    onExport = onExport,
+                    onRetry = onRetry,
+                    onSave = onSave,
+                    onShare = onShare
+                )
+
+                TextButton(
+                    onClick = onBack,
+                    enabled = exportPhase !is VideoExportPhase.Exporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.video_overlay_back_to_marker), color = TextSecondary)
+                }
             }
         }
     }
@@ -684,23 +706,10 @@ private fun OverlayOptionsDialog(options: OverlayPreferences, onChange: (Overlay
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) } },
         text = {
             Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.overlay_canvas))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OverlayCanvas.entries.forEach { canvas ->
-                        FilterChip(selected = options.canvas == canvas, onClick = { onChange(options.copy(canvas = canvas)) },
-                            label = { Text(stringResource(if (canvas == OverlayCanvas.SOCIAL_9_16) R.string.overlay_canvas_social else R.string.overlay_canvas_original)) })
-                    }
-                }
-                Text(stringResource(R.string.overlay_speed_units))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OverlaySpeedUnit.entries.forEach { unit ->
-                        FilterChip(selected = options.speedUnit == unit, onClick = { onChange(options.copy(speedUnit = unit)) }, label = { Text(unit.label) })
-                    }
-                }
                 ToggleRow(stringResource(R.string.overlay_show_time), options.showTime, true) { onChange(options.copy(showTime = it)) }
                 ToggleRow(stringResource(R.string.overlay_average_speed), options.showSpeed, true) { onChange(options.copy(showSpeed = it)) }
                 ToggleRow(stringResource(R.string.video_overlay_show_run_type), options.showRunType, true) { onChange(options.copy(showRunType = it)) }
-                Text(stringResource(R.string.overlay_splits))
+                Text(stringResource(R.string.overlay_splits), fontWeight = FontWeight.SemiBold)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OverlaySplitMode.entries.forEach { mode ->
                         val label = when (mode) { OverlaySplitMode.OFF -> R.string.overlay_splits_off
@@ -709,9 +718,10 @@ private fun OverlayOptionsDialog(options: OverlayPreferences, onChange: (Overlay
                         FilterChip(selected = options.splitMode == mode, onClick = { onChange(options.copy(splitMode = mode)) }, label = { Text(stringResource(label)) })
                     }
                 }
-                Text(stringResource(R.string.overlay_position))
+                HorizontalDivider(color = DividerColor)
+                Text(stringResource(R.string.overlay_position), fontWeight = FontWeight.SemiBold)
                 OverlayPosition.entries.chunked(2).forEach { positions ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         positions.forEach { position ->
                             val label = when (position) {
                                 OverlayPosition.TOP_LEFT -> R.string.overlay_top_left; OverlayPosition.TOP_RIGHT -> R.string.overlay_top_right
@@ -724,4 +734,14 @@ private fun OverlayOptionsDialog(options: OverlayPreferences, onChange: (Overlay
                 Text(stringResource(R.string.overlay_safe_help), style = MaterialTheme.typography.bodySmall)
             }
         })
+}
+
+@Composable
+private fun OverlayChoiceSection(title: String, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, color = TextSecondary, style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp), content = content)
+    }
 }

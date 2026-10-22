@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="parity_home_start_section">Start a session</string>
+    <string name="parity_home_solo_laps">Solo Laps</string>
+    <string name="parity_home_one_phone">1 phone</string>
+    <string name="parity_home_connected_phones">1–6 phones</string>
+    <string name="parity_home_saved_title">Your training, saved here</string>
+    <string name="parity_home_saved_message">Your times and photos appear after your first session.</string>
+    <string name="parity_home_session_metadata">%1$s · %2$s</string>
+    <string name="parity_home_flying_title">Flying %1$s</string>
+    <string name="parity_home_sprint_title">%1$s Sprint</string>
+    <string name="parity_home_no_timed_runs">No timed runs</string>
+    <string name="parity_settings_preferences">Preferences</string>
+    <string name="parity_settings_appearance">Appearance</string>
+    <string name="parity_settings_voice_timing">Voice start timing</string>
+    <string name="parity_settings_data">Data</string>
+    <string name="parity_settings_subscription">Subscription</string>
+    <string name="parity_settings_random_starter">Randomized, like a real starter.</string>
+    <string name="parity_history_empty_description">Your times and photos appear after you save your first timing session.</string>
+    <string name="parity_session_no_laps">No saved laps</string>
+    <string name="parity_session_no_runs">No saved runs</string>
+    <string name="parity_session_no_matching_runs">No matching runs</string>
+    <string name="parity_session_no_results_message">This saved session contains no results. Start a new timing session to record more runs.</string>
+    <string name="parity_session_no_athlete_results">No runs are recorded for the selected athlete.</string>
+    <string name="parity_session_all_athletes">Show All Athletes</string>
+    <plurals name="parity_home_run_count">
+        <item quantity="one">%d run</item>
+        <item quantity="other">%d runs</item>
+    </plurals>
+    <string name="parity_settings_privacy">Privacy Policy</string>
+    <string name="parity_settings_terms">Terms of Service</string>
+</resources>

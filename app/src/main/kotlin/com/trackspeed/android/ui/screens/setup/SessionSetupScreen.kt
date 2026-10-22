@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,6 +67,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -334,20 +336,20 @@ fun SessionSetupScreen(
                         title = stringResource(R.string.setup_session_mode),
                         icon = Icons.Outlined.PhoneAndroid
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier.fillMaxWidth().selectableGroup(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             SessionStartOptionChip(
-                                title = stringResource(R.string.setup_connected_gates),
-                                subtitle = stringResource(R.string.setup_connected_gates_detail),
+                                title = stringResource(R.string.parity_session_timing_gates),
+                                subtitle = stringResource(R.string.parity_session_timing_phones),
                                 icon = Icons.Outlined.Flag,
                                 selected = !landscapeSelected && !uiState.isSoloMode,
                                 onClick = {
                                     landscapeSelected = false
                                     viewModel.selectSoloMode(false)
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.fillMaxWidth()
                             )
                             SessionStartOptionChip(
                                 title = stringResource(R.string.setup_solo_laps),
@@ -358,12 +360,12 @@ fun SessionSetupScreen(
                                     landscapeSelected = false
                                     viewModel.selectSoloMode(true)
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                         SessionStartOptionChip(
                             title = stringResource(R.string.one_phone_mode_title),
-                            subtitle = stringResource(R.string.one_phone_mode_detail),
+                            subtitle = stringResource(R.string.parity_session_one_phone),
                             icon = Icons.Outlined.Videocam,
                             selected = landscapeSelected,
                             onClick = { landscapeSelected = true },
@@ -392,18 +394,6 @@ fun SessionSetupScreen(
                     )
                 }
             } else {
-            if (!uiState.isSoloMode || !uiState.allowsSolo) item {
-                CompactSetupSection(
-                    title = stringResource(R.string.setup_start_type),
-                    icon = Icons.AutoMirrored.Filled.DirectionsRun
-                ) {
-                    SessionStartTypeRow(
-                        startType = selectedStartType,
-                        onClick = { showStartTypeSelector = true }
-                    )
-                }
-            }
-
             if (uiState.isSoloMode) {
                 item {
                     CompactSetupSection(
@@ -425,7 +415,7 @@ fun SessionSetupScreen(
             } else {
                 item {
                     CompactSetupSection(
-                        title = stringResource(R.string.setup_gates),
+                        title = stringResource(R.string.parity_session_your_devices),
                         icon = Icons.Outlined.Flag
                     ) {
                         Row(
@@ -466,12 +456,78 @@ fun SessionSetupScreen(
                                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.setup_add_gate))
                             }
                         }
+                        HorizontalDivider(color = BorderSubtle)
+                        HostRoleSelector(
+                            selectedHostRole = uiState.selectedHostRole,
+                            onSelect = viewModel::selectHostRole
+                        )
                     }
                 }
 
+            if (!uiState.isSoloMode || !uiState.allowsSolo) item {
+                CompactSetupSection(
+                    title = stringResource(R.string.parity_session_start),
+                    icon = Icons.AutoMirrored.Filled.DirectionsRun
+                ) {
+                    SessionStartTypeRow(
+                        startType = selectedStartType,
+                        onClick = { showStartTypeSelector = true }
+                    )
+                }
+            }
+
                 item {
                     CompactSetupSection(
-                        title = stringResource(R.string.setup_athletes),
+                        title = stringResource(R.string.parity_session_your_course),
+                        icon = Icons.Outlined.Tune
+                    ) {
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            uiState.gatePositions.forEachIndexed { index, position ->
+                                GateMarker(
+                                    label = gateLabel(index, uiState.gatePositions.size),
+                                    distanceLabel = gateDistanceLabel(position),
+                                    tint = when (index) {
+                                        0 -> AccentGreen
+                                        uiState.gatePositions.lastIndex -> AccentBlue
+                                        else -> AccentOrange
+                                    },
+                                    modifier = Modifier.width(76.dp)
+                                )
+                            }
+                        }
+                        HorizontalDivider(color = BorderSubtle)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            uiState.distanceOptions.forEach { distance ->
+                                SessionTextChoiceChip(
+                                    title = distance.label,
+                                    selected = uiState.customDistanceText.isBlank() &&
+                                        kotlin.math.abs(uiState.selectedDistance - distance.meters) < 0.001,
+                                    onClick = { viewModel.selectDistance(distance.meters) }
+                                )
+                            }
+                        }
+                        OutlinedTextField(
+                            value = uiState.customDistanceText,
+                            onValueChange = viewModel::setCustomDistance,
+                            label = { Text(stringResource(R.string.setup_custom_distance)) },
+                            suffix = { Text(stringResource(R.string.setup_meters)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+            }
+                item {
+                    CompactSetupSection(
+                        title = stringResource(R.string.parity_session_optional_athletes),
                         icon = Icons.Default.Person
                     ) {
                         if (uiState.athletes.isEmpty()) {
@@ -508,39 +564,6 @@ fun SessionSetupScreen(
                     }
                 }
 
-                item {
-                    CompactSetupSection(
-                        title = stringResource(R.string.setup_distance),
-                        icon = Icons.Outlined.Tune
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            uiState.distanceOptions.forEach { distance ->
-                                SessionTextChoiceChip(
-                                    title = distance.label,
-                                    selected = uiState.customDistanceText.isBlank() &&
-                                        kotlin.math.abs(uiState.selectedDistance - distance.meters) < 0.001,
-                                    onClick = { viewModel.selectDistance(distance.meters) }
-                                )
-                            }
-                        }
-                        OutlinedTextField(
-                            value = uiState.customDistanceText,
-                            onValueChange = viewModel::setCustomDistance,
-                            label = { Text(stringResource(R.string.setup_custom_distance)) },
-                            suffix = { Text(stringResource(R.string.setup_meters)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-            }
-            }
         }
     }
 }
@@ -609,7 +632,8 @@ private fun CompactSetupSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .gunmetalCard()
+            .background(CardBackground, RoundedCornerShape(20.dp))
+            .border(1.dp, BorderSubtle, RoundedCornerShape(20.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -637,33 +661,35 @@ private fun SessionStartOptionChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier = modifier
-            .height(88.dp)
+            .heightIn(min = 78.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) AccentNavy else MaterialTheme.colorScheme.surfaceVariant)
+            .background(if (selected) AccentBlue else MaterialTheme.colorScheme.surfaceVariant)
             .border(
                 width = 1.dp,
-                color = if (selected) AccentNavy else BorderSubtle,
+                color = if (selected) Color.Transparent else BorderSubtle,
                 shape = RoundedCornerShape(14.dp)
             )
-            .selectable(
-                selected = selected,
-                onClick = onClick,
-                role = Role.RadioButton
-            )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         val contentColor = if (selected) Color.White else TextPrimary
-        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(17.dp))
-        Text(title, color = contentColor, fontWeight = FontWeight.SemiBold, maxLines = 1)
-        Text(
-            text = subtitle,
-            color = contentColor.copy(alpha = 0.78f),
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
-        )
+        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(28.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, color = contentColor, style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold)
+            Text(subtitle, color = contentColor.copy(alpha = 0.8f),
+                style = MaterialTheme.typography.bodySmall)
+        }
+        if (selected) {
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = contentColor,
+                modifier = Modifier.size(22.dp))
+        }
     }
 }
 

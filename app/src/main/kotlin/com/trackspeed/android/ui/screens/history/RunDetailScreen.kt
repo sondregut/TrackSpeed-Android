@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -289,11 +291,16 @@ fun RunDetailScreen(
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = stringResource(R.string.run_detail_not_found),
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = TextMuted,
+                        modifier = Modifier.size(44.dp))
+                    Text(stringResource(R.string.run_detail_not_found), color = TextPrimary,
+                        style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.parity_replay_missing_hint), color = TextSecondary,
+                        textAlign = TextAlign.Center)
+                    Button(onClick = onNavigateBack) { Text(stringResource(R.string.common_back)) }
+                }
             }
             return@Scaffold
         }
@@ -333,26 +340,6 @@ fun RunDetailScreen(
                 )
             }
 
-            item {
-                VideoOverlayActionCard(
-                    onClick = { onVideoOverlayClick(run.id, run.sessionId) }
-                )
-            }
-
-            if (run.hasFrameScrubberPayload()) {
-                item {
-                    FrameScrubberActionCard(
-                        onClick = { onFramesClick(run.id, run.sessionId) }
-                    )
-                }
-            }
-
-            if (segments.isNotEmpty()) {
-                item {
-                    SplitBreakdownCard(segments = segments)
-                }
-            }
-
             // Gate images gallery
             if (run.thumbnailPath != null) {
                 item {
@@ -368,6 +355,46 @@ fun RunDetailScreen(
                         onReviewSubmitted = { viewModel.submitCrossingReview(it) },
                         onThumbnailClick = { expandedThumbnail = it }
                     )
+                }
+            } else {
+                item {
+                    Row(Modifier.fillMaxWidth().background(CardBackground, RoundedCornerShape(16.dp))
+                        .border(1.dp, BorderSubtle, RoundedCornerShape(16.dp)).padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, tint = TextMuted)
+                        Text(stringResource(R.string.race_no_photo), color = TextSecondary)
+                    }
+                }
+            }
+
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = { onShareClick(run.id, run.sessionId) },
+                        modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.parity_replay_share))
+                    }
+                    OutlinedButton(onClick = { onVideoOverlayClick(run.id, run.sessionId) },
+                        modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Videocam, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.parity_replay_video))
+                    }
+                }
+            }
+
+            if (run.hasFrameScrubberPayload()) {
+                item {
+                    FrameScrubberActionCard(
+                        onClick = { onFramesClick(run.id, run.sessionId) }
+                    )
+                }
+            }
+
+            if (segments.isNotEmpty()) {
+                item {
+                    SplitBreakdownCard(segments = segments)
                 }
             }
 
@@ -403,7 +430,7 @@ private fun AthleteHeader(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = name.first().uppercase(),
+                text = name.take(1).uppercase(),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
@@ -444,33 +471,36 @@ private fun MainStatsCard(
     val timeColor = when {
         isPersonalBest -> BestGreen
         isSeasonBest -> SeasonGold
-        else -> TextPrimary
+        else -> AccentGreen
     }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .gunmetalCard(),
+            .border(1.dp, BorderSubtle, RoundedCornerShape(20.dp)),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+        colors = CardDefaults.cardColors(containerColor = CardBackground)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.Start
         ) {
-            // Large time
+            Text(stringResource(R.string.race_run_time_label), color = TextMuted,
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.1.sp))
+            Spacer(Modifier.height(4.dp))
+            // Keep the same primary time hierarchy as the live run detail sheet.
             Text(
                 text = formatTime(timeSeconds),
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 56.sp,
+                    fontSize = 42.sp,
                     letterSpacing = (-1).sp
                 ),
                 color = timeColor,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Start
             )
 
             Text(
@@ -505,7 +535,7 @@ private fun MainStatsCard(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            HorizontalDivider(color = BorderSubtle)
             Spacer(modifier = Modifier.height(16.dp))
 
             // Stats row: Distance, optional Speed, Reaction

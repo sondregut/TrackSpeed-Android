@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -14,9 +15,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +37,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -39,8 +45,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -515,126 +523,129 @@ private fun PairingContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
+        Column(
+            Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Scanning animation with help button
+            Box(contentAlignment = Alignment.TopEnd) {
+                ScanningAnimation()
 
-        // Scanning animation with help button
-        Box(contentAlignment = Alignment.TopEnd) {
-            ScanningAnimation()
-
-            IconButton(
-                onClick = { showHelpDialog = true },
-                modifier = Modifier
-                    .size(32.dp)
-                    .offset(x = 24.dp, y = (-8).dp)
-                    .background(BorderSubtle, CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Info,
-                    contentDescription = stringResource(R.string.race_connection_help_cd),
-                    tint = TextSecondary,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-
-        Text(
-            text = if (hasRequiredDevices) {
-                stringResource(R.string.race_pairing_ready_to_time)
-            } else if (hasRequiredConnections) {
-                stringResource(R.string.race_pairing_synchronizing_phones)
-            } else if (isJoinMode) {
-                stringResource(R.string.race_join_session)
-            } else if (isHostingSession) {
-                stringResource(R.string.race_pairing_create_session)
-            } else {
-                stringResource(R.string.race_pairing_searching)
-            },
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            color = TextPrimary,
-            textAlign = TextAlign.Center
-        )
-
-        Text(
-            text = if (hasRequiredDevices) {
-                pluralStringResource(
-                    R.plurals.race_pairing_connected_ready,
-                    displayedConnectedDeviceCount,
-                    displayedConnectedDeviceCount
-                )
-            } else if (hasRequiredConnections) {
-                stringResource(
-                    R.string.race_pairing_synchronized_fraction,
-                    syncedDeviceCount.coerceAtMost(requiredDeviceCount),
-                    requiredDeviceCount
-                )
-            } else if (isJoinMode) {
-                stringResource(R.string.race_pairing_open_host)
-            } else if (isHostingSession) {
-                val neededPhones = if (isControlOnlyHost) {
-                    numberOfGates.coerceAtLeast(2)
-                } else {
-                    (numberOfGates - 1).coerceAtLeast(1)
-                }
-                if (neededPhones == 1) {
-                    stringResource(R.string.race_pairing_join_other_no_account)
-                } else if (isControlOnlyHost) {
-                    stringResource(R.string.race_pairing_join_each_timing)
-                } else {
-                    stringResource(R.string.race_pairing_join_each_timing)
-                }
-            } else if (connectedDeviceCount > 0) {
-                stringResource(
-                    R.string.race_pairing_connected_fraction,
-                    connectedDeviceCount,
-                    requiredDeviceCount
-                )
-            } else {
-                stringResource(R.string.race_pairing_auto_discover, requiredDeviceCount)
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (displayedConnectedDeviceCount > 0) AccentGreen else TextSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-
-        if (isJoinMode) {
-            JoinSessionStatusCard(pairingStatus = pairingStatus)
-        }
-
-        if (isHostingSession) {
-            PairingStatusCard(
-                displayedConnectedDeviceCount = displayedConnectedDeviceCount,
-                requiredDeviceCount = requiredDeviceCount,
-                hostRole = hostRole
-            )
-
-            GateLineupCard(
-                connectedDeviceCount = displayedConnectedDeviceCount,
-                requiredDeviceCount = requiredDeviceCount,
-                hostRole = hostRole
-            )
-        }
-
-        // Status pill
-        if (pairingStatus.isNotEmpty() && connectedDeviceCount == 0) {
-            Box(
-                modifier = Modifier
-                    .background(TextSecondary.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = pairingStatus,
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontWeight = FontWeight.SemiBold
+                IconButton(
+                    onClick = { showHelpDialog = true },
+                    modifier = Modifier
+                        .size(32.dp)
+                        .offset(x = 24.dp, y = (-8).dp)
+                        .background(BorderSubtle, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Info,
+                        contentDescription = stringResource(R.string.race_connection_help_cd),
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
                     )
+                }
+            }
+
+            Text(
+                text = if (hasRequiredDevices) {
+                    stringResource(R.string.race_pairing_ready_to_time)
+                } else if (hasRequiredConnections) {
+                    stringResource(R.string.race_pairing_synchronizing_phones)
+                } else if (isJoinMode) {
+                    stringResource(R.string.race_join_session)
+                } else if (isHostingSession) {
+                    stringResource(R.string.race_pairing_create_session)
+                } else {
+                    stringResource(R.string.race_pairing_searching)
+                },
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = TextPrimary,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = if (hasRequiredDevices) {
+                    pluralStringResource(
+                        R.plurals.race_pairing_connected_ready,
+                        displayedConnectedDeviceCount,
+                        displayedConnectedDeviceCount
+                    )
+                } else if (hasRequiredConnections) {
+                    stringResource(
+                        R.string.race_pairing_synchronized_fraction,
+                        syncedDeviceCount.coerceAtMost(requiredDeviceCount),
+                        requiredDeviceCount
+                    )
+                } else if (isJoinMode) {
+                    stringResource(R.string.race_pairing_open_host)
+                } else if (isHostingSession) {
+                    val neededPhones = if (isControlOnlyHost) {
+                        numberOfGates.coerceAtLeast(2)
+                    } else {
+                        (numberOfGates - 1).coerceAtLeast(1)
+                    }
+                    if (neededPhones == 1) {
+                        stringResource(R.string.race_pairing_join_other_no_account)
+                    } else if (isControlOnlyHost) {
+                        stringResource(R.string.race_pairing_join_each_timing)
+                    } else {
+                        stringResource(R.string.race_pairing_join_each_timing)
+                    }
+                } else if (connectedDeviceCount > 0) {
+                    stringResource(
+                        R.string.race_pairing_connected_fraction,
+                        connectedDeviceCount,
+                        requiredDeviceCount
+                    )
+                } else {
+                    stringResource(R.string.race_pairing_auto_discover, requiredDeviceCount)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (displayedConnectedDeviceCount > 0) AccentGreen else TextSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            if (isJoinMode) {
+                JoinSessionStatusCard(pairingStatus = pairingStatus)
+            }
+
+            if (isHostingSession) {
+                PairingStatusCard(
+                    displayedConnectedDeviceCount = displayedConnectedDeviceCount,
+                    requiredDeviceCount = requiredDeviceCount,
+                    hostRole = hostRole
+                )
+
+                GateLineupCard(
+                    connectedDeviceCount = displayedConnectedDeviceCount,
+                    requiredDeviceCount = requiredDeviceCount,
+                    hostRole = hostRole
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.weight(1f))
+            // Status pill
+            if (pairingStatus.isNotEmpty() && connectedDeviceCount == 0) {
+                Box(
+                    modifier = Modifier
+                        .background(TextSecondary.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = pairingStatus,
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                }
+            }
+
+        }
 
         // Start timing button appears when the configured gate count is connected.
         if (hasRequiredDevices) {
@@ -1787,7 +1798,7 @@ private fun ActiveAthleteChipBar(
 ) {
     if (!uiState.isHostingSession) return
     val athletes = uiState.sessionAthletesForUi()
-    if (athletes.isEmpty()) return
+    if (athletes.isEmpty() || !uiState.isHostingSession) return
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -2740,7 +2751,7 @@ private fun ActiveRaceContent(
     var activeStartOverlay by remember(uiState.startType, uiState.phase) { mutableStateOf<StartMode?>(null) }
     var showBluetoothAudioWarning by remember(uiState.startType, uiState.phase) { mutableStateOf(false) }
     var showSessionSettings by remember(uiState.phase) { mutableStateOf(false) }
-    var showLiveResults by remember(uiState.phase) { mutableStateOf(false) }
+    var showLiveResults by rememberSaveable(uiState.phase) { mutableStateOf(false) }
     var showFullscreenCamera by remember(uiState.phase) { mutableStateOf(false) }
     var selectedRun by remember(uiState.phase) { mutableStateOf<RunEntity?>(null) }
     var expandedThumbnail by remember(uiState.phase) { mutableStateOf<ExpandedThumbnail?>(null) }
@@ -2763,6 +2774,10 @@ private fun ActiveRaceContent(
         showBluetoothAudioWarning = uiState.role == DeviceRole.START &&
             hasAudibleStartCue &&
             AudioStartTiming.hasBluetoothAudioOutput(context)
+    }
+
+    BackHandler(enabled = showLiveResults && selectedRun == null && expandedThumbnail == null) {
+        showLiveResults = false
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -2795,19 +2810,6 @@ private fun ActiveRaceContent(
             )
         }
 
-        if (showLiveResults) {
-            ActiveSessionResultsSheet(
-                uiState = uiState,
-                onRunClick = { run ->
-                    showLiveResults = false
-                    selectedRun = run
-                },
-                onThumbnailClick = { expandedThumbnail = it },
-                onReviewSubmitted = viewModel::submitCrossingReview,
-                onDismiss = { showLiveResults = false }
-            )
-        }
-
         selectedRun?.let { run ->
             RaceRunDetailSheet(
                 run = run,
@@ -2835,6 +2837,8 @@ private fun ActiveRaceContent(
                 onEndSession = viewModel::presentSessionEndConfirmation
             )
 
+            ActiveTimingStatusStrip(uiState)
+
             if (showBluetoothAudioWarning) {
                 BluetoothAudioWarningBanner(
                     onDismiss = { showBluetoothAudioWarning = false }
@@ -2848,99 +2852,125 @@ private fun ActiveRaceContent(
             )
 
             ActiveRaceTabBar(
-                onRecordClick = {},
+                showingResults = showLiveResults,
+                onRecordClick = { showLiveResults = false },
                 onResultsClick = { showLiveResults = true }
             )
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(228.dp)
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                ActiveRaceTimingSummary(
-                    uiState = uiState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                )
-
-                if (uiState.requiresLocalCamera) {
-                    if (showFullscreenCamera) {
-                        Spacer(modifier = Modifier.size(width = 160.dp, height = 228.dp))
-                    } else {
-                        ActiveRaceCameraCard(
+            // Keep the TextureView mounted when Results covers Record. Removing it
+            // calls onSurfaceDestroyed, closes capture and resets the crossing buffer.
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+                val cameraWidth = minOf(160.dp, (maxWidth - 48.dp) * 0.46f)
+                val cameraHeight = minOf(228.dp, maxHeight * 0.48f)
+                Column(
+                    Modifier.fillMaxSize().then(
+                        if (showLiveResults) Modifier.clearAndSetSemantics { } else Modifier
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(cameraHeight)
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        ActiveRaceTimingSummary(
                             uiState = uiState,
-                            onSurfaceReady = viewModel::onSurfaceReady,
-                            onSurfaceDestroyed = viewModel::onSurfaceDestroyed,
-                            onExpand = { showFullscreenCamera = true },
-                            modifier = Modifier.size(width = 160.dp, height = 228.dp)
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+
+                        if (uiState.requiresLocalCamera) {
+                            if (showFullscreenCamera) {
+                                Spacer(modifier = Modifier.size(width = cameraWidth, height = cameraHeight))
+                            } else {
+                                ActiveRaceCameraCard(
+                                    uiState = uiState,
+                                    onSurfaceReady = viewModel::onSurfaceReady,
+                                    onSurfaceDestroyed = viewModel::onSurfaceDestroyed,
+                                    onExpand = { showFullscreenCamera = true },
+                                    modifier = Modifier.size(width = cameraWidth, height = cameraHeight)
+                                )
+                            }
+                        } else {
+                            ActiveRaceControlPhoneCard(
+                                modifier = Modifier.size(width = cameraWidth, height = cameraHeight)
+                            )
+                        }
+                    }
+
+                    if (uiState.usesLocalPoseStart && uiState.raceStatus != "paused") {
+                        CameraStartStatus(uiState.cameraStartPhase, uiState.cameraStartProgress,
+                            uiState.cameraStartPoseAvailable, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    }
+
+                    if (uiState.numberOfGates > 2) {
+                        GateCollectionStatus(
+                            receivedGateCount = uiState.receivedGateCount,
+                            numberOfGates = uiState.numberOfGates
                         )
                     }
-                } else {
-                    ActiveRaceControlPhoneCard(
-                        modifier = Modifier.size(width = 160.dp, height = 228.dp)
-                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .verticalScroll(rememberScrollState()),
+                        contentAlignment = Alignment.TopCenter
+                    ) {
+                        if (uiState.completedRuns.isNotEmpty()) {
+                            SessionResultsList(
+                                runs = uiState.completedRuns,
+                                numberOfGates = uiState.numberOfGates,
+                                showSpeedInResults = uiState.showSpeedInResults,
+                                speedUnit = uiState.speedUnit,
+                                detectionReviewEnabled = false,
+                                onRunClick = { selectedRun = it },
+                                onThumbnailClick = { expandedThumbnail = it },
+                                onReviewSubmitted = viewModel::submitCrossingReview,
+                                maxRuns = 3,
+                                expandLatestInitially = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            ActiveRaceEmptyResults()
+                        }
+                    }
+
+                    if (canTriggerExternalStart) {
+                        StartTriggerButton(
+                            startMode = startMode,
+                            onClick = { activeStartOverlay = startMode }
+                        )
+                    }
+
+                    if (canCancelRun) {
+                        CancelRunButton(onClick = viewModel::cancelCurrentRun)
+                    } else if (canToggleDetectionPause) {
+                        PauseResumeButton(
+                            isPaused = isDetectionPaused,
+                            onClick = viewModel::toggleDetectionPause
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-            }
-
-            if (uiState.usesLocalPoseStart && uiState.raceStatus != "paused") {
-                CameraStartStatus(uiState.cameraStartPhase, uiState.cameraStartProgress,
-                    uiState.cameraStartPoseAvailable, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            }
-
-            if (uiState.numberOfGates > 2) {
-                GateCollectionStatus(
-                    receivedGateCount = uiState.receivedGateCount,
-                    numberOfGates = uiState.numberOfGates
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .verticalScroll(rememberScrollState()),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                if (uiState.completedRuns.isNotEmpty()) {
-                    SessionResultsList(
-                        runs = uiState.completedRuns,
-                        numberOfGates = uiState.numberOfGates,
-                        showSpeedInResults = uiState.showSpeedInResults,
-                        speedUnit = uiState.speedUnit,
-                        detectionReviewEnabled = false,
+                if (showLiveResults) {
+                    ActiveSessionResultsPane(
+                        uiState = uiState,
                         onRunClick = { selectedRun = it },
                         onThumbnailClick = { expandedThumbnail = it },
                         onReviewSubmitted = viewModel::submitCrossingReview,
-                        maxRuns = 3,
-                        modifier = Modifier.fillMaxWidth()
+                        onRecordClick = { showLiveResults = false },
+                        modifier = Modifier.fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                            .pointerInput(Unit) { detectTapGestures { } }
                     )
-                } else {
-                    ActiveRaceEmptyResults()
                 }
             }
-
-            if (canTriggerExternalStart) {
-                StartTriggerButton(
-                    startMode = startMode,
-                    onClick = { activeStartOverlay = startMode }
-                )
-            }
-
-            if (canCancelRun) {
-                CancelRunButton(onClick = viewModel::cancelCurrentRun)
-            } else if (canToggleDetectionPause) {
-                PauseResumeButton(
-                    isPaused = isDetectionPaused,
-                    onClick = viewModel::toggleDetectionPause
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
         if (showFullscreenCamera && uiState.requiresLocalCamera) {
@@ -3014,6 +3044,45 @@ private fun ActiveRaceContent(
 }
 
 @Composable
+private fun ActiveTimingStatusStrip(uiState: RaceModeUiState) {
+    val cameraProblem = uiState.requiresLocalCamera &&
+        (!uiState.hasPermission || uiState.cameraState is CameraManager.CameraState.Error)
+    val (label, icon, fill) = when {
+        cameraProblem -> Triple(R.string.parity_session_camera_attention, Icons.Outlined.VideocamOff, AccentRed)
+        uiState.raceStatus == "paused" -> Triple(R.string.parity_session_paused, Icons.Outlined.PauseCircle, Color(0xFF535B68))
+        uiState.raceStatus == "finished" -> Triple(R.string.parity_session_finished, Icons.Outlined.Flag, TextPrimary)
+        uiState.raceStatus == "waiting_for_result" -> Triple(R.string.parity_session_calculating, Icons.Outlined.HourglassTop, Color(0xFF7354A3))
+        uiState.isLocalGateCalibrating -> Triple(R.string.parity_session_calibrating, Icons.Outlined.Tune, Color(0xFF535B68))
+        uiState.requiresLocalCamera && uiState.detectionState == PhotoFinishDetector.State.UNSTABLE ->
+            Triple(R.string.parity_session_hold_still, Icons.Outlined.PanTool, AccentOrange)
+        uiState.raceStatus in setOf("started", "collecting_gates") -> Triple(R.string.parity_session_running, Icons.Outlined.Timer, Color(0xFF087E5B))
+        uiState.raceStatus == "waiting" && !uiState.requiresLocalCamera &&
+            uiState.isLocalGateReady && uiState.isRemoteGateReadinessSatisfied ->
+            Triple(R.string.parity_session_ready, Icons.Outlined.CheckCircle, Color(0xFF16733F))
+        uiState.raceStatus == "waiting" && uiState.localGateStatus.isReady &&
+            !uiState.usesLocalPoseStart &&
+            (uiState.role != DeviceRole.START || uiState.isRemoteGateReadinessSatisfied) -> Triple(R.string.parity_session_ready, Icons.Outlined.CheckCircle, Color(0xFF16733F))
+        uiState.raceStatus == "waiting" && uiState.usesLocalPoseStart &&
+            uiState.cameraStartPhase == com.trackspeed.android.camerastart.CameraStartArming.Phase.ARMED ->
+            Triple(R.string.parity_session_ready, Icons.Outlined.CheckCircle, Color(0xFF16733F))
+        else -> Triple(R.string.parity_session_waiting, Icons.Outlined.HourglassTop, Color(0xFF535B68))
+    }
+    val ink = if (label == R.string.parity_session_hold_still) Color.Black
+        else if (label == R.string.parity_session_finished) MaterialTheme.colorScheme.background else Color.White
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).background(fill)
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = ink, modifier = Modifier.size(24.dp))
+        Text(stringResource(label), color = ink, fontWeight = FontWeight.ExtraBold,
+            style = MaterialTheme.typography.titleLarge)
+    }
+}
+
+@Composable
 private fun ActiveRaceSessionHeader(
     uiState: RaceModeUiState,
     onSettings: () -> Unit,
@@ -3051,7 +3120,9 @@ private fun ActiveRaceSessionHeader(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        uiState.syncQuality?.let { SyncQualityBadge(quality = it) }
+        if (BuildConfig.DEBUG && uiState.detectionDiagnosticsEnabled) {
+            uiState.syncQuality?.let { SyncQualityBadge(quality = it) }
+        }
 
         if (uiState.isHostingSession) {
             IconButton(
@@ -3088,24 +3159,25 @@ private fun ActiveRaceSessionHeader(
 
 @Composable
 private fun ActiveRaceTabBar(
+    showingResults: Boolean,
     onRecordClick: () -> Unit,
     onResultsClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .heightIn(min = 48.dp)
             .background(CardBackground.copy(alpha = 0.5f))
     ) {
         ActiveRaceTab(
             text = stringResource(R.string.timing_tab_record),
-            selected = true,
+            selected = !showingResults,
             onClick = onRecordClick,
             modifier = Modifier.weight(1f)
         )
         ActiveRaceTab(
             text = stringResource(R.string.timing_tab_results),
-            selected = false,
+            selected = showingResults,
             onClick = onResultsClick,
             modifier = Modifier.weight(1f)
         )
@@ -3119,98 +3191,88 @@ private fun ActiveRaceTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxHeight()
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
+    Tab(
+        selected = selected,
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 48.dp),
+        selectedContentColor = TextPrimary,
+        unselectedContentColor = TextSecondary
     ) {
-        Text(
-            text = text,
-            color = if (selected) TextPrimary else TextSecondary,
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
-            )
-        )
-        if (selected) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .background(AccentBlue)
-            )
+        Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+            Text(text, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                style = MaterialTheme.typography.labelLarge)
+            if (selected) {
+                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(2.dp).background(AccentBlue))
+            }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ActiveRaceTimingSummary(
     uiState: RaceModeUiState,
     modifier: Modifier = Modifier
 ) {
     val latestRun = uiState.completedRuns.maxByOrNull { it.runNumber }
-    val isRunning = uiState.raceStatus in setOf(
-        "started",
-        "collecting_gates",
-        "waiting_for_result"
-    )
-    val displayTime = when {
-        uiState.elapsedTimeSeconds > 0.0 -> uiState.elapsedTimeSeconds
-        latestRun != null -> latestRun.timeSeconds
-        else -> 0.0
-    }
-    val runNumber = (latestRun?.runNumber ?: 0) + 1
+    val readout = activeRunDisplay(uiState.raceStatus, uiState.elapsedTimeSeconds, latestRun)
+    val isRunning = readout.isRunning
+    val displayTime = readout.timeSeconds
+    val runNumber = readout.runNumber
     val timerColor = when {
         isRunning -> AccentBlue
         latestRun != null -> AccentGreen
         else -> TextTertiary
     }
 
-    Column(
-        modifier = modifier.padding(top = 12.dp),
-        horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(7.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.timing_run_number, runNumber),
-            color = TextSecondary,
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
-        )
-        Text(
-            text = formatRaceTime(displayTime),
-            color = timerColor,
-            style = MaterialTheme.typography.displayMedium.copy(
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 43.sp
-            ),
-            maxLines = 1
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            verticalAlignment = Alignment.Top
+    BoxWithConstraints(modifier) {
+        val timeText = formatRaceTime(displayTime)
+        val timerSize = (maxWidth.value / timeText.length.coerceAtLeast(4) /
+            LocalDensity.current.fontScale * 1.45f).coerceIn(12f, 43f).sp
+        Column(
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 12.dp),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            ActiveRaceMetric(
-                label = stringResource(R.string.timing_label_speed),
-                value = if (displayTime > 0.0) {
-                    formatSpeed(uiState.distanceMeters, displayTime, uiState.speedUnit)
-                } else {
-                    stringResource(R.string.timing_no_speed_ms)
-                }
-            )
-            ActiveRaceMetric(
-                label = stringResource(R.string.timing_label_distance),
-                value = formatDistance(uiState.distanceMeters)
-            )
-        }
-        if (uiState.raceStatus == "waiting_for_result") {
             Text(
-                text = stringResource(R.string.race_waiting_host_result),
-                color = AccentOrange,
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                maxLines = 2
+                text = stringResource(R.string.timing_run_number, runNumber),
+                color = TextSecondary,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
             )
+            Text(
+                text = timeText,
+                color = timerColor,
+                style = MaterialTheme.typography.displayMedium.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = timerSize
+                ),
+                maxLines = 1
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                ActiveRaceMetric(
+                    label = stringResource(R.string.timing_label_speed),
+                    value = if (displayTime > 0.0) {
+                        formatSpeed(uiState.distanceMeters, displayTime, uiState.speedUnit)
+                    } else {
+                        stringResource(R.string.parity_session_speed_placeholder,
+                            when (uiState.speedUnit) { "mph", "km/h" -> uiState.speedUnit; else -> "m/s" })
+                    }
+                )
+                ActiveRaceMetric(
+                    label = stringResource(R.string.timing_label_distance),
+                    value = formatDistance(uiState.distanceMeters)
+                )
+            }
+            if (uiState.raceStatus == "waiting_for_result") {
+                Text(
+                    text = stringResource(R.string.race_waiting_host_result),
+                    color = AccentOrange,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 2
+                )
+            }
         }
     }
 }
@@ -4627,85 +4689,43 @@ private fun LiveResultsStat(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ActiveSessionResultsSheet(
+private fun ActiveSessionResultsPane(
     uiState: RaceModeUiState,
     onRunClick: (RunEntity) -> Unit,
     onThumbnailClick: (ExpandedThumbnail) -> Unit,
     onReviewSubmitted: (DetectionReviewSubmission) -> Unit,
-    onDismiss: () -> Unit
+    onRecordClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = SurfaceDark
-    ) {
+    Column(modifier) {
+        Row(
+            Modifier.fillMaxWidth().background(CardBackground).padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Outlined.Straighten, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+            Text(formatDistance(uiState.distanceMeters), color = AccentBlue, fontWeight = FontWeight.SemiBold)
+            Text(StartType.fromRawValue(uiState.startType).localizedDisplayName(), color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        }
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp),
+            Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = stringResource(R.string.timing_tab_results),
-                        color = TextPrimary,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Text(
-                        text = stringResource(
-                            R.string.race_session_summary_format,
-                            StartType.fromRawValue(uiState.startType).localizedDisplayName(),
-                            formatDistance(uiState.distanceMeters)
-                        ),
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.timing_tab_record), color = AccentBlue)
-                }
-            }
-
             if (uiState.completedRuns.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .background(CardBackground, RoundedCornerShape(18.dp)),
-                    contentAlignment = Alignment.Center
+                Column(
+                    Modifier.fillMaxWidth().padding(vertical = 40.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Timer,
-                            contentDescription = null,
-                            tint = TextSecondary,
-                            modifier = Modifier.size(38.dp)
-                        )
-                        Text(
-                            text = stringResource(R.string.race_no_runs_yet),
-                            color = TextSecondary,
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                    }
+                    Icon(Icons.Outlined.Timer, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(44.dp))
+                    Text(stringResource(R.string.race_no_runs_yet), color = TextPrimary,
+                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.parity_session_results_hint), color = TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
                 }
             } else {
-                LiveResultsSummaryStrip(
-                    runs = uiState.completedRuns,
-                    modifier = Modifier.fillMaxWidth()
-                )
                 SessionResultsList(
                     runs = uiState.completedRuns,
                     numberOfGates = uiState.numberOfGates,
@@ -4718,6 +4738,14 @@ private fun ActiveSessionResultsSheet(
                     maxRuns = null,
                     modifier = Modifier.fillMaxWidth()
                 )
+                LiveResultsSummaryStrip(runs = uiState.completedRuns, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        Surface(color = CardBackground) {
+            Button(onClick = onRecordClick, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Icon(Icons.Outlined.PlayCircle, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.parity_session_go_record))
             }
         }
     }
@@ -4734,6 +4762,7 @@ private fun SessionResultsList(
     onThumbnailClick: (ExpandedThumbnail) -> Unit,
     onReviewSubmitted: (DetectionReviewSubmission) -> Unit,
     maxRuns: Int? = 6,
+    expandLatestInitially: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val sortedRuns = remember(runs, maxRuns) {
@@ -4741,7 +4770,9 @@ private fun SessionResultsList(
         maxRuns?.let { sorted.take(it) } ?: sorted
     }
     val bestTime = com.trackspeed.android.data.model.comparableBestTime(runs)
-    var expandedRunId by remember { mutableStateOf<String?>(null) }
+    var expandedRunId by remember {
+        mutableStateOf(if (expandLatestInitially) sortedRuns.firstOrNull()?.id else null)
+    }
 
     LaunchedEffect(sortedRuns) {
         val visibleIds = sortedRuns.map { it.id }.toSet()

@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,11 +18,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -57,6 +61,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +74,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -176,7 +184,7 @@ fun RunFramesScrubberScreen(
     viewModel: RunFramesScrubberViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showOverlays by remember { mutableStateOf(true) }
+    var showOverlays by rememberSaveable { mutableStateOf(true) }
     var currentIndex by remember { mutableIntStateOf(0) }
 
     val frames = uiState.frames
@@ -305,6 +313,7 @@ private fun EmptyScrubberState(
             )
             Text(
                 text = message,
+                textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary
             )
@@ -335,40 +344,50 @@ private fun FrameScrubberContent(
         gatePositionForRun(run)
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().padding(paddingValues).padding(12.dp)
     ) {
-        item {
+        val minimumImageHeight = 200.dp
+        val sectionSpacing = 10.dp
+        // A short multi-window viewport cannot show both panes usefully.
+        // Scroll the entire stack there; never put a weighted image in it.
+        val scrollWholeContent = maxHeight < minimumImageHeight + 160.dp
+        val contentScrollState = rememberScrollState()
+        val controlsScrollState = rememberScrollState()
+        val controlsMaxHeight = maxHeight - minimumImageHeight - sectionSpacing
+
+        Column(
+            modifier = Modifier.fillMaxSize().then(
+                if (scrollWholeContent) Modifier.verticalScroll(contentScrollState) else Modifier
+            ),
+            verticalArrangement = Arrangement.spacedBy(sectionSpacing)
+        ) {
             FrameImagePanel(
                 bitmap = bitmap,
                 frame = frame,
                 run = run,
                 gatePosition = gatePosition,
                 showOverlays = showOverlays,
-                isCrossingFrame = currentIndex == crossingFrameIndex
+                isCrossingFrame = currentIndex == crossingFrameIndex,
+                modifier = Modifier.fillMaxWidth().then(
+                    if (scrollWholeContent) Modifier.height(minimumImageHeight) else Modifier.weight(1f)
+                )
             )
-        }
-
-        item {
-            FrameSummaryRow(
-                frame = frame,
-                currentIndex = currentIndex,
-                frameCount = frames.size,
-                isCrossingFrame = currentIndex == crossingFrameIndex
-            )
-        }
-
-        item {
-            FrameScrubberControls(
-                currentIndex = currentIndex,
-                frameCount = frames.size,
-                crossingFrameIndex = crossingFrameIndex,
-                onIndexChange = onIndexChange
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth().then(
+                    if (scrollWholeContent) Modifier else Modifier
+                        .heightIn(max = controlsMaxHeight)
+                        .verticalScroll(controlsScrollState)
+                ),
+                verticalArrangement = Arrangement.spacedBy(sectionSpacing)
+            ) {
+                // Bound growing text/cards before measuring the weighted
+                // image, so accessibility text cannot consume its viewport.
+                FrameSummaryRow(frame = frame, currentIndex = currentIndex, frameCount = frames.size,
+                    isCrossingFrame = currentIndex == crossingFrameIndex)
+                FrameScrubberControls(currentIndex = currentIndex, frameCount = frames.size,
+                    crossingFrameIndex = crossingFrameIndex, onIndexChange = onIndexChange)
+            }
         }
     }
 }
@@ -380,12 +399,11 @@ private fun FrameImagePanel(
     run: RunEntity,
     gatePosition: Float,
     showOverlays: Boolean,
-    isCrossingFrame: Boolean
+    isCrossingFrame: Boolean,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(430.dp),
+        modifier = modifier,
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Black)
     ) {
@@ -452,7 +470,7 @@ private fun FrameImagePanel(
                     )
                     Text(stringResource(R.string.frame_scrubber_image_unavailable), color = TextSecondary)
                     Text(
-                        text = frame.imagePath,
+                        text = stringResource(R.string.parity_replay_image_missing),
                         style = MaterialTheme.typography.labelSmall,
                         color = TextMuted,
                         maxLines = 2,
@@ -601,7 +619,10 @@ private fun FrameScrubberControls(
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            val framePosition = stringResource(R.string.parity_replay_frame_position, currentIndex + 1, frameCount)
             Slider(
+                modifier = Modifier.semantics { contentDescription = framePosition },
+                enabled = frameCount > 1,
                 value = currentIndex.toFloat(),
                 onValueChange = { onIndexChange(it.toInt()) },
                 valueRange = 0f..((frameCount - 1).coerceAtLeast(1).toFloat()),
@@ -617,10 +638,11 @@ private fun FrameScrubberControls(
                     onClick = { onIndexChange(currentIndex - 1) },
                     enabled = currentIndex > 0
                 ) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = null)
+                    Icon(Icons.Default.SkipPrevious, contentDescription = stringResource(R.string.parity_replay_previous_frame))
                 }
                 Button(
                     onClick = { onIndexChange(crossingFrameIndex) },
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = ScrubberWarning)
                 ) {
                     Icon(Icons.Default.GpsFixed, contentDescription = null)
@@ -631,7 +653,7 @@ private fun FrameScrubberControls(
                     onClick = { onIndexChange(currentIndex + 1) },
                     enabled = currentIndex < frameCount - 1
                 ) {
-                    Icon(Icons.Default.SkipNext, contentDescription = null)
+                    Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.parity_replay_next_frame))
                 }
             }
         }

@@ -4,18 +4,25 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Contrast
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Notifications
@@ -38,6 +45,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -196,7 +206,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsScreenContent(
+internal fun SettingsScreenContent(
     state: SettingsUiState,
     thumbnailStorageSize: String = "0 KB",
     onDistanceSelected: (Double) -> Unit,
@@ -234,6 +244,7 @@ private fun SettingsScreenContent(
     onNotificationSettingsClick: () -> Unit = {},
     onDebugToolsClick: () -> Unit = {}
 ) {
+    val uriHandler = LocalUriHandler.current
     var distanceDropdownExpanded by remember { mutableStateOf(false) }
     var startTypeDropdownExpanded by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
@@ -245,7 +256,7 @@ private fun SettingsScreenContent(
             .fillMaxSize()
             .gradientBackground()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = 16.dp)
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -258,59 +269,8 @@ private fun SettingsScreenContent(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        SectionHeader(stringResource(R.string.settings_trackspeed_pro))
-
-        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
-            Column {
-                SettingsRow(
-                    icon = Icons.Outlined.Star,
-                    label = if (EarlyReleaseAccess.isEnabled) {
-                        stringResource(R.string.early_release_access_active)
-                    } else if (state.isProUser) {
-                        stringResource(R.string.settings_manage_subscription)
-                    } else {
-                        stringResource(R.string.settings_upgrade_to_pro)
-                    },
-                    value = if (EarlyReleaseAccess.isEnabled) {
-                        stringResource(R.string.early_release_all_features)
-                    } else if (state.isProUser) {
-                        stringResource(R.string.settings_pro_active)
-                    } else {
-                        null
-                    },
-                    showChevron = !EarlyReleaseAccess.isEnabled,
-                    onClick = when {
-                        EarlyReleaseAccess.isEnabled -> ({})
-                        state.isProUser -> onManageSubscriptionClick
-                        else -> onPaywallClick
-                    }
-                )
-
-                if (EarlyReleaseAccess.isEnabled) {
-                    SettingsDivider()
-                    SettingsRow(
-                        icon = Icons.Outlined.Star,
-                        label = stringResource(R.string.settings_manage_subscription),
-                        showChevron = true,
-                        onClick = onManageSubscriptionClick
-                    )
-                }
-
-                SettingsDivider()
-
-                SettingsRow(
-                    icon = Icons.Outlined.LocalOffer,
-                    label = stringResource(R.string.settings_redeem_promo_code),
-                    showChevron = true,
-                    onClick = onRedeemPromoClick
-                )
-            }
-        }
-
-        SectionFooter(stringResource(R.string.settings_pro_access_footer))
-
         // ── PREFERENCES SECTION ──
-        SectionHeader(stringResource(R.string.settings_section_timing))
+        SectionHeader(stringResource(R.string.parity_settings_preferences))
 
         Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
             Column {
@@ -514,6 +474,58 @@ private fun SettingsScreenContent(
 
                 SettingsDivider()
 
+                // Language
+                var showLanguageDialog by remember { mutableStateOf(false) }
+
+                SettingsRow(
+                    icon = Icons.Outlined.Language,
+                    label = stringResource(R.string.settings_language_title),
+                    value = getLanguageDisplayName(state.appLanguage),
+                    onClick = { showLanguageDialog = true }
+                )
+
+                if (showLanguageDialog) {
+                    LanguagePickerDialog(
+                        currentLanguage = state.appLanguage,
+                        onLanguageSelected = { tag ->
+                            onAppLanguageSelected(tag)
+                            applyLanguage(tag)
+                        },
+                        onDismiss = { showLanguageDialog = false }
+                    )
+                }
+
+                SettingsDivider()
+
+                // Preview voice button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onPreviewVoice)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ParitySettingsIconBadge(Icons.Outlined.PlayArrow)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = stringResource(R.string.settings_preview_voice),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = AccentBlue
+                    )
+                }
+            }
+        }
+
+        SectionFooter(stringResource(R.string.settings_photo_finish_footer))
+
+        // ── APPEARANCE SECTION ──
+        SectionHeader(stringResource(R.string.parity_settings_appearance))
+
+        SettingsAppearanceChoices(state.appTheme, onThemeSelected)
+
+        SectionHeader(stringResource(R.string.parity_settings_voice_timing))
+        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+            Column {
                 VoiceTimingSliderRow(
                     label = stringResource(R.string.settings_pre_start_delay),
                     value = state.preStartDelayMin,
@@ -568,57 +580,9 @@ private fun SettingsScreenContent(
                     checked = state.includeReadyCommand,
                     onCheckedChange = onIncludeReadyCommandChanged
                 )
-
-                SettingsDivider()
-
-                // Language
-                var showLanguageDialog by remember { mutableStateOf(false) }
-
-                SettingsRow(
-                    icon = Icons.Outlined.Language,
-                    label = stringResource(R.string.settings_language_title),
-                    value = getLanguageDisplayName(state.appLanguage),
-                    onClick = { showLanguageDialog = true }
-                )
-
-                if (showLanguageDialog) {
-                    LanguagePickerDialog(
-                        currentLanguage = state.appLanguage,
-                        onLanguageSelected = { tag ->
-                            onAppLanguageSelected(tag)
-                            applyLanguage(tag)
-                        },
-                        onDismiss = { showLanguageDialog = false }
-                    )
-                }
-
-                SettingsDivider()
-
-                // Preview voice button
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onPreviewVoice)
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.PlayArrow,
-                        contentDescription = null,
-                        tint = AccentBlue,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Text(
-                        text = stringResource(R.string.settings_preview_voice),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = AccentBlue
-                    )
-                }
             }
         }
-
-        SectionFooter(stringResource(R.string.settings_photo_finish_footer))
+        SectionFooter(stringResource(R.string.parity_settings_random_starter))
 
         // ── CROSSING FEEDBACK SECTION ──
         SectionHeader(stringResource(R.string.settings_crossing_feedback))
@@ -713,7 +677,7 @@ private fun SettingsScreenContent(
         Spacer(modifier = Modifier.height(4.dp))
 
         // ── DATA SECTION ──
-        SectionHeader(stringResource(R.string.settings_section_storage))
+        SectionHeader(stringResource(R.string.parity_settings_data))
 
         Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
             Column {
@@ -765,86 +729,83 @@ private fun SettingsScreenContent(
 
         SectionFooter(stringResource(R.string.settings_clear_data_description))
 
+        SectionHeader(stringResource(R.string.parity_settings_subscription))
+
+        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+            Column {
+                SettingsRow(
+                    icon = Icons.Outlined.Star,
+                    label = if (EarlyReleaseAccess.isEnabled) {
+                        stringResource(R.string.early_release_access_active)
+                    } else if (state.isProUser) {
+                        stringResource(R.string.settings_manage_subscription)
+                    } else {
+                        stringResource(R.string.settings_upgrade_to_pro)
+                    },
+                    value = if (EarlyReleaseAccess.isEnabled) {
+                        stringResource(R.string.early_release_all_features)
+                    } else if (state.isProUser) {
+                        stringResource(R.string.settings_pro_active)
+                    } else {
+                        null
+                    },
+                    showChevron = !EarlyReleaseAccess.isEnabled,
+                    onClick = when {
+                        EarlyReleaseAccess.isEnabled -> ({})
+                        state.isProUser -> onManageSubscriptionClick
+                        else -> onPaywallClick
+                    }
+                )
+
+                if (EarlyReleaseAccess.isEnabled) {
+                    SettingsDivider()
+                    SettingsRow(
+                        icon = Icons.Outlined.Star,
+                        label = stringResource(R.string.settings_manage_subscription),
+                        showChevron = true,
+                        onClick = onManageSubscriptionClick
+                    )
+                }
+
+                SettingsDivider()
+
+                SettingsRow(
+                    icon = Icons.Outlined.LocalOffer,
+                    label = stringResource(R.string.settings_redeem_promo_code),
+                    showChevron = true,
+                    onClick = onRedeemPromoClick
+                )
+            }
+        }
+
+        SectionFooter(stringResource(R.string.settings_pro_access_footer))
+
         // ── ABOUT SECTION ──
         SectionHeader(stringResource(R.string.settings_section_about))
 
         Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
             Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.settings_version),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
-                    )
-                }
+                SettingsRow(
+                    icon = Icons.Outlined.Info,
+                    label = stringResource(R.string.settings_version),
+                    value = stringResource(R.string.settings_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
+                )
+                SettingsDivider()
+                SettingsRow(
+                    icon = Icons.Outlined.PrivacyTip,
+                    label = stringResource(R.string.parity_settings_privacy),
+                    showChevron = true,
+                    onClick = { uriHandler.openUri("https://mytrackspeed.com/privacy") }
+                )
+                SettingsDivider()
+                SettingsRow(
+                    icon = Icons.Outlined.Description,
+                    label = stringResource(R.string.parity_settings_terms),
+                    showChevron = true,
+                    onClick = { uriHandler.openUri("https://mytrackspeed.com/terms") }
+                )
             }
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // ── APPEARANCE SECTION ──
-        SectionHeader(stringResource(R.string.settings_section_display))
-
-        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(
-                    AppTheme.MIDNIGHT to stringResource(R.string.theme_midnight),
-                    AppTheme.LIGHT to stringResource(R.string.theme_light),
-                    AppTheme.DARKGOLD to stringResource(R.string.theme_gold)
-                ).forEach { (theme, label) ->
-                    val isSelected = state.appTheme == theme
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .then(
-                                if (isSelected) {
-                                    Modifier.surfaceCard()
-                                } else {
-                                    Modifier
-                                }
-                            )
-                            .clickable { onThemeSelected(theme) }
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Outlined.DarkMode,
-                                contentDescription = null,
-                                tint = if (isSelected) AccentBlue else TextSecondary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isSelected) TextPrimary else TextSecondary
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
 
         // ── DEVELOPER SECTION (debug only) ──
         if (BuildConfig.DEBUG) {
@@ -1049,6 +1010,82 @@ private fun SettingsScreenContent(
 // ── Reusable row components ──
 
 @Composable
+private fun SettingsAppearanceChoices(selectedTheme: AppTheme, onSelected: (AppTheme) -> Unit) {
+    val options = listOf(
+        AppTheme.MIDNIGHT to stringResource(R.string.theme_midnight),
+        AppTheme.LIGHT to stringResource(R.string.theme_light),
+        AppTheme.DARKGOLD to stringResource(R.string.theme_gold)
+    )
+    val largeText = LocalDensity.current.fontScale >= 1.3f
+    if (largeText) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (theme, label) ->
+                SettingsAppearanceChoice(theme, label, selectedTheme == theme, true, { onSelected(theme) }, Modifier.fillMaxWidth())
+            }
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            options.forEach { (theme, label) ->
+                SettingsAppearanceChoice(theme, label, selectedTheme == theme, false, { onSelected(theme) }, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsAppearanceChoice(
+    theme: AppTheme,
+    label: String,
+    selected: Boolean,
+    horizontal: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier
+) {
+    val icon = when (theme) {
+        AppTheme.LIGHT -> Icons.Outlined.LightMode
+        AppTheme.DARKGOLD -> Icons.Outlined.Contrast
+        else -> Icons.Outlined.DarkMode
+    }
+    val foreground = if (selected) Color.White else TextSecondary
+    val card = modifier.clip(RoundedCornerShape(12.dp))
+        .background(if (selected) AccentBlue else CardBackground)
+        .selectable(selected, role = Role.RadioButton, onClick = onClick)
+        .padding(horizontal = 12.dp, vertical = 16.dp)
+    if (horizontal) {
+        Row(card, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = foreground, modifier = Modifier.size(22.dp))
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = foreground)
+        }
+    } else {
+        Column(card, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(icon, null, tint = foreground, modifier = Modifier.size(22.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, color = foreground)
+        }
+    }
+}
+
+@Composable
+internal fun ParitySettingsIconBadge(icon: ImageVector, tint: Color = settingsBadgeTint(icon)) {
+    Box(
+        Modifier.size(28.dp).clip(RoundedCornerShape(7.dp)).background(tint),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(16.dp))
+    }
+}
+
+private fun settingsBadgeTint(icon: ImageVector): Color = when (icon) {
+    Icons.Outlined.RecordVoiceOver, Icons.Outlined.VolumeUp, Icons.Outlined.Mic, Icons.Outlined.PlayArrow -> Color(0xFF45B981)
+    Icons.Outlined.Notifications, Icons.Outlined.FlashOn -> Color(0xFFF4C008)
+    Icons.Outlined.Straighten, Icons.Outlined.Timer -> Color(0xFFF9D14B)
+    Icons.Outlined.Storage, Icons.Outlined.Info -> Color(0xFF8A94A6)
+    Icons.Outlined.PrivacyTip, Icons.Outlined.Description -> Color(0xFF9B92E6)
+    Icons.Outlined.Build -> Color(0xFF3C3C43)
+    Icons.Outlined.Delete -> Color(0xFFD95959)
+    else -> Color(0xFF5DC0BA)
+}
+
+@Composable
 private fun SettingsRow(
     icon: ImageVector?,
     label: String,
@@ -1064,26 +1101,20 @@ private fun SettingsRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = TextSecondary,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(modifier = Modifier.width(14.dp))
+            ParitySettingsIconBadge(icon)
+            Spacer(modifier = Modifier.width(12.dp))
         }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = TextPrimary,
-            modifier = Modifier.weight(1f)
-        )
-        if (value != null) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
+        if (LocalDensity.current.fontScale >= 1.3f && value != null) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(label, style = MaterialTheme.typography.bodyLarge, color = TextPrimary)
+                Text(value, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            }
+        } else {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = TextPrimary, modifier = Modifier.weight(1f))
+            if (value != null) {
+                Spacer(Modifier.width(8.dp))
+                Text(value, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, modifier = Modifier.widthIn(max = 160.dp))
+            }
         }
         if (showChevron) {
             Spacer(modifier = Modifier.width(4.dp))
@@ -1111,13 +1142,8 @@ private fun SettingsToggleRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = AccentBlue,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(modifier = Modifier.width(14.dp))
+            ParitySettingsIconBadge(icon)
+            Spacer(modifier = Modifier.width(12.dp))
         }
         Text(
             text = label,
@@ -1205,13 +1231,8 @@ private fun <T> SettingsChipRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(14.dp))
+                ParitySettingsIconBadge(icon)
+                Spacer(modifier = Modifier.width(12.dp))
             }
             Text(
                 text = label,
@@ -1222,7 +1243,7 @@ private fun <T> SettingsChipRow(
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = if (icon != null) Modifier.padding(start = 36.dp) else Modifier
+            modifier = if (icon != null) Modifier.padding(start = 40.dp) else Modifier
         ) {
             options.forEach { option ->
                 val isSelected = selectedOption == option
@@ -1256,7 +1277,7 @@ private fun <T> SettingsChipRow(
 @Composable
 private fun SettingsDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier.padding(start = 56.dp, end = 16.dp),
         color = BorderSubtle
     )
 }
@@ -1264,11 +1285,10 @@ private fun SettingsDivider() {
 @Composable
 private fun SectionHeader(title: String) {
     Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = TextSecondary,
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        color = TextPrimary,
         fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.5.sp,
         modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 8.dp)
     )
 }

@@ -1,10 +1,5 @@
 package com.trackspeed.android.ui.screens.onboarding.steps
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -18,7 +13,7 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SensorsOff
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Lock
@@ -26,9 +21,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -53,6 +45,18 @@ import com.trackspeed.android.ui.screens.settings.applyLanguage
 import com.trackspeed.android.ui.screens.settings.getLanguageDisplayName
 import com.trackspeed.android.ui.theme.*
 
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Constraints
+import kotlin.math.roundToInt
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WelcomeStep(
@@ -66,237 +70,141 @@ fun WelcomeStep(
 ) {
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showSignInSheet by remember { mutableStateOf(false) }
-    var appeared by remember { mutableStateOf(false) }
-    val alpha by animateFloatAsState(
-        targetValue = if (appeared) 1f else 0f,
-        animationSpec = tween(durationMillis = 600),
-        label = "welcome_fade"
-    )
-    val offsetY by animateFloatAsState(
-        targetValue = if (appeared) 0f else 20f,
-        animationSpec = tween(durationMillis = 600),
-        label = "welcome_offset"
-    )
+    var contentTop by remember { mutableStateOf<Float?>(null) }
 
-    LaunchedEffect(Unit) { appeared = true }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Background image with blur (matching iOS SprintFinishBackground fallback)
-        Image(
-            painter = painterResource(R.drawable.sprint_finish_background),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(6.dp)
-        )
-
-        // Dark gradient overlay matching iOS: 0.4 -> 0.6 -> 0.85
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            BackgroundGradientTop.copy(alpha = 0.4f),
-                            BackgroundGradientBottom.copy(alpha = 0.6f),
-                            BackgroundGradientBottom.copy(alpha = 0.85f)
-                        )
-                    )
-                )
-        )
-
-        // Content
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top bar: debug skip (left) + language picker (right)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, start = 20.dp, end = 20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+    Box(Modifier.fillMaxSize()) {
+        WelcomePhotoBackdrop(contentTop)
+        BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+            // The minimum viewport height anchors controls at the bottom; scrolling keeps large text reachable.
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Debug skip (subtle, matching iOS forward.fill at 0.3 opacity)
-                if (BuildConfig.DEBUG) {
-                    IconButton(onClick = onDebugSkip) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = TextSecondary.copy(alpha = 0.3f),
-                            modifier = Modifier.size(16.dp)
-                        )
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 12.dp, start = 20.dp, end = 20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (BuildConfig.DEBUG) {
+                        IconButton(onClick = onDebugSkip) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(16.dp))
+                        }
+                    } else Spacer(Modifier.size(48.dp))
+                    FilledTonalButton(
+                        onClick = { showLanguagePicker = true },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.12f), contentColor = Color.White),
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(if (selectedLanguage == "system") stringResource(R.string.settings_language_system_short)
+                            else getLanguageDisplayName(selectedLanguage), fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium, maxLines = 1)
                     }
-                } else {
-                    Spacer(Modifier.size(48.dp))
                 }
-
-                // Language button (matching iOS ultraThinMaterial pill)
-                FilledTonalButton(
-                    onClick = { showLanguagePicker = true },
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = Color.White.copy(alpha = 0.12f),
-                        contentColor = TextPrimary
-                    ),
-                    shape = RoundedCornerShape(50),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                Column(
+                    Modifier.widthIn(max = 500.dp).fillMaxWidth().padding(horizontal = 20.dp)
+                        .padding(top = 20.dp, bottom = 8.dp)
+                        .onGloballyPositioned { contentTop = it.positionInRoot().y },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Language,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        if (selectedLanguage == "system") {
-                            stringResource(R.string.settings_language_system_short)
-                        } else {
-                            getLanguageDisplayName(selectedLanguage)
-                        },
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1
-                    )
+                    Text(stringResource(R.string.parity_onboarding_welcome_title),
+                        fontSize = 34.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold,
+                        color = Color.White, textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().semantics { heading() })
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = onGetStarted, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Text(stringResource(R.string.parity_onboarding_build_setup), fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                    }
+                    OutlinedButton(
+                        onClick = onJoinSession, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                        shape = RoundedCornerShape(50), border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.9f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.Black.copy(alpha = 0.28f), contentColor = Color.White),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Icon(Icons.Default.Sensors, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.onboarding_welcome_join_session), fontSize = 17.sp,
+                            fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+                    }
+                    TextButton(onClick = { showSignInSheet = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.onboarding_welcome_sign_in), color = Color.White,
+                            fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
+                    }
                 }
             }
-
-            Spacer(Modifier.weight(1f))
-
-            // Logo and title (matching iOS VStack spacing: lg)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.offset(y = offsetY.dp)
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.app_logo),
-                    contentDescription = stringResource(R.string.onboarding_welcome_logo_description),
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(RoundedCornerShape(22.dp)),
-                    alpha = alpha
-                )
-                Spacer(Modifier.height(20.dp))
-                // iOS: "Welcome to" in title2, textSecondary
-                Text(
-                    text = stringResource(R.string.onboarding_welcome_prefix),
-                    fontSize = 22.sp,
-                    color = TextSecondary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.offset(y = offsetY.dp)
-                )
-                Spacer(Modifier.height(4.dp))
-                // iOS: "TrackSpeed" in title1, text
-                Text(
-                    text = stringResource(R.string.onboarding_welcome_title),
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.offset(y = offsetY.dp)
-                )
-                Spacer(Modifier.height(12.dp))
-                // iOS: "Professional sprint timing using your iPhone" in body, textSecondary
-                Text(
-                    text = stringResource(R.string.onboarding_value_subtitle) + "\n" +
-                        stringResource(R.string.onboarding_value_title),
-                    fontSize = 16.sp,
-                    color = TextSecondary,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 22.sp,
-                    modifier = Modifier.offset(y = offsetY.dp)
-                )
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            // Buttons (matching iOS: centered 260dp width, pill shape)
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 32.dp)
-                    .offset(y = offsetY.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Get Started - iOS: width 260, height 50, full rounded, onboardingAccent
-                Button(
-                    onClick = onGetStarted,
-                    modifier = Modifier
-                        .width(260.dp)
-                        .height(50.dp),
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-                ) {
-                    Text(
-                        stringResource(R.string.onboarding_welcome_get_started),
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                // Join Session - iOS: outlined pill with antenna icon
-                OutlinedButton(
-                    onClick = onJoinSession,
-                    modifier = Modifier
-                        .width(260.dp)
-                        .height(50.dp),
-                    shape = RoundedCornerShape(50),
-                    border = BorderStroke(2.dp, AccentBlue)
-                ) {
-                    Icon(
-                        Icons.Default.SensorsOff,
-                        contentDescription = null,
-                        tint = AccentBlue,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(R.string.onboarding_welcome_join_session),
-                        color = AccentBlue,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                // Sign in link - iOS: underlined, textSecondary — opens bottom sheet
-                TextButton(onClick = { showSignInSheet = true }) {
-                    Text(
-                        stringResource(R.string.onboarding_welcome_sign_in),
-                        color = TextSecondary,
-                        fontSize = 14.sp,
-                        textDecoration = TextDecoration.Underline
-                    )
-                }
-            }
-            Spacer(Modifier.height(48.dp))
         }
-
-        // Language picker dialog
         if (showLanguagePicker) {
-            LanguagePickerDialog(
-                currentLanguage = selectedLanguage,
-                onLanguageSelected = { tag ->
-                    onLanguageSelected(tag)
-                    applyLanguage(tag)
-                },
-                onDismiss = { showLanguagePicker = false }
-            )
+            LanguagePickerDialog(currentLanguage = selectedLanguage,
+                onLanguageSelected = { tag -> onLanguageSelected(tag); applyLanguage(tag) },
+                onDismiss = { showLanguagePicker = false })
         }
-
-        // Sign-in bottom sheet (matching iOS SignInSheet with .presentationDetents([.medium, .large]))
         if (showSignInSheet) {
-            SignInBottomSheet(
-                onDismiss = { showSignInSheet = false },
-                onAuthenticated = {
-                    showSignInSheet = false
-                    onSignIn()
-                }
-            )
+            SignInBottomSheet(onDismiss = { showSignInSheet = false },
+                onAuthenticated = { showSignInSheet = false; onSignIn() })
         }
     }
+}
+
+/** Match the current iPhone photo crop: keep its phone above the growing title/controls. */
+@Composable
+private fun WelcomePhotoBackdrop(contentTopInRoot: Float?) {
+    var topInRoot by remember { mutableFloatStateOf(0f) }
+    val relativeContentTop = contentTopInRoot?.minus(topInRoot)
+    Layout(
+        modifier = Modifier.fillMaxSize().clipToBounds().background(Color.Black)
+            .onGloballyPositioned { topInRoot = it.positionInRoot().y }
+            .drawWithContent {
+                drawContent()
+                val photo = welcomePhotoPlacement(size.width, size.height, relativeContentTop, density)
+                val shadeHeight = minOf(180.dp.toPx(), size.height * 0.25f)
+                drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f),
+                    Color.Black.copy(alpha = 0.2f), Color.Transparent), endY = shadeHeight),
+                    size = Size(size.width, shadeHeight))
+                val phoneBottom = photo.top + photo.height * 0.761f
+                val imageBottom = photo.top + photo.height
+                val fadeHeight = (imageBottom - phoneBottom).coerceAtLeast(0f)
+                if (fadeHeight > 0f) {
+                    drawRect(Brush.verticalGradient(listOf(Color.Transparent,
+                        Color.Black.copy(alpha = if (imageBottom < size.height) 0.85f else 0.5f)),
+                        startY = phoneBottom, endY = imageBottom),
+                        topLeft = Offset(0f, phoneBottom), size = Size(size.width, fadeHeight))
+                }
+            },
+        content = {
+            Image(painterResource(R.drawable.onboarding_welcome_photo), contentDescription = null,
+                contentScale = ContentScale.FillBounds)
+        }
+    ) { measurables, constraints ->
+        val photo = welcomePhotoPlacement(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat(), relativeContentTop, density)
+        val image = measurables.single().measure(Constraints.fixed(photo.width.roundToInt(), photo.height.roundToInt()))
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            image.placeRelative((constraints.maxWidth - image.width) / 2, photo.top.roundToInt())
+        }
+    }
+}
+
+private data class WelcomePhotoPlacement(val width: Float, val height: Float, val top: Float)
+
+private fun welcomePhotoPlacement(width: Float, height: Float, contentTop: Float?, density: Float): WelcomePhotoPlacement {
+    val aspect = 850f / 1850f
+    val photoWidth = maxOf(width, height * aspect)
+    val photoHeight = photoWidth / aspect
+    val centered = (height - photoHeight) / 2f
+    val wanted = contentTop?.let { minOf(centered, it - 12f * density - photoHeight * 0.761f) } ?: centered
+    return WelcomePhotoPlacement(photoWidth, photoHeight, maxOf(wanted, 52f * density - photoHeight * 0.287f))
 }
 
 // ── Sign-In Bottom Sheet (matching iOS SignInSheet) ────────────────────────────

@@ -208,7 +208,7 @@ private fun NotificationSettingsContent(
                     // Training Reminder
                     NotificationToggleRow(
                         icon = Icons.Outlined.FitnessCenter,
-                        iconTint = AccentOrange,
+                        iconTint = Color(0xFF5DC0BA),
                         title = stringResource(R.string.notification_settings_training_title),
                         description = stringResource(R.string.notification_settings_training_description, NotificationTiming.INACTIVITY_THRESHOLD_DAYS),
                         checked = state.trainingReminderEnabled,
@@ -420,20 +420,7 @@ private fun NotificationToggleRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(iconTint.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(18.dp)
-            )
-        }
+        ParitySettingsIconBadge(icon, iconTint)
 
         Spacer(modifier = Modifier.width(12.dp))
 
@@ -514,11 +501,10 @@ private fun InfoRow(
 @Composable
 private fun SectionHeader(title: String) {
     Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = TextSecondary,
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        color = TextPrimary,
         fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.5.sp,
         modifier = Modifier.padding(horizontal = 4.dp)
     )
 }

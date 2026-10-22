@@ -1,23 +1,18 @@
 package com.trackspeed.android.ui.screens.onboarding.steps
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.filled.CallSplit
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.PersonOff
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.ShowChart
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.ViewList
-import androidx.compose.material.icons.filled.WifiTethering
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,174 +22,80 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
 import com.trackspeed.android.ui.screens.onboarding.OnboardingPainPoint
-import com.trackspeed.android.ui.theme.*
-
-private const val MIN_CARD_COUNT = 3
 
 @Composable
-fun HowItWorksStep(
-    selectedPainPoints: Set<OnboardingPainPoint>,
-    onContinue: () -> Unit
-) {
-    val orderedPairs = rememberPainFixPairs(selectedPainPoints)
+fun HowItWorksStep(selectedPainPoints: Set<OnboardingPainPoint>, onContinue: () -> Unit) {
+    // Keep older saved choices useful without bringing back the retired pain-point question.
+    val selected = OnboardingPainPoint.entries.filter { it in selectedPainPoints }
+    val defaults = listOf(OnboardingPainPoint.STOPWATCH_INACCURATE,
+        OnboardingPainPoint.PROGRESS_BLIND, OnboardingPainPoint.NO_COACH)
+    val benefits = (selected + defaults.filterNot { it in selected }).take(3)
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Text(
-            text = stringResource(R.string.onboarding_howitworks_title),
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = TextPrimary,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.onboarding_howitworks_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
+    Box(Modifier.fillMaxSize()) {
+        OnboardingPhotoBackdrop(R.drawable.onboarding_sync_quiet_photo)
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            Modifier.fillMaxSize().statusBarsPadding().padding(top = 64.dp).navigationBarsPadding(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            orderedPairs.forEach { pain ->
-                PainFixRow(pain = pain)
+            Column(
+                Modifier.weight(1f).widthIn(max = 600.dp).fillMaxWidth().verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp).padding(top = 8.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                Text(stringResource(R.string.parity_onboarding_benefits_title),
+                    fontSize = 34.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold,
+                    color = Color.White, modifier = Modifier.semantics { heading() })
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    benefits.forEach { BenefitRow(it) }
+                }
             }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Button(
-            onClick = onContinue,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-        ) {
-            Text(
-                text = stringResource(R.string.common_continue),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold
+            OnboardingPhotoContinueButton(
+                stringResource(R.string.common_continue), onContinue,
+                modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)
             )
         }
-        Spacer(modifier = Modifier.height(32.dp))
     }
-}
-
-private fun rememberPainFixPairs(
-    selectedPainPoints: Set<OnboardingPainPoint>
-): List<OnboardingPainPoint> {
-    val ordered = OnboardingPainPoint.entries.filter { selectedPainPoints.contains(it) }.toMutableList()
-    if (ordered.size < MIN_CARD_COUNT) {
-        for (pain in OnboardingPainPoint.defaultOrder) {
-            if (!ordered.contains(pain)) {
-                ordered += pain
-            }
-            if (ordered.size >= MIN_CARD_COUNT) break
-        }
-    }
-    return ordered
 }
 
 @Composable
-private fun PainFixRow(pain: OnboardingPainPoint) {
+private fun BenefitRow(benefit: OnboardingPainPoint) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(CardBackground, RoundedCornerShape(18.dp))
-            .border(1.dp, DividerColor, RoundedCornerShape(18.dp))
-            .padding(16.dp),
-        verticalAlignment = Alignment.Top
+        Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(12.dp)).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .background(accentForPain(pain), RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = fixIconForPain(pain),
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
+        Box(Modifier.size(44.dp).background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(6.dp)),
+            contentAlignment = Alignment.Center) {
+            Icon(benefitIcon(benefit), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
         }
-
-        Spacer(modifier = Modifier.width(14.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = null,
-                    tint = TextMuted,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = stringResource(pain.painRes),
-                    style = MaterialTheme.typography.bodySmall.copy(textDecoration = TextDecoration.LineThrough),
-                    color = TextMuted
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    tint = AccentGreen,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = stringResource(pain.fixRes),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary
-                )
-            }
-        }
+        Spacer(Modifier.width(12.dp))
+        Text(stringResource(benefitTitle(benefit)), modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
     }
 }
 
-private fun fixIconForPain(pain: OnboardingPainPoint): ImageVector {
-    return when (pain) {
-        OnboardingPainPoint.PROGRESS_BLIND -> Icons.Default.ShowChart
-        OnboardingPainPoint.STOPWATCH_INACCURATE -> Icons.Default.Timer
-        OnboardingPainPoint.HARDWARE_EXPENSIVE -> Icons.Default.AttachMoney
-        OnboardingPainPoint.NO_COACH -> Icons.Default.WifiTethering
-        OnboardingPainPoint.WASTED_SESSIONS -> Icons.Default.ViewList
-        OnboardingPainPoint.SPLITS_BLACK_BOX -> Icons.Default.CallSplit
-    }
+@StringRes
+private fun benefitTitle(benefit: OnboardingPainPoint): Int = when (benefit) {
+    OnboardingPainPoint.STOPWATCH_INACCURATE -> R.string.parity_onboarding_benefit_timing
+    OnboardingPainPoint.PROGRESS_BLIND -> R.string.parity_onboarding_benefit_progress
+    OnboardingPainPoint.HARDWARE_EXPENSIVE -> R.string.parity_onboarding_benefit_phone
+    OnboardingPainPoint.NO_COACH -> R.string.parity_onboarding_benefit_solo
+    OnboardingPainPoint.WASTED_SESSIONS -> R.string.parity_onboarding_benefit_saved
+    OnboardingPainPoint.SPLITS_BLACK_BOX -> R.string.parity_onboarding_benefit_splits
 }
 
-private fun accentForPain(pain: OnboardingPainPoint): Color {
-    return when (pain) {
-        OnboardingPainPoint.PROGRESS_BLIND -> Color(0xFF4CAF50)
-        OnboardingPainPoint.STOPWATCH_INACCURATE -> Color(0xFF5C8DB8)
-        OnboardingPainPoint.HARDWARE_EXPENSIVE -> Color(0xFFF59E0B)
-        OnboardingPainPoint.NO_COACH -> Color(0xFF9A6BD4)
-        OnboardingPainPoint.WASTED_SESSIONS -> Color(0xFF38A6A5)
-        OnboardingPainPoint.SPLITS_BLACK_BOX -> Color(0xFFD94D6A)
-    }
+private fun benefitIcon(benefit: OnboardingPainPoint): ImageVector = when (benefit) {
+    OnboardingPainPoint.STOPWATCH_INACCURATE -> Icons.Default.CameraAlt
+    OnboardingPainPoint.PROGRESS_BLIND -> Icons.Default.ShowChart
+    OnboardingPainPoint.HARDWARE_EXPENSIVE -> Icons.Default.Smartphone
+    OnboardingPainPoint.NO_COACH -> Icons.Default.DirectionsRun
+    OnboardingPainPoint.WASTED_SESSIONS -> Icons.Default.PhotoLibrary
+    OnboardingPainPoint.SPLITS_BLACK_BOX -> Icons.Default.Flag
 }

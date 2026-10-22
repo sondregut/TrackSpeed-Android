@@ -26,10 +26,14 @@ import androidx.compose.material.icons.outlined.NorthEast
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Replay
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -73,6 +77,7 @@ import com.trackspeed.android.referral.ReferralService
 import com.trackspeed.android.ui.components.BillingIssueBanner
 import com.trackspeed.android.ui.screens.history.SessionHistoryScreen
 import com.trackspeed.android.ui.screens.profile.ProfileScreen
+import com.trackspeed.android.model.StartType
 import com.trackspeed.android.model.TestPreset
 import com.trackspeed.android.ui.util.localizedName
 import com.trackspeed.android.model.TestPresetCategory
@@ -81,7 +86,6 @@ import com.trackspeed.android.ui.theme.*
 import com.trackspeed.android.ui.util.formatDistance
 import com.trackspeed.android.ui.util.formatSessionMode
 import androidx.annotation.StringRes
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.trackspeed.android.R
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -395,7 +399,7 @@ private enum class HomeTab(@StringRes val labelRes: Int, val icon: ImageVector) 
     PROFILE(R.string.home_tab_profile, Icons.Default.Person)
 }
 
-private enum class FirstSessionTutorialTarget {
+internal enum class FirstSessionTutorialTarget {
     CUSTOM_SESSION,
     TEMPLATES_SCREEN,
     JOIN_SESSION
@@ -694,6 +698,7 @@ fun HomeScreen(
                             )
                         },
                         onCustomSessionClick = onBasicModeClick,
+                        onProfileClick = { selectedTab = HomeTab.PROFILE },
                         onJoinSessionClick = onClockSyncClick,
                         onSeeAllClick = { selectedTab = HomeTab.HISTORY },
                         onSessionClick = onSessionClick,
@@ -732,6 +737,7 @@ fun HomeScreen(
                         }
                     )
                     HomeTab.HISTORY -> SessionHistoryScreen(
+                        onStartSessionClick = onBasicModeClick,
                         onSessionClick = onSessionClick,
                         onStatsClick = onStatsClick
                     )
@@ -1426,10 +1432,11 @@ private fun getGreetingRes(): Int {
 }
 
 @Composable
-private fun HomeContent(
+internal fun HomeContent(
     isInBillingGracePeriod: Boolean = false,
     onPresetClick: (TestPreset) -> Unit,
     onCustomSessionClick: () -> Unit,
+    onProfileClick: () -> Unit = {},
     onJoinSessionClick: () -> Unit,
     onSeeAllClick: () -> Unit,
     onSessionClick: (String) -> Unit = {},
@@ -1531,107 +1538,184 @@ private fun HomeContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
-
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = TextPrimary
-            )
-            OutlinedButton(
+            IconButton(
+                onClick = onProfileClick,
+                modifier = Modifier.size(48.dp).clip(CircleShape)
+                    .background(CardBackground).border(1.dp, BorderSubtle, CircleShape)
+            ) {
+                Icon(Icons.Default.Person, stringResource(R.string.home_tab_profile), tint = TextPrimary)
+            }
+            Button(
                 onClick = onJoinSessionClick,
-                modifier = Modifier.onGloballyPositioned {
-                    onTutorialTargetPositioned(
-                        FirstSessionTutorialTarget.JOIN_SESSION,
-                        it.boundsInRoot()
-                    )
+                modifier = Modifier.heightIn(min = 48.dp).onGloballyPositioned {
+                    onTutorialTargetPositioned(FirstSessionTutorialTarget.JOIN_SESSION, it.boundsInRoot())
                 },
                 shape = CircleShape,
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = TextPrimary, contentColor = BackgroundGradientBottom),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Sync,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = stringResource(R.string.home_join_session),
-                    fontWeight = FontWeight.SemiBold
-                )
+                Icon(Icons.Outlined.Sync, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.home_join_session), fontWeight = FontWeight.SemiBold)
             }
         }
+        Text(
+            text = stringResource(R.string.app_name),
+            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = (-1.2).sp),
+            color = TextPrimary,
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+        )
 
         if (isInBillingGracePeriod) {
-            BillingIssueBanner(
-                onActionClick = onPaywallClick,
-                onDismiss = {}
+            BillingIssueBanner(onActionClick = onPaywallClick, onDismiss = {})
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            HomeDashboardSectionTitle(stringResource(R.string.parity_home_start_section))
+            DashboardSetupChoices(
+                onSoloClick = { onPresetClick(TestPreset.practice) },
+                onConnectedClick = onCustomSessionClick
             )
         }
 
-        HomeDashboardSectionTitle(stringResource(R.string.home_this_month))
-        DashboardMonthlyStatsCard(
-            sessionCount = monthSessions.size,
-            runCount = monthRunCount,
-            personalBest = personalBest,
-            personalBestLabel = latestSession?.let {
-                stringResource(R.string.home_distance_pr, formatDistance(it.distance))
-            } ?: stringResource(R.string.home_personal_best)
-        )
-
-        HomeDashboardSectionTitle(stringResource(R.string.home_latest_session))
         if (latestSession == null) {
-            DashboardEmptySessionCard(onClick = onCustomSessionClick)
+            DashboardEmptySessionCard(onClick = onSeeAllClick)
         } else {
+            HomeDashboardSectionTitle(stringResource(R.string.home_latest_session))
             RecentSessionCard(
                 session = latestSession,
                 summary = sessionSummaries[latestSession.id],
                 onClick = { onSessionClick(latestSession.id) },
                 onRepeat = { onRepeatSessionClick(latestSession) }
             )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            HomeDashboardSectionTitle(stringResource(R.string.home_recent_sessions))
-            if (recentSessions.isNotEmpty()) {
-                TextButton(onClick = onSeeAllClick) {
-                    Text(stringResource(R.string.home_see_all))
+            if (recentBeforeLatest.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    HomeDashboardSectionTitle(stringResource(R.string.home_recent_sessions))
+                    TextButton(onClick = onSeeAllClick) { Text(stringResource(R.string.home_see_all)) }
+                }
+                Column(Modifier.fillMaxWidth().surfaceCard()) {
+                    recentBeforeLatest.forEachIndexed { index, session ->
+                        DashboardRecentSessionRow(session, sessionSummaries[session.id]) { onSessionClick(session.id) }
+                        if (index < recentBeforeLatest.lastIndex) {
+                            HorizontalDivider(Modifier.padding(start = 68.dp), color = BorderSubtle)
+                        }
+                    }
                 }
             }
-        }
-
-        if (recentBeforeLatest.isEmpty()) {
-            Text(
-                text = stringResource(R.string.home_no_recent_sessions),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .gunmetalCard()
-                    .padding(20.dp)
+            HomeDashboardSectionTitle(stringResource(R.string.home_this_month))
+            DashboardMonthlyStatsCard(
+                sessionCount = monthSessions.size,
+                runCount = monthRunCount,
+                personalBest = personalBest,
+                personalBestLabel = stringResource(R.string.home_distance_pr, formatDistance(latestSession.distance))
             )
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun DashboardSetupChoices(onSoloClick: () -> Unit, onConnectedClick: () -> Unit) {
+    val largeText = LocalDensity.current.fontScale >= 1.3f
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth < 340.dp || largeText) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                DashboardSetupCard(true, onSoloClick, Modifier.fillMaxWidth())
+                DashboardSetupCard(false, onConnectedClick, Modifier.fillMaxWidth())
+            }
         } else {
-            recentBeforeLatest.forEach { session ->
-                RecentSessionCard(
-                    session = session,
-                    summary = sessionSummaries[session.id],
-                    onClick = { onSessionClick(session.id) }
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Max)) {
+                DashboardSetupCard(true, onSoloClick, Modifier.weight(1f).fillMaxHeight())
+                DashboardSetupCard(false, onConnectedClick, Modifier.weight(1f).fillMaxHeight())
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(24.dp))
+@Composable
+private fun DashboardSetupCard(solo: Boolean, onClick: () -> Unit, modifier: Modifier) {
+    Column(
+        modifier.surfaceCard().clickable(onClick = onClick).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(if (solo) Icons.Outlined.Replay else Icons.Outlined.Sync, null, tint = AccentBlue, modifier = Modifier.size(24.dp))
+        Text(
+            stringResource(if (solo) R.string.parity_home_solo_laps else R.string.home_start_session),
+            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = TextPrimary
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(if (solo) R.string.parity_home_one_phone else R.string.parity_home_connected_phones),
+                style = MaterialTheme.typography.bodySmall, color = TextSecondary, modifier = Modifier.weight(1f)
+            )
+            Icon(Icons.Outlined.ChevronRight, null, tint = TextPrimary,
+                modifier = Modifier.size(32.dp).clip(CircleShape).background(CardBackground).padding(7.dp))
+        }
+    }
+}
+
+private val TrainingSessionEntity.isDashboardLapSession: Boolean
+    get() = DashboardSessionMetadata.usesLapLabels(numberOfPhones, numberOfGates)
+
+@Composable
+private fun dashboardSessionTitle(session: TrainingSessionEntity): String {
+    session.name?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    if (session.isDashboardLapSession) return stringResource(R.string.parity_home_solo_laps)
+    val startType = StartType.fromRawValue(session.startType)
+    val preset = TestPreset.all.firstOrNull { candidate ->
+        startType in candidate.availableStartTypes &&
+            session.numberOfPhones in candidate.minPhones..candidate.maxPhones &&
+            (abs(candidate.distance - session.distance) < 0.05 ||
+                candidate.selectableDistances?.any { abs(it - session.distance) < 0.05 } == true)
+    }
+    if (preset != null) return preset.localizedName()
+    return stringResource(
+        if (StartType.fromRawValue(session.startType) == StartType.FLYING) R.string.parity_home_flying_title else R.string.parity_home_sprint_title,
+        formatDistance(session.distance)
+    )
+}
+
+@Composable
+private fun dashboardRunCount(session: TrainingSessionEntity, count: Int): String =
+    if (session.isDashboardLapSession) {
+        pluralStringResource(R.plurals.timing_lap_count, count, count)
+    } else {
+        pluralStringResource(R.plurals.parity_home_run_count, count, count)
+    }
+
+@Composable
+private fun DashboardRecentSessionRow(session: TrainingSessionEntity, summary: SessionSummary?, onClick: () -> Unit) {
+    val date = remember(session.date) { java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(Date(session.date)) }
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            if (session.isDashboardLapSession) Icons.Outlined.Replay else Icons.AutoMirrored.Outlined.DirectionsRun,
+            null, tint = AccentBlue,
+            modifier = Modifier.size(42.dp).clip(CircleShape).background(AccentBlue.copy(alpha = 0.12f)).padding(11.dp)
+        )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(dashboardSessionTitle(session), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
+                color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(stringResource(R.string.parity_home_session_metadata, date, dashboardRunCount(session, summary?.runCount ?: 0)),
+                style = MaterialTheme.typography.bodySmall, color = TextMuted, maxLines = 2)
+        }
+        summary?.bestTime?.takeIf { it > 0 }?.let {
+            Text(stringResource(R.string.common_seconds_value, String.format(Locale.getDefault(), "%.2f", it)),
+                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = SuccessGreen)
+        }
     }
 }
 
@@ -1718,37 +1802,20 @@ private fun DashboardMetricDivider() {
 
 @Composable
 private fun DashboardEmptySessionCard(onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .gunmetalCard()
-            .clickable(onClick = onClick)
-            .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    Row(
+        Modifier.fillMaxWidth().surfaceCard().clickable(onClick = onClick).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Outlined.DirectionsRun,
-            contentDescription = null,
-            tint = TextMuted,
-            modifier = Modifier.size(36.dp)
-        )
-        Text(
-            text = stringResource(R.string.home_no_sessions_title),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = TextPrimary
-        )
-        Text(
-            text = stringResource(R.string.home_no_sessions_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = stringResource(R.string.home_start_session),
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = AccentNavy
-        )
+        if (LocalDensity.current.fontScale < 1.5f) {
+            Icon(Icons.Outlined.History, null, tint = TextPrimary,
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(CardBackground).padding(11.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.parity_home_saved_title), style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.parity_home_saved_message), style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        }
+        Icon(Icons.Outlined.ChevronRight, null, tint = TextPrimary, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -2374,7 +2441,7 @@ private fun RecentSessionCard(
     onClick: () -> Unit,
     onRepeat: (() -> Unit)? = null
 ) {
-    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy, h:mm a", Locale.getDefault()) }
+    val dateFormat = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT, Locale.getDefault())
     val distanceLabel = formatDistance(session.distance)
     val modeLabel = formatSessionMode(session.numberOfPhones, session.numberOfGates)
 
@@ -2402,117 +2469,48 @@ private fun RecentSessionCard(
         value = loadedThumbnail
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .gunmetalCard()
-            .clickable(onClick = onClick)
-    ) {
+    Column(Modifier.fillMaxWidth().surfaceCard()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
+            Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 56x56 thumbnail (matching iOS RecentSessionRow)
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                val loadedThumbnail = thumbnail
-                if (loadedThumbnail != null) {
-                    Image(
-                        bitmap = loadedThumbnail,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    // Gradient placeholder with runner icon (matching iOS fallback)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        TextSecondary.copy(alpha = 0.3f),
-                                        TextSecondary.copy(alpha = 0.1f)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.DirectionsRun,
-                            contentDescription = null,
-                            tint = TextSecondary,
-                            modifier = Modifier.size(24.dp)
-                        )
+            if (LocalDensity.current.fontScale < 1.5f) {
+                Box(
+                    Modifier.width(72.dp).height(104.dp).clip(RoundedCornerShape(12.dp))
+                        .background(CardBackground).border(1.dp, BorderSubtle, RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val loadedThumbnail = thumbnail
+                    if (loadedThumbnail != null) {
+                        Image(loadedThumbnail, null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    } else {
+                        Icon(Icons.AutoMirrored.Outlined.DirectionsRun, null, tint = AccentBlue, modifier = Modifier.size(24.dp))
                     }
                 }
             }
-
-            // Details column
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Date line (abbreviated date + shortened time, matching iOS)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(dashboardSessionTitle(session), style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                Text(stringResource(R.string.parity_home_session_metadata, dateFormat.format(Date(session.date)), dashboardRunCount(session, summary?.runCount ?: 0)),
+                    style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                Text("$distanceLabel · $modeLabel", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                val bestTime = summary?.bestTime?.takeIf { it > 0 }
                 Text(
-                    text = dateFormat.format(Date(session.date)),
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    bestTime?.let { stringResource(R.string.common_seconds_value, String.format(Locale.getDefault(), "%.2f", it)) }
+                        ?: stringResource(R.string.parity_home_no_timed_runs),
+                    style = if (bestTime != null) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold, color = if (bestTime != null) SuccessGreen else TextMuted
                 )
-
-                // Metadata pills row (matching iOS HStack with distance pill, runs pill, best time)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Distance pill
-                    MetadataPill(text = distanceLabel, icon = "\uD83D\uDCCF") // ruler
-
-                    MetadataPill(text = modeLabel, icon = "\uD83D\uDCF1") // phone
-
-                    // Runs pill
-                    if (summary != null) {
-                        MetadataPill(text = "${summary.runCount}", icon = "\u23F1") // stopwatch
-                    }
-
-                    // Best time (green, matching iOS AppColors.success)
-                    if ((summary?.bestTime ?: 0.0) > 0) {
-                        Text(
-                            text = stringResource(
-                                R.string.common_seconds_value,
-                                String.format(Locale.getDefault(), "%.2f", summary?.bestTime)
-                            ),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            color = SuccessGreen
-                        )
-                    }
-                }
-
-                if (onRepeat != null) {
-                    Text(
-                        text = stringResource(R.string.home_repeat_setup),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = AccentNavy,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable(onClick = onRepeat)
-                            .padding(vertical = 4.dp)
-                    )
+            }
+        }
+        if (onRepeat != null) {
+            HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = BorderSubtle)
+            TextButton(onClick = onRepeat, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Refresh, null, modifier = Modifier.size(18.dp))
+                    Text(stringResource(R.string.home_repeat_setup), fontWeight = FontWeight.SemiBold)
                 }
             }
         }

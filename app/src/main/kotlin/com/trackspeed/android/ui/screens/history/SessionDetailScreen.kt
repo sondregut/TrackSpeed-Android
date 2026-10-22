@@ -327,6 +327,38 @@ fun SessionDetailScreen(
                 }
             }
 
+            if (uiState.session != null && uiState.runs.isEmpty()) {
+                item {
+                    Column(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Outlined.Timer, null, tint = TextMuted.copy(alpha = 0.5f), modifier = Modifier.size(56.dp))
+                        Text(
+                            stringResource(
+                                when {
+                                    uiState.selectedAthleteId != null -> R.string.parity_session_no_matching_runs
+                                    uiState.session?.numberOfPhones == 1 -> R.string.parity_session_no_laps
+                                    else -> R.string.parity_session_no_runs
+                                }
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold, color = TextPrimary
+                        )
+                        Text(
+                            stringResource(if (uiState.selectedAthleteId != null) R.string.parity_session_no_athlete_results else R.string.parity_session_no_results_message),
+                            style = MaterialTheme.typography.bodyMedium, color = TextMuted, textAlign = TextAlign.Center
+                        )
+                        if (uiState.selectedAthleteId != null) {
+                            OutlinedButton(onClick = { viewModel.setAthleteFilter(null) }) {
+                                Text(stringResource(R.string.parity_session_all_athletes))
+                            }
+                        }
+                    }
+                }
+            }
+
             // Run rows
             items(
                 items = uiState.runs,
@@ -450,7 +482,8 @@ private fun SessionOverviewHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .gunmetalCard()
+                .background(CardBackground, RoundedCornerShape(12.dp))
+                .border(1.dp, DividerColor, RoundedCornerShape(12.dp))
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -473,7 +506,7 @@ private fun SessionOverviewHeader(
                     } ?: "—",
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFeatureSettings = "tnum"
                     ),
                     color = AccentBlue,
                     maxLines = 1
@@ -506,7 +539,7 @@ private fun SessionOverviewHeader(
                     text = runCount.toString(),
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFeatureSettings = "tnum"
                     ),
                     color = TextPrimary
                 )

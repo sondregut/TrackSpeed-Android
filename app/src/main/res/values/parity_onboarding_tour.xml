@@ -1,0 +1,17 @@
+<resources>
+    <string name="parity_tour_setup_title">Build a timing system.</string>
+    <string name="parity_tour_setup_detail">One phone for laps, or tripods at the start and finish.</string>
+    <string name="parity_tour_connect_title">Sync the phones.</string>
+    <string name="parity_tour_connect_detail">Join from the other phone. No shared Wi-Fi needed.</string>
+    <string name="parity_tour_alignment_title">Line up the camera.</string>
+    <string name="parity_tour_alignment_detail">Put the line where you cross, then tap OK.</string>
+    <string name="parity_tour_starts_title">Start your way.</string>
+    <string name="parity_tour_starts_detail">Flying, touch, countdown, voice or in-frame starts.</string>
+    <string name="parity_tour_auto_title">Just run.</string>
+    <string name="parity_tour_auto_detail">The clock stops the moment you cross the line.</string>
+    <string name="parity_tour_proof_title">See the proof.</string>
+    <string name="parity_tour_proof_detail">Flying 10 m sprint. Start and finish frames for every run.</string>
+    <string name="parity_tour_proof_image">Example flying 10 metre result with start and finish frames</string>
+    <string name="parity_tour_personalize">Personalize TrackSpeed</string>
+    <string name="parity_onboarding_progress">Setup progress</string>
+</resources>

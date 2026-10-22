@@ -95,9 +95,11 @@ class OnboardingViewModel @Inject constructor(
 
     init {
         _uiState.update {
+            val referred = isReferredUser()
             it.copy(
-                isReferred = isReferredUser(),
-                isAuthenticated = authRepository.isAuthenticated
+                isReferred = referred,
+                isAuthenticated = authRepository.isAuthenticated,
+                currentStep = OnboardingRoute(referred, EarlyReleaseAccess.isEnabled).restore(it.currentStep)
             )
         }
 
@@ -158,6 +160,7 @@ class OnboardingViewModel @Inject constructor(
     }
 
     fun advanceAfterWelcome() {
+        if (_uiState.value.currentStep != OnboardingStep.WELCOME) return
         val isReferred = isReferredUser()
         val nextStep = if (isReferred) {
             OnboardingStep.REFERRAL_WELCOME
@@ -186,16 +189,27 @@ class OnboardingViewModel @Inject constructor(
 
     private fun route() = OnboardingRoute(_uiState.value.isReferred, EarlyReleaseAccess.isEnabled)
 
+    // Keep imperative navigation available to non-UI callers.
     fun goForward() = goToStep(route().next(_uiState.value.currentStep))
 
-    fun goBack() {
+    fun goForwardFrom(source: OnboardingStep) {
+        route().nextFrom(_uiState.value.currentStep, source)?.let(::goToStep)
+    }
+
+    fun goBack() = goBackFrom(_uiState.value.currentStep)
+
+    fun goBackFrom(source: OnboardingStep) {
         val current = _uiState.value.currentStep
-        val previous = route().previous(current)
+        val previous = route().previousFrom(current, source) ?: return
         analyticsService.track(AnalyticsEvent.ONBOARDING_BACK_PRESSED, mapOf(
             "from_step" to current.analyticsName, "to_step" to previous.analyticsName,
             "flow_version" to "android_streamlined_20261022"
         ))
         _uiState.update { it.copy(currentStep = previous) }
+    }
+
+    fun goToStepFrom(source: OnboardingStep, destination: OnboardingStep) {
+        route().destinationFrom(_uiState.value.currentStep, source, destination)?.let(::goToStep)
     }
 
     fun goToStep(step: OnboardingStep) {
@@ -481,16 +495,26 @@ class OnboardingViewModel @Inject constructor(
      * submit it first (async) and then decide whether to skip the paywall.
      * Matches iOS: free promo codes skip all remaining paywall steps.
      */
-    fun handleAttributionContinue() {
+    fun handleAttributionContinue(source: OnboardingStep? = null) {
+        // UI calls carry their rendered source. Non-UI callers retain the existing flow.
+        if (source != null && (_uiState.value.currentStep != source ||
+                _uiState.value.promoRedemptionState is PromoRedemptionState.Loading)) return
+        fun continueFromSource() {
+            if (source == null) goForward() else goForwardFrom(source)
+        }
+        fun completeFromSource() {
+            if (source == null) goToStep(OnboardingStep.GETTING_STARTED)
+            else goToStepFrom(source, OnboardingStep.GETTING_STARTED)
+        }
         // Already pro (e.g. from deeplink redemption) → skip immediately
         if (!EarlyReleaseAccess.isEnabled && shouldSkipPaywall()) {
-            goToStep(OnboardingStep.GETTING_STARTED)
+            completeFromSource()
             return
         }
 
         val code = _uiState.value.profile.promoCode?.takeIf { it.isNotBlank() }
         if (code == null) {
-            goForward()
+            continueFromSource()
             return
         }
 
@@ -515,9 +539,9 @@ class OnboardingViewModel @Inject constructor(
 
             // After redemption attempt, check if user now has pro
             if (!EarlyReleaseAccess.isEnabled && shouldSkipPaywall()) {
-                goToStep(OnboardingStep.GETTING_STARTED)
+                completeFromSource()
             } else {
-                goForward()
+                continueFromSource()
             }
         }
     }

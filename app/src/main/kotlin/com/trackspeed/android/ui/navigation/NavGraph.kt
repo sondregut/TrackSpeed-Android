@@ -384,6 +384,9 @@ fun TrackSpeedNavHost(
                 },
                 onStatsClick = {
                     navController.navigate(Screen.Stats.route)
+                },
+                onStartSessionClick = {
+                    navController.navigate(Screen.SessionSetup.createRoute())
                 }
             )
         }
