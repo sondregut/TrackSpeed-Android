@@ -79,7 +79,7 @@ enum class OnboardingStep {
 }
 
 /** Explicit product route: enum ordinals are stable legacy identifiers, not navigation order. */
-internal class OnboardingRoute(isReferred: Boolean, earlyRelease: Boolean) {
+internal class OnboardingRoute(isReferred: Boolean, private val earlyRelease: Boolean) {
     val steps = buildList {
         add(OnboardingStep.WELCOME)
         if (isReferred) add(OnboardingStep.REFERRAL_WELCOME)
@@ -92,15 +92,47 @@ internal class OnboardingRoute(isReferred: Boolean, earlyRelease: Boolean) {
         if (!earlyRelease) add(OnboardingStep.COMPETITOR_COMPARISON)
         addAll(listOf(OnboardingStep.PAYWALL, OnboardingStep.AUTH, OnboardingStep.GETTING_STARTED))
     }
-    fun next(step: OnboardingStep): OnboardingStep =
-        steps.getOrNull(steps.indexOf(step) + 1) ?: OnboardingStep.GETTING_STARTED
+    /** Upgrade saved process state without reopening retired questions or skipping access. */
+    fun restore(step: OnboardingStep): OnboardingStep {
+        if (step in steps) return step
+        return when (step) {
+            OnboardingStep.FLYING_TIME -> OnboardingStep.ROLE_SELECTION
+            OnboardingStep.GOAL_TIME -> OnboardingStep.SPORT_SELECTION
+            OnboardingStep.PAIN_POINTS, OnboardingStep.PAIN_SWIPE,
+            OnboardingStep.GOAL_MOTIVATION -> OnboardingStep.HOW_IT_WORKS
+            OnboardingStep.REFERRAL_WELCOME -> OnboardingStep.VALUE_PROPOSITION
+            OnboardingStep.PROFILE_SETUP -> OnboardingStep.AUTH
+            OnboardingStep.COMPLETION -> OnboardingStep.GETTING_STARTED
+            OnboardingStep.PAYWALL_RECOVERY -> if (earlyRelease) OnboardingStep.PAYWALL else step
+            OnboardingStep.RATING, OnboardingStep.TRIAL_INTRO, OnboardingStep.TRIAL_REMINDER,
+            OnboardingStep.NOTIFICATION, OnboardingStep.COMPETITOR_COMPARISON,
+            OnboardingStep.SPIN_WHEEL -> OnboardingStep.PAYWALL
+            else -> OnboardingStep.WELCOME
+        }
+    }
+    fun next(step: OnboardingStep): OnboardingStep {
+        val current = restore(step)
+        // Recovery is an off-route purchase choice, never an implicit authentication bypass.
+        if (current == OnboardingStep.PAYWALL_RECOVERY) return OnboardingStep.PAYWALL
+        return steps.getOrNull(steps.indexOf(current) + 1) ?: OnboardingStep.GETTING_STARTED
+    }
     fun previous(step: OnboardingStep): OnboardingStep = when (step) {
         OnboardingStep.PAYWALL_RECOVERY -> OnboardingStep.PAYWALL
         OnboardingStep.AUTH -> OnboardingStep.PAYWALL
-        else -> steps.getOrNull(steps.indexOf(step) - 1) ?: OnboardingStep.WELCOME
+        else -> steps.getOrNull(steps.indexOf(restore(step)) - 1) ?: OnboardingStep.WELCOME
     }
+    /** Outgoing animated pages retain callbacks; only their current source may navigate. */
+    fun nextFrom(current: OnboardingStep, source: OnboardingStep): OnboardingStep? =
+        destinationFrom(current, source, next(source))
+
+    fun previousFrom(current: OnboardingStep, source: OnboardingStep): OnboardingStep? =
+        destinationFrom(current, source, previous(source))
+
+    fun destinationFrom(current: OnboardingStep, source: OnboardingStep, destination: OnboardingStep): OnboardingStep? =
+        destination.takeIf { current == source }
+
     fun progress(step: OnboardingStep): Float {
         val end = steps.indexOf(OnboardingStep.PAYWALL).coerceAtLeast(1)
-        return steps.indexOf(step).coerceIn(0, end).toFloat() / end
+        return steps.indexOf(restore(step)).coerceIn(0, end).toFloat() / end
     }
 }
