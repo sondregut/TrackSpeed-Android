@@ -70,6 +70,7 @@ data class ReplicaDetectionConfiguration(
         var sceneMotionBroadShadowMaxStripWidth: Float = 14f,
         var sceneMotionBroadShadowMaxHorizontalRun: Int = 14,
         var xAnchorSelectorV3Enabled: Boolean = true,
+        var motionDirectionApproachRuntimeEnabled: Boolean = true,
         var motionDirectionMinDeltaPixels: Float = 4f,
         var motionDirectionHistoryMaxAgeFrames: Int = 8,
         var motionDirectionHistoryLength: Int = 8,
@@ -305,6 +306,7 @@ private fun ReplicaDetectionConfiguration.Parameters.applyRemoteValue(
         "sceneMotionBroadShadowMaxStripWidth" -> sceneMotionBroadShadowMaxStripWidth = float(0.0..90.0)
         "sceneMotionBroadShadowMaxHorizontalRun" -> sceneMotionBroadShadowMaxHorizontalRun = integer(0..90)
         "xAnchorSelectorV3Enabled" -> xAnchorSelectorV3Enabled = bool()
+        "motionDirectionApproachRuntimeEnabled" -> motionDirectionApproachRuntimeEnabled = bool()
         "motionDirectionMinDeltaPixels" -> motionDirectionMinDeltaPixels = float(0.0..40.0)
         "motionDirectionHistoryMaxAgeFrames" -> motionDirectionHistoryMaxAgeFrames = integer(1..60)
         "motionDirectionHistoryLength" -> motionDirectionHistoryLength = integer(2..60)

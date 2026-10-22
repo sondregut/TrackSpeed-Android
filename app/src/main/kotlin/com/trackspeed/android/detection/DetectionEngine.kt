@@ -58,6 +58,9 @@ class DetectionEngine(injectedConfiguration: ReplicaDetectionConfiguration? = nu
     private val bufferB = ByteArray(processWidth * processHeight)
     private var usingA = true
     private val maskBuf = ByteArray(processWidth * processHeight)
+    private val previousApproachMask = ByteArray(processWidth * processHeight)
+    private var motionMaskFrameIndex: Int? = null
+    private var previousApproachFrameIndex: Int? = null
     private val labels = IntArray(processWidth * processHeight)
     private var parentBuf = IntArray(0)
     private var compBuf = arrayOf<Component>()
@@ -128,6 +131,8 @@ class DetectionEngine(injectedConfiguration: ReplicaDetectionConfiguration? = nu
         lowContrastSequenceFrames = 0
         limbWaitStreak = 0
         motionDirectionHistory.clear()
+        motionMaskFrameIndex = null
+        previousApproachFrameIndex = null
         hasPrevious = false
         frameIndex = 0
         lastFullW = 0
@@ -149,6 +154,8 @@ class DetectionEngine(injectedConfiguration: ReplicaDetectionConfiguration? = nu
     fun resetWarmup() {
         frameIndex = 0
         hasPrevious = false
+        motionMaskFrameIndex = null
+        previousApproachFrameIndex = null
         motionDirectionHistory.clear()
     }
 
@@ -167,6 +174,8 @@ class DetectionEngine(injectedConfiguration: ReplicaDetectionConfiguration? = nu
         lowContrastSequenceFrames = 0
         limbWaitStreak = 0
         motionDirectionHistory.clear()
+        motionMaskFrameIndex = null
+        previousApproachFrameIndex = null
     }
 
     // ── Main entry point ───────────────────────────────────────────────
@@ -202,6 +211,8 @@ class DetectionEngine(injectedConfiguration: ReplicaDetectionConfiguration? = nu
             scaleX = max(srcW / processWidth, 1)
             scaleY = max(srcH / processHeight, 1)
             hasPrevious = false
+            motionMaskFrameIndex = null
+            previousApproachFrameIndex = null
         }
 
         val w = processWidth
@@ -215,6 +226,10 @@ class DetectionEngine(injectedConfiguration: ReplicaDetectionConfiguration? = nu
             if (!hasPrevious) return null
             if (frameIndex <= parameters.warmupFrames) return null
 
+            // Preserve every consecutive motion mask, including frames before a gate candidate.
+            previousApproachFrameIndex = motionMaskFrameIndex
+            maskBuf.copyInto(previousApproachMask)
+            motionMaskFrameIndex = frameIndex
             // 1. Frame diff + threshold (fused).
             val count = w * h
             for (i in 0 until count) {
@@ -349,7 +364,13 @@ class DetectionEngine(injectedConfiguration: ReplicaDetectionConfiguration? = nu
             }
 
             val compCenterX = (candidate.comp.minX + candidate.comp.maxX) / 2f
-            val movingLeftToRight = inferMotionDirection(compCenterX)
+            val approachDirection = if (parameters.motionDirectionApproachRuntimeEnabled)
+                ApproachDirectionEstimator.movingLeftToRight(
+                    previousApproachMask.takeIf { previousApproachFrameIndex == frameIndex - 1 },
+                    maskBuf, w, h, candidate.comp.minY, candidate.comp.maxY,
+                    parameters.motionDirectionMinDeltaPixels
+                ) else null
+            val movingLeftToRight = approachDirection ?: inferMotionDirection(compCenterX)
             recordMotionDirectionSample(compCenterX)
 
             if (gateOccupied) return null

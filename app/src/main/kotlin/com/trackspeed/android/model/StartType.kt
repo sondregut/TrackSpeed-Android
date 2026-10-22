@@ -44,17 +44,22 @@ enum class StartType(
         displayName = "In-Frame Start",
         shortName = "In-Frame",
         description = "Stand at the front-camera gate, then cross the on-screen line to start"
-    );
+    ),
+    MOTION_START("motionStart", "Motion Start", "Motion", "First movement from the start phone"),
+    REACTION_START("reactionStart", "Reaction Start", "Reaction", "Reaction to the start phone’s cue");
+
+    /** Native onset/audio calibration is not yet validated on Android. Remote start events are supported. */
+    val supportsLocalStart: Boolean get() = this != MOTION_START && this != REACTION_START
 
     val usesStartTrigger: Boolean
-        get() = this == TOUCH_RELEASE || this == COUNTDOWN || this == VOICE_COMMAND
+        get() = this == TOUCH_RELEASE || this == COUNTDOWN || this == VOICE_COMMAND || !supportsLocalStart
 
     val startTriggerRoleName: String
         get() = when (this) {
             TOUCH_RELEASE -> "Touch Start"
             COUNTDOWN -> "Countdown Start"
             VOICE_COMMAND -> "Voice Start"
-            FLYING, IN_FRAME -> displayName
+            FLYING, IN_FRAME, MOTION_START, REACTION_START -> displayName
         }
 
     val startTriggerStatusText: String
@@ -62,7 +67,7 @@ enum class StartType(
             TOUCH_RELEASE -> "Touch start"
             COUNTDOWN -> "Countdown start"
             VOICE_COMMAND -> "Voice start"
-            FLYING, IN_FRAME -> displayName
+            FLYING, IN_FRAME, MOTION_START, REACTION_START -> displayName
         }
 
     val startTriggerHint: String
@@ -70,7 +75,7 @@ enum class StartType(
             TOUCH_RELEASE -> "You'll trigger the start by releasing your finger"
             COUNTDOWN -> "You'll trigger the start with the countdown"
             VOICE_COMMAND -> "You'll trigger the start with voice commands"
-            FLYING, IN_FRAME -> description
+            FLYING, IN_FRAME, MOTION_START, REACTION_START -> description
         }
 
     val requiresStartGate: Boolean
@@ -89,6 +94,7 @@ enum class StartType(
     }
 
     companion object {
+        val localStartTypes: List<StartType> get() = entries.filter { it.supportsLocalStart }
         /**
          * Parse any legacy or current raw value into the canonical StartType.
          * Handles all historical values that may exist in Room DB, DataStore, or nav args.
@@ -103,6 +109,8 @@ enum class StartType(
             "voicecommand" -> VOICE_COMMAND
             "voice" -> VOICE_COMMAND
             "inframe" -> IN_FRAME
+            "motionstart" -> MOTION_START
+            "reactionstart" -> REACTION_START
             else -> FLYING
         }
     }

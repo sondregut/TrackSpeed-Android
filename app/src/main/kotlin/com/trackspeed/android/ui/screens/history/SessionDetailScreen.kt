@@ -597,7 +597,7 @@ private fun StartType.overviewIcon(): ImageVector = when (this) {
     StartType.TOUCH_RELEASE -> Icons.Outlined.TouchApp
     StartType.COUNTDOWN -> Icons.Outlined.Timer
     StartType.VOICE_COMMAND -> Icons.Outlined.Mic
-    StartType.IN_FRAME -> Icons.Default.CenterFocusStrong
+    StartType.IN_FRAME, StartType.MOTION_START, StartType.REACTION_START -> Icons.Default.CenterFocusStrong
 }
 
 @Composable

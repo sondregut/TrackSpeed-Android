@@ -1462,6 +1462,10 @@ private fun RaceReadyContent(
     viewModel: RaceModeViewModel,
     onStartSession: () -> Unit
 ) {
+    if (uiState.hasUnsupportedLocalStart) {
+        Text(stringResource(R.string.race_remote_start_required), modifier = Modifier.padding(24.dp), color = TextPrimary)
+        return
+    }
     val selectedStartMode = StartMode.fromString(uiState.startType)
     if (uiState.requiresLocalCamera && !uiState.isLocalGateReady) {
         RaceReadyCameraAlignment(
@@ -2144,7 +2148,7 @@ private fun joinReadyRoleName(role: DeviceRole?, startType: StartType): String {
                     StartType.TOUCH_RELEASE -> R.string.race_touch_start_role
                     StartType.COUNTDOWN -> R.string.race_countdown_start_role
                     StartType.VOICE_COMMAND -> R.string.race_voice_start_role
-                    StartType.FLYING, StartType.IN_FRAME -> R.string.race_start_gate
+                    StartType.FLYING, StartType.IN_FRAME, StartType.MOTION_START, StartType.REACTION_START -> R.string.race_start_gate
                 }
             )
         } else stringResource(R.string.race_start_gate)
@@ -2164,7 +2168,7 @@ private fun joinReadyRoleDetail(role: DeviceRole?, startType: StartType): String
                     StartType.TOUCH_RELEASE -> R.string.race_touch_start_hint
                     StartType.COUNTDOWN -> R.string.race_countdown_start_hint
                     StartType.VOICE_COMMAND -> R.string.race_voice_start_hint
-                    StartType.FLYING, StartType.IN_FRAME -> R.string.race_role_start_line_detail
+                    StartType.FLYING, StartType.IN_FRAME, StartType.MOTION_START, StartType.REACTION_START -> R.string.race_role_start_line_detail
                 }
             )
         } else {
@@ -2722,6 +2726,10 @@ private fun ActiveRaceContent(
     uiState: RaceModeUiState,
     viewModel: RaceModeViewModel
 ) {
+    if (uiState.hasUnsupportedLocalStart) {
+        Text(stringResource(R.string.race_remote_start_required), modifier = Modifier.padding(24.dp), color = TextPrimary)
+        return
+    }
     val context = LocalContext.current
     var activeStartOverlay by remember(uiState.startType, uiState.phase) { mutableStateOf<StartMode?>(null) }
     var showBluetoothAudioWarning by remember(uiState.startType, uiState.phase) { mutableStateOf(false) }
@@ -2988,7 +2996,7 @@ private fun ActiveRaceContent(
                         activeStartOverlay = null
                     }
                 )
-                StartMode.FLYING, StartMode.INFRAME -> Unit
+                StartMode.FLYING, StartMode.INFRAME, StartMode.MOTION, StartMode.REACTION -> Unit
             }
         }
     }
@@ -3511,7 +3519,7 @@ private fun SessionSettingsSheet(
             }
 
             SessionSettingsSection(title = stringResource(R.string.session_settings_start_type)) {
-                StartMode.entries.chunked(2).forEach { rowModes ->
+                StartMode.localModes.chunked(2).forEach { rowModes ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -4144,6 +4152,7 @@ private fun StartTriggerButton(
             StartMode.VOICE -> stringResource(R.string.race_open_voice_start)
             StartMode.FLYING -> stringResource(R.string.race_await_gate_crossing)
             StartMode.INFRAME -> stringResource(R.string.race_await_inframe_start)
+            StartMode.MOTION, StartMode.REACTION -> stringResource(R.string.race_remote_start_required)
         },
         icon = Icons.Filled.PlayArrow,
         backgroundColor = AccentBlue,
@@ -4719,7 +4728,7 @@ private fun SessionResultsList(
         val sorted = runs.sortedByDescending { it.runNumber }
         maxRuns?.let { sorted.take(it) } ?: sorted
     }
-    val bestTime = runs.minOfOrNull { it.timeSeconds }
+    val bestTime = com.trackspeed.android.data.model.comparableBestTime(runs)
     var expandedRunId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(sortedRuns) {
@@ -5010,16 +5019,19 @@ private fun GateThumbnailCard(
         value = loadedBitmap
     }
 
+    val thumbSize = com.trackspeed.android.ui.components.liveThumbnailSize(
+        bitmap?.width, bitmap?.height,
+        androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 700, expanded = true)
     Column(
-        modifier = Modifier.width(112.dp),
+        modifier = Modifier.width(maxOf(112f, thumbSize.width).dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         val currentBitmap = bitmap
         Box(
             modifier = Modifier
-                .width(112.dp)
-                .height(128.dp)
+                .width(thumbSize.width.dp)
+                .height(thumbSize.height.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(spec.placeholderColor.copy(alpha = 0.14f))
                 .border(1.dp, spec.placeholderColor.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
@@ -5047,7 +5059,7 @@ private fun GateThumbnailCard(
                     bitmap = currentBitmap.asImageBitmap(),
                     contentDescription = spec.label,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Fit
                 )
             } else {
                 Column(

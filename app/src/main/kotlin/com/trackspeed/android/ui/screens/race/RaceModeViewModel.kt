@@ -222,8 +222,9 @@ class RaceModeViewModel @Inject constructor(
     private var frameCount = 0L
 
     // Buffered finish crossing: saved when finish phone detects before start event arrives
-    private var bufferedFinishTimeNanos: Long? = null
-    private var bufferedFinishThumbnail: Bitmap? = null
+    private val pendingFinishes = PendingFinishBuffer<PendingFinishEvidence>()
+    private val bufferedFinishTimeNanos: Long? get() = pendingFinishes.firstTimestamp
+    private var selectedPendingFinishFrames: List<LocalGateFrameSnapshot>? = null
 
     // Start event timeout
     private var startEventTimeoutJob: Job? = null
@@ -945,6 +946,7 @@ class RaceModeViewModel @Inject constructor(
     }
 
     fun beginLocalGateCalibration() {
+        if (_uiState.value.hasUnsupportedLocalStart) return
         val state = _uiState.value
         val canCalibrateForRecovery =
             state.phase == RacePhase.ACTIVE_RACE && foregroundGateReadinessRecoveryInProgress
@@ -1098,6 +1100,7 @@ class RaceModeViewModel @Inject constructor(
 
     private fun startSessionBlockedReason(state: RaceModeUiState): String {
         return when {
+            state.hasUnsupportedLocalStart -> context.getString(R.string.race_remote_start_required)
             !state.isLocalGateReady ->
                 context.getString(R.string.race_error_calibrate_phone)
             !state.isRemoteGateReadinessSatisfied -> {
@@ -1124,6 +1127,7 @@ class RaceModeViewModel @Inject constructor(
     }
 
     private fun maybeSendLocalArmedAck(status: GateStatusInfo = _uiState.value.localGateStatus) {
+        if (_uiState.value.hasUnsupportedLocalStart) return
         if (!status.isReady) return
         val role = _uiState.value.gateAssignment?.role
             ?: _uiState.value.role?.toTimingRole()
@@ -1263,8 +1267,8 @@ class RaceModeViewModel @Inject constructor(
         pausedSinceNanos = 0L
         appBackgroundPausedDetection = false
         appBackgroundedDuringStartedRun = false
-        bufferedFinishTimeNanos = null
-        bufferedFinishThumbnail = null
+        pendingFinishes.clear()
+        selectedPendingFinishFrames = null
         finishThumbnail = null
         localStartCalibration = null
         localFinishCalibration = null
@@ -1330,8 +1334,8 @@ class RaceModeViewModel @Inject constructor(
         // the same canonical identity until the first finish closes it.
         remoteStartTimeNanos = null
         clearResultDedupeState()
-        bufferedFinishTimeNanos = null
-        bufferedFinishThumbnail = null
+        pendingFinishes.clear()
+        selectedPendingFinishFrames = null
         Log.i(TAG, "Replacement local start accepted; runId=${currentRunId.take(8)}")
         return true
     }
@@ -1527,6 +1531,7 @@ class RaceModeViewModel @Inject constructor(
 
     fun handleExternalStart(startTimestampNanos: Long) {
         val state = _uiState.value
+        if (state.hasUnsupportedLocalStart) return
         if (state.phase != RacePhase.ACTIVE_RACE) return
 
         val assignment = state.gateAssignment ?: fallbackGateAssignment(state.role, state.numberOfGates)
@@ -1821,10 +1826,15 @@ class RaceModeViewModel @Inject constructor(
                 uploadCrossingWithThumbnail("start", referenceTimestampFromLocal(crossingTimeNanos), thumbnail)
             }
             DeviceRole.FINISH -> {
-                if (localFinishTimeNanos != null || bufferedFinishTimeNanos != null) return
-                // Finish phone: the first crossing closes this run, even while
-                // delivery of its start event is still pending.
-                localFinishTimeNanos = crossingTimeNanos
+                if (localFinishTimeNanos != null) return
+                val start = localStartTimeNanos
+                if (start != null && orderedTimingSplit(start, crossingTimeNanos) == null) return
+                // Until the start arrives, retain candidates instead of closing on
+                // an unrelated crossing that may have happened before that start.
+                if (start != null) localFinishTimeNanos = crossingTimeNanos
+                if (localFrameScrubbingEnabled) pendingFinishes.updateLatestEvidence {
+                    it.copy(frames = localGateFrameBuffer.snapshotEventFrames())
+                }
                 markLocalGateFrameEvent(crossingTimeNanos)
                 finishThumbnail = thumbnail
                 val calibration = event.toLocalGateCalibration(TimingRole.FINISH_LINE, currentState.gatePosition)
@@ -1869,8 +1879,10 @@ class RaceModeViewModel @Inject constructor(
                 } else {
                     // Start event hasn't arrived yet (BLE latency) — buffer the finish crossing
                     // It will be processed when onRemoteStartReceived() is called
-                    bufferedFinishTimeNanos = crossingTimeNanos
-                    bufferedFinishThumbnail = thumbnail
+                    pendingFinishes.add(crossingTimeNanos, PendingFinishEvidence(
+                        thumbnail, calibration, canonicalCrossing.eventId,
+                        if (localFrameScrubbingEnabled) localGateFrameBuffer.snapshotEventFrames() else emptyList()
+                    ))
                     Log.i(TAG, "Buffered finish crossing — waiting for start event from remote")
                     _uiState.update { it.copy(raceStatus = "waiting_for_start") }
                     scheduleStartEventWaitTimeout()
@@ -2255,8 +2267,8 @@ class RaceModeViewModel @Inject constructor(
 
     private fun discardBufferedFinishAfterStartEventTimeout(reason: String) {
         stopTimerTick()
-        bufferedFinishTimeNanos = null
-        bufferedFinishThumbnail = null
+        pendingFinishes.clear()
+        selectedPendingFinishFrames = null
         localFinishTimeNanos = null
         localFinishCrossingEventId = null
         finishThumbnail = null
@@ -2448,8 +2460,8 @@ class RaceModeViewModel @Inject constructor(
         localFinishTimeNanos = null
         localFinishCrossingEventId = null
         remoteStartTimeNanos = null
-        bufferedFinishTimeNanos = null
-        bufferedFinishThumbnail = null
+        pendingFinishes.clear()
+        selectedPendingFinishFrames = null
         finishThumbnail = null
         localStartCalibration = null
         localFinishCalibration = null
@@ -3321,6 +3333,7 @@ class RaceModeViewModel @Inject constructor(
     }
 
     private fun sendLocalArmedAckBroadcast(): Boolean {
+        if (_uiState.value.hasUnsupportedLocalStart) return false
         val status = _uiState.value.localGateStatus
         if (!status.isReady) return false
         val role = localTimingRole() ?: return false
@@ -3335,6 +3348,7 @@ class RaceModeViewModel @Inject constructor(
     }
 
     private fun sendLocalArmedAckToPeer(peerId: String, peerAddress: String): Boolean {
+        if (_uiState.value.hasUnsupportedLocalStart) return false
         if (peerAddress.isBlank()) return false
         val status = _uiState.value.localGateStatus
         if (!status.isReady) return false
@@ -4281,13 +4295,17 @@ class RaceModeViewModel @Inject constructor(
         }
 
         // Check if a finish crossing was buffered (detected before start event arrived)
-        val bufferedFinish = bufferedFinishTimeNanos
+        if (localFrameScrubbingEnabled) pendingFinishes.updateLatestEvidence {
+            it.copy(frames = localGateFrameBuffer.snapshotEventFrames())
+        }
+        val bufferedFinish = pendingFinishes.takeFirstAfter(localStartTime)
         if (bufferedFinish != null) {
-            Log.i(TAG, "Processing buffered finish crossing: $bufferedFinish ns")
-            localFinishTimeNanos = bufferedFinish
-            finishThumbnail = bufferedFinishThumbnail
-            bufferedFinishTimeNanos = null
-            bufferedFinishThumbnail = null
+            Log.i(TAG, "Processing first eligible buffered finish: ${bufferedFinish.timestampNanos} ns")
+            selectedPendingFinishFrames = bufferedFinish.evidence.frames
+            localFinishTimeNanos = bufferedFinish.timestampNanos
+            finishThumbnail = bufferedFinish.evidence.thumbnail
+            localFinishCalibration = bufferedFinish.evidence.calibration
+            localFinishCrossingEventId = bufferedFinish.evidence.eventId
             stopTimerTick()
             calculateResult()
         } else {
@@ -4466,11 +4484,10 @@ class RaceModeViewModel @Inject constructor(
             Log.d(TAG, "Legacy finishResult ignored - duplicate split ${payload.splitNanos}")
             return
         }
+        val finishTimestamp = finishTimestampForResult(localStartTimeNanos, payload.splitNanos) ?: return
         lastProcessedFinishSplitNanos = payload.splitNanos
-
         val image = decodeBase64Bitmap(payload.imageData, "legacy finishResult image")
         val splitSeconds = payload.splitNanos / 1_000_000_000.0
-        val finishTimestamp = (localStartTimeNanos ?: SystemClock.elapsedRealtimeNanos()) + payload.splitNanos
         adoptCanonicalRunId(runId, "legacy finish result")
         val resultRunId = canonicalRunId(runId)
         val resultRunNumber = currentRunNumber
@@ -4489,12 +4506,15 @@ class RaceModeViewModel @Inject constructor(
         endLiveTimingWorkloadIfNeeded()
         scheduleAutoResetForNewRun()
 
+        val latestState = _uiState.value
+        val resultSessionId = sessionId
+        val startCalibration = localStartCalibration
+        val resultAthleteId = activeAthleteId ?: sessionAthletes.firstOrNull()?.id ?: sessionSelectedAthleteIds.firstOrNull()
         viewModelScope.launch {
             try {
-                val latestState = _uiState.value
-                val athlete = selectedRaceAthleteForSave()
+                val athlete = resultAthleteId?.let { athleteDao.getAthleteById(it) }
                 sessionRepository.saveRaceResult(
-                    sessionId = sessionId,
+                    sessionId = resultSessionId,
                     runNumber = resultRunNumber,
                     runId = resultRunId,
                     timingContextJson = resultTimingContext?.toString(),
@@ -4509,11 +4529,11 @@ class RaceModeViewModel @Inject constructor(
                     athleteName = athlete?.name,
                     athleteColor = athlete?.color,
                     crossingTimestampNanos = finishTimestamp,
-                    localGateRole = localStartCalibration?.role,
-                    crossingVelocityPxPerSec = localStartCalibration?.velocityPxPerSec,
-                    crossingDirection = localStartCalibration?.crossingDirection,
-                    workWidth = localStartCalibration?.workWidth,
-                    thumbnailDebugJson = localStartCalibration?.thumbnailDebug?.toString(),
+                    localGateRole = startCalibration?.role,
+                    crossingVelocityPxPerSec = startCalibration?.velocityPxPerSec,
+                    crossingDirection = startCalibration?.crossingDirection,
+                    workWidth = startCalibration?.workWidth,
+                    thumbnailDebugJson = startCalibration?.thumbnailDebug?.toString(),
                     localGateFrames = localGateFramesForSave(resultRunId)
                 )
                 applyPendingRemoteRunUpdates(resultRunId)
@@ -4574,6 +4594,11 @@ class RaceModeViewModel @Inject constructor(
             return
         }
 
+        val finishTimestamp = finishTimestampForResult(localStartTimeNanos, payload.splitNanos)
+        if (finishTimestamp == null) {
+            Log.w(TAG, "Timing result ignored - missing start or timestamp overflow")
+            return
+        }
         val resultReference = startReference ?: currentStartReference
         if (resultReference != null && !completedResultStartReferences.add(resultReference)) {
             Log.d(TAG, "Timing result ignored - duplicate start reference $resultReference")
@@ -4582,7 +4607,6 @@ class RaceModeViewModel @Inject constructor(
 
         adoptCanonicalRunId(runId, "timing result")
         val splitSeconds = payload.splitNanos / 1_000_000_000.0
-        val finishTimestamp = (localStartTimeNanos ?: SystemClock.elapsedRealtimeNanos()) + payload.splitNanos
         val resultRunId = canonicalRunId(runId)
         val resultRunNumber = currentRunNumber
         val resultTimingContext = activeTimingContext
@@ -4600,12 +4624,15 @@ class RaceModeViewModel @Inject constructor(
         endLiveTimingWorkloadIfNeeded()
         scheduleAutoResetForNewRun()
 
+        val state = _uiState.value
+        val resultAthleteId = activeAthleteId ?: sessionAthletes.firstOrNull()?.id ?: sessionSelectedAthleteIds.firstOrNull()
+        val startCalibration = localStartCalibration
+        val resultSessionId = sessionId
         viewModelScope.launch {
             try {
-                val state = _uiState.value
-                val athlete = selectedRaceAthleteForSave()
+                val athlete = resultAthleteId?.let { athleteDao.getAthleteById(it) }
                 sessionRepository.saveRaceResult(
-                    sessionId = sessionId,
+                    sessionId = resultSessionId,
                     runNumber = resultRunNumber,
                     runId = resultRunId,
                     timingContextJson = resultTimingContext?.toString(),
@@ -4620,11 +4647,11 @@ class RaceModeViewModel @Inject constructor(
                     athleteName = athlete?.name,
                     athleteColor = athlete?.color,
                     crossingTimestampNanos = finishTimestamp,
-                    localGateRole = localStartCalibration?.role,
-                    crossingVelocityPxPerSec = localStartCalibration?.velocityPxPerSec,
-                    crossingDirection = localStartCalibration?.crossingDirection,
-                    workWidth = localStartCalibration?.workWidth,
-                    thumbnailDebugJson = localStartCalibration?.thumbnailDebug?.toString(),
+                    localGateRole = startCalibration?.role,
+                    crossingVelocityPxPerSec = startCalibration?.velocityPxPerSec,
+                    crossingDirection = startCalibration?.crossingDirection,
+                    workWidth = startCalibration?.workWidth,
+                    thumbnailDebugJson = startCalibration?.thumbnailDebug?.toString(),
                     localGateFrames = localGateFramesForSave(resultRunId)
                 )
                 applyPendingRemoteRunUpdates(resultRunId)
@@ -4770,32 +4797,38 @@ class RaceModeViewModel @Inject constructor(
             uncertaintyMs = totalUncertaintyMs
         )
 
-        // Save result to local Room DB
+        // Capture the measured run before suspend points or automatic re-arming.
+        val resultState = _uiState.value
+        val resultSessionId = sessionId
+        val resultThumbnail = finishThumbnail
+        val finishCalibration = localFinishCalibration
+        val resultFrames = selectedPendingFinishFrames
+        val resultAthleteId = activeAthleteId ?: sessionAthletes.firstOrNull()?.id ?: sessionSelectedAthleteIds.firstOrNull()
         viewModelScope.launch {
             try {
-                val athlete = selectedRaceAthleteForSave()
+                val athlete = resultAthleteId?.let { athleteDao.getAthleteById(it) }
                 sessionRepository.saveRaceResult(
-                    sessionId = sessionId,
+                    sessionId = resultSessionId,
                     runNumber = resultRunNumber,
                     runId = resultRunId,
                     timingContextJson = resultTimingContext?.toString(),
-                    distance = _uiState.value.distanceMeters,
-                    startType = _uiState.value.startType,
-                    numberOfGates = _uiState.value.numberOfGates,
-                    gateDistances = _uiState.value.gateDistances,
+                    distance = resultState.distanceMeters,
+                    startType = resultState.startType,
+                    numberOfGates = resultState.numberOfGates,
+                    gateDistances = resultState.gateDistances,
                     timeSeconds = splitSeconds,
-                    thumbnail = finishThumbnail,
-                    gatePosition = _uiState.value.gatePosition,
+                    thumbnail = resultThumbnail,
+                    gatePosition = resultState.gatePosition,
                     athleteId = athlete?.id,
                     athleteName = athlete?.name,
                     athleteColor = athlete?.color,
                     crossingTimestampNanos = finish,
-                    localGateRole = localFinishCalibration?.role,
-                    crossingVelocityPxPerSec = localFinishCalibration?.velocityPxPerSec,
-                    crossingDirection = localFinishCalibration?.crossingDirection,
-                    workWidth = localFinishCalibration?.workWidth,
-                    thumbnailDebugJson = localFinishCalibration?.thumbnailDebug?.toString(),
-                    localGateFrames = localGateFramesForSave(resultRunId)
+                    localGateRole = finishCalibration?.role,
+                    crossingVelocityPxPerSec = finishCalibration?.velocityPxPerSec,
+                    crossingDirection = finishCalibration?.crossingDirection,
+                    workWidth = finishCalibration?.workWidth,
+                    thumbnailDebugJson = finishCalibration?.thumbnailDebug?.toString(),
+                    localGateFrames = resultFrames ?: localGateFramesForSave(resultRunId)
                 )
                 applyPendingRemoteRunUpdates(resultRunId)
                 Log.i(TAG, "Saved race result to local DB")
@@ -5632,8 +5665,8 @@ class RaceModeViewModel @Inject constructor(
         pausedSinceNanos = 0L
         appBackgroundPausedDetection = false
         appBackgroundedDuringStartedRun = false
-        bufferedFinishTimeNanos = null
-        bufferedFinishThumbnail = null
+        pendingFinishes.clear()
+        selectedPendingFinishFrames = null
         finishThumbnail = null
         localStartCalibration = null
         localFinishCalibration = null
@@ -5705,8 +5738,8 @@ class RaceModeViewModel @Inject constructor(
         pausedSinceNanos = 0L
         appBackgroundPausedDetection = false
         appBackgroundedDuringStartedRun = false
-        bufferedFinishTimeNanos = null
-        bufferedFinishThumbnail = null
+        pendingFinishes.clear()
+        selectedPendingFinishFrames = null
         finishThumbnail = null
         localStartCalibration = null
         localFinishCalibration = null
@@ -5803,8 +5836,8 @@ class RaceModeViewModel @Inject constructor(
         pausedSinceNanos = 0L
         appBackgroundPausedDetection = false
         appBackgroundedDuringStartedRun = false
-        bufferedFinishTimeNanos = null
-        bufferedFinishThumbnail = null
+        pendingFinishes.clear()
+        selectedPendingFinishFrames = null
         finishThumbnail = null
         localStartCalibration = null
         localFinishCalibration = null
@@ -6185,8 +6218,12 @@ data class RaceModeUiState(
             return StartType.fromRawValue(startType).requiresCameraAtGate(isStartGate)
         }
 
+    val hasUnsupportedLocalStart: Boolean
+        get() = (role == DeviceRole.START || gateAssignment?.role == TimingRole.START_LINE) &&
+            !StartType.fromRawValue(startType).supportsLocalStart
+
     val isLocalGateReady: Boolean
-        get() = role == DeviceRole.CONTROL || !requiresLocalCamera || localGateStatus.isReady
+        get() = !hasUnsupportedLocalStart && (role == DeviceRole.CONTROL || !requiresLocalCamera || localGateStatus.isReady)
 
     val requiredRemoteReadyGateCount: Int
         get() = (requiredPhysicalDeviceCount - 1).coerceAtLeast(0)
@@ -6425,3 +6462,10 @@ private fun defaultGateStatus(gatePosition: Double = 0.5): GateStatusInfo {
         batteryLevel = null
     )
 }
+
+private data class PendingFinishEvidence(
+    val thumbnail: Bitmap?,
+    val calibration: LocalGateCalibration,
+    val eventId: String,
+    val frames: List<LocalGateFrameSnapshot>
+)

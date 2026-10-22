@@ -197,7 +197,7 @@ internal class WifiAwareClockSyncService(context: Context) {
                     val config = configBuilder.build()
                     session.publish(config, object : DiscoverySessionCallback() {
                         override fun onPublishStarted(session: PublishDiscoverySession) {
-                    if (!resources.track { session.close() }) return
+                            if (!resources.track { session.close() }) return
                             publishSession.set(session)
                             published.countDown()
                             Log.i(
@@ -346,7 +346,7 @@ internal class WifiAwareClockSyncService(context: Context) {
                     val config = configBuilder.build()
                     session.subscribe(config, object : DiscoverySessionCallback() {
                         override fun onSubscribeStarted(session: SubscribeDiscoverySession) {
-                    if (!resources.track { session.close() }) return
+                            if (!resources.track { session.close() }) return
                             subscribeSession.set(session)
                             subscribed.countDown()
                             Log.i(

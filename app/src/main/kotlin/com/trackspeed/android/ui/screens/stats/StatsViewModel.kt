@@ -53,7 +53,7 @@ object TestTypeClassifier {
             StartType.IN_FRAME -> classifyInFrame(distance)
             StartType.TOUCH_RELEASE,
             StartType.COUNTDOWN,
-            StartType.VOICE_COMMAND -> classifySprint(distance)
+            StartType.VOICE_COMMAND, StartType.MOTION_START, StartType.REACTION_START -> classifySprint(distance)
         }
     }
 

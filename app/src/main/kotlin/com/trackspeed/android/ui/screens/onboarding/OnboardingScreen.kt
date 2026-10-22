@@ -1,6 +1,9 @@
 package com.trackspeed.android.ui.screens.onboarding
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -28,10 +31,14 @@ import com.trackspeed.android.ui.theme.*
 @Composable
 fun OnboardingScreen(
     onComplete: () -> Unit,
+    onStartSession: () -> Unit = onComplete,
     onGuestJoinSession: () -> Unit = {},
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val route = OnboardingRoute(state.isReferred, EarlyReleaseAccess.isEnabled)
+    BackHandler(enabled = state.currentStep != OnboardingStep.WELCOME &&
+        state.currentStep != OnboardingStep.GETTING_STARTED) { viewModel.goBack() }
 
     LaunchedEffect(state.currentStep) {
         viewModel.trackStepViewed(state.currentStep)
@@ -63,7 +70,7 @@ fun OnboardingScreen(
                     Spacer(Modifier.width(48.dp))
                 }
                 LinearProgressIndicator(
-                    progress = { state.currentStep.progress },
+                    progress = { route.progress(state.currentStep) },
                     modifier = Modifier
                         .weight(1f)
                         .height(4.dp)
@@ -79,9 +86,7 @@ fun OnboardingScreen(
         AnimatedContent(
             targetState = state.currentStep,
             transitionSpec = {
-                val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                slideInHorizontally { fullWidth -> direction * fullWidth } togetherWith
-                    slideOutHorizontally { fullWidth -> -direction * fullWidth }
+                fadeIn() togetherWith fadeOut()
             },
             modifier = Modifier.fillMaxSize(),
             label = "onboarding_step"
@@ -109,8 +114,13 @@ fun OnboardingScreen(
                 OnboardingStep.REFERRAL_WELCOME -> ReferralWelcomeStep(
                     onContinue = { viewModel.goToStep(OnboardingStep.VALUE_PROPOSITION) }
                 )
-                OnboardingStep.VALUE_PROPOSITION -> ValuePropositionStep(
-                    onContinue = { viewModel.goForward() }
+                OnboardingStep.VALUE_PROPOSITION, OnboardingStep.CAMERA_ALIGNMENT,
+                OnboardingStep.AUTO_TIMING, OnboardingStep.PROOF_PROGRESS -> FeaturePhotoStep(
+                    step = step, onContinue = viewModel::goForward
+                )
+                OnboardingStep.GETTING_STARTED -> GettingStartedGuide(
+                    onSkip = { viewModel.completeOnboarding(onComplete) },
+                    onStartSession = { viewModel.completeOnboarding(onStartSession) }
                 )
                 OnboardingStep.PAIN_POINTS -> PainPointsStep(
                     selectedPainPoints = state.selectedPainPoints,
@@ -129,27 +139,15 @@ fun OnboardingScreen(
                     onContinue = { viewModel.goForward() },
                     onSkip = { viewModel.goForward() }
                 )
-                OnboardingStep.FLYING_TIME -> FlyingTimeStep(
-                    selectedDistance = state.profile.flyingDistance,
-                    flyingPR = state.profile.flyingPR,
-                    usesEventPrEstimate = state.profile.usesEventPrEstimate,
-                    eventDiscipline = state.profile.discipline,
-                    eventPR = state.profile.personalRecord,
-                    onDistanceSelected = { viewModel.setFlyingDistance(it) },
-                    onTimeChanged = { viewModel.setMeasuredFlyingPR(it) },
-                    onUseEventPrEstimateChanged = { viewModel.setUsesEventPrEstimate(it) },
-                    onEventDisciplineSelected = { viewModel.setDiscipline(it) },
-                    onEventPrChanged = { viewModel.setPersonalRecord(it) },
-                    onContinue = { viewModel.goForward() }
+                OnboardingStep.FLYING_TIME, OnboardingStep.ROLE_SELECTION -> RoleSelectionStep(
+                    selectedRole = state.profile.role,
+                    onRoleSelected = viewModel::setRole,
+                    onContinue = viewModel::goForward
                 )
-                OnboardingStep.GOAL_TIME -> GoalTimeStep(
-                    discipline = state.profile.discipline,
-                    personalRecord = state.profile.personalRecord,
-                    goalTime = state.profile.goalTime,
-                    onPersonalRecordChanged = { viewModel.setPersonalRecord(it) },
-                    onGoalTimeChanged = { viewModel.setGoalTime(it) },
-                    onContinue = { viewModel.goForward() },
-                    flyingDistance = state.profile.flyingDistance
+                OnboardingStep.GOAL_TIME, OnboardingStep.SPORT_SELECTION -> SportSelectionStep(
+                    selectedDiscipline = state.profile.discipline,
+                    onDisciplineSelected = viewModel::setDiscipline,
+                    onContinue = viewModel::goForward
                 )
                 OnboardingStep.GOAL_MOTIVATION -> GoalMotivationStep(
                     flyingPR = state.profile.flyingPR,
@@ -160,8 +158,8 @@ fun OnboardingScreen(
                 OnboardingStep.START_TYPES -> StartTypesStep(
                     onContinue = { viewModel.goForward() }
                 )
-                OnboardingStep.MULTI_DEVICE -> MultiDeviceStep(
-                    onContinue = { viewModel.goForward() }
+                OnboardingStep.MULTI_DEVICE -> FeaturePhotoStep(
+                    step = step, onContinue = viewModel::goForward
                 )
                 OnboardingStep.ATTRIBUTION -> AttributionStep(
                     onAttributionSelected = { viewModel.setAttribution(it) },
@@ -170,7 +168,7 @@ fun OnboardingScreen(
                     onSubmitPromoCode = { code, source -> viewModel.submitPromoCode(code, source) },
                     isLoading = state.promoRedemptionState is PromoRedemptionState.Loading,
                     onContinue = {
-                        viewModel.handleAttributionContinue { onComplete() }
+                        viewModel.handleAttributionContinue()
                     }
                 )
                 OnboardingStep.RATING -> RatingStep(

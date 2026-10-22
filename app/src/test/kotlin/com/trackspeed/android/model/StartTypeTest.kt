@@ -6,11 +6,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StartTypeTest {
+    @Test fun `remote movement starts preserve identity and never become flying`() {
+        assertEquals(StartType.MOTION_START, StartType.fromRawValue("motionStart"))
+        assertEquals(StartType.REACTION_START, StartType.fromRawValue("reactionStart"))
+        for (type in listOf(StartType.MOTION_START,StartType.REACTION_START)) {
+            assertFalse(type.supportsLocalStart)
+            assertFalse(type in StartType.localStartTypes)
+            assertTrue(type.requiresCameraAtGate(false))
+            assertTrue(type.usesStartTrigger)
+        }
+    }
+
 
     @Test
     fun `canonical start types preserve iOS wire values and order`() {
         assertEquals(
-            listOf("flying", "touchRelease", "countdown", "voiceCommand", "inFrame"),
+            listOf("flying", "touchRelease", "countdown", "voiceCommand", "inFrame", "motionStart", "reactionStart"),
             StartType.entries.map { it.rawValue }
         )
     }

@@ -795,6 +795,8 @@ private fun startTypeShortLabel(startType: StartType): String = when (startType)
     StartType.COUNTDOWN -> stringResource(R.string.setup_start_countdown)
     StartType.VOICE_COMMAND -> stringResource(R.string.setup_start_voice)
     StartType.IN_FRAME -> stringResource(R.string.setup_start_in_frame)
+    StartType.MOTION_START -> stringResource(R.string.start_type_motion)
+    StartType.REACTION_START -> stringResource(R.string.start_type_reaction)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2381,7 +2383,7 @@ private fun startTypeIcon(startType: StartType): ImageVector = when (startType) 
     StartType.TOUCH_RELEASE -> Icons.Default.TouchApp
     StartType.COUNTDOWN -> Icons.Default.Timer
     StartType.VOICE_COMMAND -> Icons.Default.Mic
-    StartType.IN_FRAME -> Icons.Default.CenterFocusStrong
+    StartType.IN_FRAME, StartType.MOTION_START, StartType.REACTION_START -> Icons.Default.CenterFocusStrong
 }
 
 @Composable
@@ -2526,7 +2528,7 @@ private fun StartTypeStepPreview() {
                 )
                 StartTypeSelectionStep(
                     selectedStartType = "flying",
-                    availableStartTypes = StartType.entries,
+                    availableStartTypes = StartType.localStartTypes,
                     onSelect = {}
                 )
             }
