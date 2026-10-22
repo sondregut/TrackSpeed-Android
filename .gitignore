@@ -26,3 +26,9 @@ __pycache__/
 
 # Scratch
 tmp/
+
+# Local credential files must not enter source control.
+/.env.*
+!/.env.example
+/.codex/*.local.toml
+/.codex/*.bak
