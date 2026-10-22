@@ -10,6 +10,9 @@ import com.trackspeed.android.data.local.entities.TrainingSessionEntity
 import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.model.StartType
 import com.trackspeed.android.util.HistoryDistanceFormatter
+import com.trackspeed.android.ui.util.RetainedFlowLoader
+import com.trackspeed.android.data.local.entities.RunEntity
+import com.trackspeed.android.data.local.dao.SessionSummary
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,6 +74,20 @@ data class HistoryStats(
     val weeklySessionCount: Int = 0
 )
 
+private data class HistorySnapshot(
+    val sessions: List<TrainingSessionEntity>,
+    val summaries: List<SessionSummary>,
+    val runs: List<RunEntity>
+)
+
+data class SessionHistoryUiState(
+    val dateGroups: List<DateGroup> = emptyList(),
+    val hasAnySessions: Boolean = false,
+    val hasLoadedData: Boolean = false,
+    val isLoading: Boolean = true,
+    val loadFailed: Boolean = false
+)
+
 @HiltViewModel
 class SessionHistoryViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -100,10 +117,17 @@ class SessionHistoryViewModel @Inject constructor(
     private val sessionSummaries = sessionRepository.getSessionSummaries()
     private val allRuns = sessionRepository.getAllRunsSortedByTime()
 
+    private val historyLoader = RetainedFlowLoader(viewModelScope) {
+        combine(allSessions, sessionSummaries, allRuns) { sessions, summaries, runs ->
+            HistorySnapshot(sessions, summaries, runs)
+        }
+    }
+
     // Dynamic distance filters from actual data
     val distanceFilters: StateFlow<List<DistanceFilter>> =
-        sessionRepository.getDistinctDistances()
-            .map { distances ->
+        historyLoader.state
+            .map { loaded ->
+                val distances = loaded.data?.sessions.orEmpty().map { it.distance }.distinct().sorted()
                 val filters = mutableListOf(DistanceFilter("", null))
                 distances.forEach { d ->
                     val label = formatDistanceLabel(d)
@@ -119,8 +143,9 @@ class SessionHistoryViewModel @Inject constructor(
 
     // Dynamic start type filters
     val startTypeFilters: StateFlow<List<StartType>> =
-        sessionRepository.getDistinctStartTypes()
-            .map { types -> types.map { StartType.fromRawValue(it) }.distinct() }
+        historyLoader.state
+            .map { loaded -> loaded.data?.sessions.orEmpty().map { it.startType }.distinct().sorted()
+                .map { StartType.fromRawValue(it) }.distinct() }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
@@ -150,37 +175,32 @@ class SessionHistoryViewModel @Inject constructor(
     }
 
     // Grouped sessions with card data
-    val dateGroups: StateFlow<List<DateGroup>> =
+    val historyState: StateFlow<SessionHistoryUiState> =
         combine(
-            allSessions,
-            sessionSummaries,
+            historyLoader.state,
             _filterDistance,
             _filterStartType,
             combine(
                 _timeFilter,
                 _modeFilter,
                 _sortOrder,
-                _searchQuery,
-                allRuns
-            ) { timeFilter, modeFilter, sort, query, runs ->
-                val athleteSearchTextBySession = runs
-                    .filter { !it.athleteName.isNullOrBlank() }
-                    .groupBy { it.sessionId }
-                    .mapValues { (_, sessionRuns) ->
-                        sessionRuns.joinToString(separator = " ") { run ->
-                            listOfNotNull(run.athleteName, run.athleteId)
-                                .joinToString(" ")
-                        }.lowercase()
-                    }
-                HistoryFilterSelection(
-                    timeFilter = timeFilter,
-                    modeFilter = modeFilter,
-                    sortOrder = sort,
-                    query = query,
-                    athleteSearchTextBySession = athleteSearchTextBySession
-                )
+                _searchQuery
+            ) { timeFilter, modeFilter, sort, query ->
+                HistoryFilterSelection(timeFilter, modeFilter, sort, query, emptyMap())
             }
-        ) { sessions, summaries, distance, startType, selection ->
+        ) { loaded, distance, startType, filters ->
+            val sessions = loaded.data?.sessions.orEmpty()
+            val summaries = loaded.data?.summaries.orEmpty()
+            val athleteSearchTextBySession = loaded.data?.runs.orEmpty()
+                .filter { !it.athleteName.isNullOrBlank() }
+                .groupBy { it.sessionId }
+                .mapValues { (_, sessionRuns) ->
+                    sessionRuns.joinToString(separator = " ") { run ->
+                        listOfNotNull(run.athleteName, run.athleteId)
+                            .joinToString(" ")
+                    }.lowercase()
+                }
+            val selection = filters.copy(athleteSearchTextBySession = athleteSearchTextBySession)
 
             val summaryMap = summaries.associateBy { it.sessionId }
 
@@ -239,21 +259,20 @@ class SessionHistoryViewModel @Inject constructor(
             }
 
             // Group by date
-            groupByDate(cardData)
+            SessionHistoryUiState(
+                dateGroups = groupByDate(cardData),
+                hasAnySessions = sessions.isNotEmpty(),
+                hasLoadedData = loaded.data != null,
+                isLoading = loaded.isLoading,
+                loadFailed = loaded.failed
+            )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = emptyList()
+            initialValue = SessionHistoryUiState()
         )
 
-    // Flat session list (for checking if there are any sessions at all)
-    val hasAnySessions: StateFlow<Boolean> =
-        allSessions.map { it.isNotEmpty() }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = false
-            )
+    fun retryLoading() = historyLoader.retry()
 
     val hasActiveFilters: StateFlow<Boolean> =
         combine(

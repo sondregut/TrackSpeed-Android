@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">جارٍ تحميل الجلسات…</string>
+    <string name="history_load_error">تعذر تحميل الجلسات.</string>
+    <string name="history_load_error_saved">تعذر تحديث الجلسات. تُعرض آخر النتائج التي تم تحميلها.</string>
+</resources>

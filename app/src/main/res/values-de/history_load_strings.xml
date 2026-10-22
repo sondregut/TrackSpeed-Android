@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Trainingseinheiten werden geladen…</string>
+    <string name="history_load_error">Trainingseinheiten konnten nicht geladen werden.</string>
+    <string name="history_load_error_saved">Trainingseinheiten konnten nicht aktualisiert werden. Die zuletzt geladenen Ergebnisse werden angezeigt.</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Antrenmanlar yükleniyor…</string>
+    <string name="history_load_error">Antrenmanlar yüklenemedi.</string>
+    <string name="history_load_error_saved">Antrenmanlar yenilenemedi. Son yüklenen sonuçlar gösteriliyor.</string>
+</resources>

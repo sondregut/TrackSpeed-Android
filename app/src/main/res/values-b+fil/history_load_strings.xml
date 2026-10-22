@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Nilo-load ang mga sesyon…</string>
+    <string name="history_load_error">Hindi ma-load ang mga sesyon.</string>
+    <string name="history_load_error_saved">Hindi ma-refresh ang mga sesyon. Ipinapakita ang mga huling na-load na resulta.</string>
+</resources>

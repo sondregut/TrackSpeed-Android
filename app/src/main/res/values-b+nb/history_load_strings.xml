@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Laster økter…</string>
+    <string name="history_load_error">Kunne ikke laste økter.</string>
+    <string name="history_load_error_saved">Kunne ikke oppdatere økter. Viser de sist innlastede resultatene.</string>
+</resources>

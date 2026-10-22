@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Indlæser træningspas…</string>
+    <string name="history_load_error">Kunne ikke indlæse træningspas.</string>
+    <string name="history_load_error_saved">Kunne ikke opdatere træningspas. Viser de senest indlæste resultater.</string>
+</resources>

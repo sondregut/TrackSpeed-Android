@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Edzések betöltése…</string>
+    <string name="history_load_error">Nem sikerült betölteni az edzéseket.</string>
+    <string name="history_load_error_saved">Nem sikerült frissíteni az edzéseket. A legutóbb betöltött eredmények láthatók.</string>
+</resources>

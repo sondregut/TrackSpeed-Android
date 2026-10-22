@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Wczytywanie sesji…</string>
+    <string name="history_load_error">Nie udało się wczytać sesji.</string>
+    <string name="history_load_error_saved">Nie udało się odświeżyć sesji. Wyświetlane są ostatnio wczytane wyniki.</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Läser in pass…</string>
+    <string name="history_load_error">Kunde inte läsa in passen.</string>
+    <string name="history_load_error_saved">Kunde inte uppdatera passen. Visar de senast inlästa resultaten.</string>
+</resources>

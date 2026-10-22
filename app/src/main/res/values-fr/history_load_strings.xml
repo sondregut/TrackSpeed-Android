@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Chargement des sessions…</string>
+    <string name="history_load_error">Impossible de charger les sessions.</string>
+    <string name="history_load_error_saved">Impossible d’actualiser les sessions. Affichage des derniers résultats chargés.</string>
+</resources>

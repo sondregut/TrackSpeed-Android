@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">सत्र लोड हो रहे हैं…</string>
+    <string name="history_load_error">सत्र लोड नहीं हो सके।</string>
+    <string name="history_load_error_saved">सत्र रीफ़्रेश नहीं हो सके। पिछली बार लोड किए गए परिणाम दिखाए जा रहे हैं।</string>
+</resources>

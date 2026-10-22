@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Memuatkan sesi…</string>
+    <string name="history_load_error">Tidak dapat memuatkan sesi.</string>
+    <string name="history_load_error_saved">Tidak dapat menyegarkan semula sesi. Memaparkan hasil yang terakhir dimuatkan.</string>
+</resources>

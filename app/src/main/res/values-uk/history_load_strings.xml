@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Завантаження сесій…</string>
+    <string name="history_load_error">Не вдалося завантажити сесії.</string>
+    <string name="history_load_error_saved">Не вдалося оновити сесії. Показано останні завантажені результати.</string>
+</resources>

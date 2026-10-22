@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">正在載入訓練紀錄…</string>
+    <string name="history_load_error">無法載入訓練紀錄。</string>
+    <string name="history_load_error_saved">無法重新整理訓練紀錄。正在顯示上次載入的結果。</string>
+</resources>

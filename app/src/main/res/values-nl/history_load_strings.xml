@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Sessies laden…</string>
+    <string name="history_load_error">Sessies konden niet worden geladen.</string>
+    <string name="history_load_error_saved">Sessies konden niet worden vernieuwd. De laatst geladen resultaten worden getoond.</string>
+</resources>

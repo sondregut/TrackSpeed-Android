@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Đang tải các buổi tập…</string>
+    <string name="history_load_error">Không thể tải các buổi tập.</string>
+    <string name="history_load_error_saved">Không thể làm mới các buổi tập. Đang hiển thị kết quả được tải lần gần nhất.</string>
+</resources>

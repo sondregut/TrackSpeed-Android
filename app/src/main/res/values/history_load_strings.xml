@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Loading sessions…</string>
+    <string name="history_load_error">Could not load sessions.</string>
+    <string name="history_load_error_saved">Could not refresh sessions. Showing the last loaded results.</string>
+</resources>

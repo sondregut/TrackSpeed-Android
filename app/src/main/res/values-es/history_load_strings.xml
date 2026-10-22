@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Cargando sesiones…</string>
+    <string name="history_load_error">No se pudieron cargar las sesiones.</string>
+    <string name="history_load_error_saved">No se pudieron actualizar las sesiones. Se muestran los últimos resultados cargados.</string>
+</resources>

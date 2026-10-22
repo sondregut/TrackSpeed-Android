@@ -78,7 +78,9 @@ fun SessionHistoryScreen(
     onStartSessionClick: (() -> Unit)? = null,
     viewModel: SessionHistoryViewModel = hiltViewModel()
 ) {
-    val dateGroups by viewModel.dateGroups.collectAsState()
+    val historyState by viewModel.historyState.collectAsState()
+    val dateGroups = historyState.dateGroups
+    val hasAnySessions = historyState.hasAnySessions
     val filterDistance by viewModel.filterDistance.collectAsState()
     val filterStartType by viewModel.filterStartType.collectAsState()
     val timeFilter by viewModel.timeFilter.collectAsState()
@@ -87,7 +89,6 @@ fun SessionHistoryScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val distanceFilters by viewModel.distanceFilters.collectAsState()
     val startTypeFilters by viewModel.startTypeFilters.collectAsState()
-    val hasAnySessions by viewModel.hasAnySessions.collectAsState()
     val hasActiveFilters by viewModel.hasActiveFilters.collectAsState()
 
     val context = LocalContext.current
@@ -264,7 +265,26 @@ fun SessionHistoryScreen(
 
         val isEmpty = dateGroups.isEmpty()
 
-        if (isEmpty && hasActiveFilters) {
+        if (historyState.hasLoadedData && (historyState.loadFailed || historyState.isLoading)) {
+            HistoryLoadFeedback(
+                isLoading = historyState.isLoading,
+                failed = historyState.loadFailed,
+                hasLoadedData = true,
+                onRetry = viewModel::retryLoading
+            )
+            Spacer(Modifier.height(12.dp))
+        }
+
+        if (!historyState.hasLoadedData) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                HistoryLoadFeedback(
+                    isLoading = historyState.isLoading,
+                    failed = historyState.loadFailed,
+                    hasLoadedData = false,
+                    onRetry = viewModel::retryLoading
+                )
+            }
+        } else if (isEmpty && hasActiveFilters) {
             // Filtered empty state
             Box(
                 modifier = Modifier
@@ -1228,6 +1248,35 @@ private fun SessionCard(
                         .size(16.dp),
                     tint = IconMuted.copy(alpha = 0.6f)
                 )
+            }
+        }
+    }
+}
+
+/** Shared by initial-load and retained-results states; never exposes raw database errors. */
+@Composable
+internal fun HistoryLoadFeedback(
+    isLoading: Boolean,
+    failed: Boolean,
+    hasLoadedData: Boolean,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier.fillMaxWidth().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(modifier = Modifier.size(28.dp), color = AccentBlue)
+            Text(stringResource(R.string.history_loading), color = TextSecondary,
+                style = MaterialTheme.typography.bodyMedium)
+        } else if (failed) {
+            Text(stringResource(if (hasLoadedData) R.string.history_load_error_saved else R.string.history_load_error),
+                color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Button(onClick = onRetry, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.paywall_retry))
             }
         }
     }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Загрузка сессий…</string>
+    <string name="history_load_error">Не удалось загрузить сессии.</string>
+    <string name="history_load_error_saved">Не удалось обновить сессии. Показаны последние загруженные результаты.</string>
+</resources>

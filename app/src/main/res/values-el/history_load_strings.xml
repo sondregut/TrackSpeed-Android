@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Φόρτωση συνεδριών…</string>
+    <string name="history_load_error">Δεν ήταν δυνατή η φόρτωση των συνεδριών.</string>
+    <string name="history_load_error_saved">Δεν ήταν δυνατή η ανανέωση των συνεδριών. Εμφανίζονται τα αποτελέσματα που φορτώθηκαν τελευταία.</string>
+</resources>

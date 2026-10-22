@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Ladataan harjoituksia…</string>
+    <string name="history_load_error">Harjoitusten lataaminen epäonnistui.</string>
+    <string name="history_load_error_saved">Harjoitusten päivittäminen epäonnistui. Näytetään viimeksi ladatut tulokset.</string>
+</resources>

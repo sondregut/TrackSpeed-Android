@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">กำลังโหลดเซสชัน…</string>
+    <string name="history_load_error">ไม่สามารถโหลดเซสชันได้</string>
+    <string name="history_load_error_saved">ไม่สามารถรีเฟรชเซสชันได้ กำลังแสดงผลลัพธ์ที่โหลดไว้ล่าสุด</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Se încarcă sesiunile…</string>
+    <string name="history_load_error">Nu s-au putut încărca sesiunile.</string>
+    <string name="history_load_error_saved">Nu s-au putut actualiza sesiunile. Se afișează ultimele rezultate încărcate.</string>
+</resources>

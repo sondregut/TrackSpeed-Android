@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">Načítání tréninků…</string>
+    <string name="history_load_error">Tréninky se nepodařilo načíst.</string>
+    <string name="history_load_error_saved">Tréninky se nepodařilo obnovit. Zobrazují se naposledy načtené výsledky.</string>
+</resources>

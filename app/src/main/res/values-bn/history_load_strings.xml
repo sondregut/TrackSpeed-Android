@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_loading">সেশন লোড হচ্ছে…</string>
+    <string name="history_load_error">সেশন লোড করা যায়নি।</string>
+    <string name="history_load_error_saved">সেশন রিফ্রেশ করা যায়নি। সর্বশেষ লোড করা ফলাফল দেখানো হচ্ছে।</string>
+</resources>
