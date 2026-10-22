@@ -3,6 +3,7 @@ package com.trackspeed.android.sync
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
+import com.trackspeed.android.diagnostics.*
 import com.trackspeed.android.protocol.GateAssignment
 import com.trackspeed.android.protocol.TimingBootstrapPolicy
 import com.trackspeed.android.protocol.TimingPayload
@@ -33,12 +34,74 @@ import kotlin.math.roundToLong
 @Singleton
 class ClockSyncManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val bleClockSyncService: BleClockSyncService
+    private val bleClockSyncService: BleClockSyncService,
+    private val connectionDiagnostics: ConnectionDiagnosticsService
 ) {
     companion object {
         private const val TAG = "ClockSyncManager"
         private const val MAX_SEQUENCES_PER_SENDER = 500
         private const val MAX_PROCESSED_MESSAGE_IDS = 500
+    }
+
+    @Volatile private var diagnosticAttempt: ConnectionDiagnosticAttempt? = null
+    private var lastDiagnosticState: Pair<ConnectionDiagnosticPhase, ConnectionDiagnosticOutcome>? = null
+    // Keys stay in memory only; they never enter diagnostic records or upload metadata.
+    private val referenceDiagnosticSamplingTokens = ConcurrentHashMap<String, Long>()
+
+    private fun clearReferenceDiagnosticSampling() {
+        referenceDiagnosticSamplingTokens.keys.toList().forEach(::endReferenceDiagnosticSampling)
+    }
+
+    private fun endReferenceDiagnosticSampling(peerId: String) {
+        referenceDiagnosticSamplingTokens.remove(peerId)?.let(connectionDiagnostics.samplingGate::end)
+    }
+
+    private fun beginConnectionDiagnostics(flow: ConnectionDiagnosticFlow) {
+        clearReferenceDiagnosticSampling()
+        val attempt = ConnectionDiagnosticAttempt(flow, SystemClock::elapsedRealtimeNanos,
+            { event -> connectionDiagnostics.record(event) })
+        diagnosticAttempt = attempt
+        lastDiagnosticState = null
+        bleClockSyncService.setDiagnosticAttempt(attempt)
+        // The transport can generate/adopt a new session during setup; do not label the start with the old ID.
+        attempt.record(ConnectionDiagnosticPhase.ATTEMPT, ConnectionDiagnosticOutcome.STARTED)
+    }
+
+    private fun recordConnectionDiagnosticState(state: BleClockSyncService.State) {
+        if (state is BleClockSyncService.State.Error || state is BleClockSyncService.State.Idle) {
+            clearReferenceDiagnosticSampling()
+        }
+        val attempt = diagnosticAttempt ?: return
+        val classification = when (state) {
+            BleClockSyncService.State.Idle -> ConnectionDiagnosticPhase.STATE to ConnectionDiagnosticOutcome.DISCONNECTED
+            BleClockSyncService.State.Pairing, BleClockSyncService.State.Scanning -> ConnectionDiagnosticPhase.DISCOVERY to ConnectionDiagnosticOutcome.WAITING
+            BleClockSyncService.State.Bonding, BleClockSyncService.State.Connecting -> ConnectionDiagnosticPhase.LINK to ConnectionDiagnosticOutcome.WAITING
+            BleClockSyncService.State.Connected -> ConnectionDiagnosticPhase.LINK to ConnectionDiagnosticOutcome.CONNECTED
+            BleClockSyncService.State.ClientReady -> ConnectionDiagnosticPhase.GATT to ConnectionDiagnosticOutcome.READY
+            is BleClockSyncService.State.Syncing -> ConnectionDiagnosticPhase.CLOCK_SYNC to ConnectionDiagnosticOutcome.WAITING
+            is BleClockSyncService.State.Synced -> ConnectionDiagnosticPhase.CLOCK_SYNC to ConnectionDiagnosticOutcome.SUCCEEDED
+            is BleClockSyncService.State.Error -> ConnectionDiagnosticPhase.STATE to ConnectionDiagnosticOutcome.FAILED
+        }
+        if (classification == lastDiagnosticState) return
+        lastDiagnosticState = classification
+        val session = runCatching { UUID.fromString(bleClockSyncService.currentSessionId) }.getOrNull()
+        val transport = when (state) {
+            BleClockSyncService.State.Pairing, BleClockSyncService.State.Scanning,
+            BleClockSyncService.State.Bonding, BleClockSyncService.State.Connecting,
+            BleClockSyncService.State.Connected, BleClockSyncService.State.ClientReady -> ConnectionDiagnosticTransport.BLE
+            // Sync states may originate from either lane; both can use the same NTP estimator.
+            else -> ConnectionDiagnosticTransport.UNKNOWN
+        }
+        attempt.record(classification.first, classification.second, transport, session) { event ->
+            val result = (state as? BleClockSyncService.State.Synced)?.result
+            event.copy(
+                role = if (_isServer.value) ConnectionDiagnosticRole.HOST else ConnectionDiagnosticRole.CLIENT,
+                errorDomain = if (state is BleClockSyncService.State.Error) ConnectionDiagnosticErrorDomain.UNKNOWN else null,
+                errorCode = if (state is BleClockSyncService.State.Error) ConnectionDiagnosticErrorCode.UNKNOWN else null,
+                uncertaintyMs = result?.uncertaintyMs, minRttMs = result?.minRttMs, jitterMs = result?.jitterMs,
+                acceptedSamples = result?.samplesUsed, rejectedSamples = result?.let { it.totalSamples - it.samplesUsed }
+            )
+        }
     }
 
     /**
@@ -287,6 +350,7 @@ class ClockSyncManager @Inject constructor(
                         _syncState.value = SyncState.Error(bleState.message)
                     }
                 }
+                recordConnectionDiagnosticState(bleState)
             }
             .launchIn(scope)
 
@@ -711,6 +775,7 @@ class ClockSyncManager @Inject constructor(
                             "Keep the phones close and retry."
                     )
                     Log.w(TAG, "Rejected SyncComplete outside setup gate: ${payload.uncertaintyMs}ms")
+                    endReferenceDiagnosticSampling(message.senderId)
                     return
                 }
                 bleClockSyncService.markReferenceSyncValidated()
@@ -732,10 +797,12 @@ class ClockSyncManager @Inject constructor(
                         "Start reference: peer clock sync completed " +
                             "(seq=${message.seq}, uncertainty=${payload.uncertaintyMs}ms)"
                     )
+                    endReferenceDiagnosticSampling(message.senderId)
                     return
                 }
                 if (!_isServer.value) {
                     Log.d(TAG, "Ignoring SyncComplete on a non-reference joiner")
+                    endReferenceDiagnosticSampling(message.senderId)
                     return
                 }
                 val senderAddress = bleClockSyncService.getDeviceAddress(message.senderId)
@@ -767,12 +834,18 @@ class ClockSyncManager @Inject constructor(
                 Log.i(TAG, "Host: Sync complete (reference clock, offset=0)")
                 // Start heartbeat so iOS peer doesn't mark us as stale
                 startHeartbeat()
+                endReferenceDiagnosticSampling(message.senderId)
             }
 
             // ── Host receives SyncRequest ──
             is TimingPayload.SyncRequest -> {
                 val localIsReference = _localGateAssignment.value?.role == TimingRole.START_LINE
                 if (localIsReference) {
+                    referenceDiagnosticSamplingTokens.compute(message.senderId) { _, previous ->
+                        if (previous != null && connectionDiagnostics.samplingGate.isActive(previous)) previous
+                        // This upload-only hold cannot survive a vanished peer indefinitely. It does not alter sync timeouts.
+                        else connectionDiagnostics.samplingGate.begin(maxHoldMs = 180_000L)
+                    }
                     val preparedAware = bleClockSyncService
                         .prepareWifiAwareClockReference(message.senderId)
                     Log.i(
@@ -1044,6 +1117,7 @@ class ClockSyncManager @Inject constructor(
         _syncedGateCount.value = 1
         _protocolState.value = ProtocolState.IDLE
         driftTracker.reset()
+        beginConnectionDiagnostics(ConnectionDiagnosticFlow.HOST)
         bleClockSyncService.startAsServer()
         bleClockSyncService.configureClockReference(
             isReference = sessionConfig.hostRole == TimingRole.START_LINE
@@ -1070,6 +1144,7 @@ class ClockSyncManager @Inject constructor(
         _syncedGateCount.value = 0
         _protocolState.value = ProtocolState.IDLE
         driftTracker.reset()
+        beginConnectionDiagnostics(ConnectionDiagnosticFlow.JOIN)
         bleClockSyncService.startAsClient()
         bleClockSyncService.configureClockReference(isReference = false)
     }
@@ -1117,6 +1192,7 @@ class ClockSyncManager @Inject constructor(
         _connectedGateCount.value = 0
         _syncedGateCount.value = 0
         driftTracker.reset()
+        beginConnectionDiagnostics(ConnectionDiagnosticFlow.CONNECTION)
         bleClockSyncService.startDual()
         bleClockSyncService.configureClockReference(isReference = false)
     }
@@ -1328,6 +1404,11 @@ class ClockSyncManager @Inject constructor(
      */
     fun stop() {
         Log.i(TAG, "Stopping clock sync")
+        val stoppedDiagnosticAttempt = diagnosticAttempt
+        val stoppedDiagnosticSession = runCatching { UUID.fromString(bleClockSyncService.currentSessionId) }.getOrNull()
+        diagnosticAttempt = null
+        bleClockSyncService.setDiagnosticAttempt(null)
+        clearReferenceDiagnosticSampling()
         connectedClients.clear()
         clientClockOffsetsBySender.clear()
         gateIndexBySenderId.clear()
@@ -1346,6 +1427,8 @@ class ClockSyncManager @Inject constructor(
         _supabaseSessionId.value = null
         hybridOffsetNanos = null
         clearFrozenActiveSessionSync()
+        stoppedDiagnosticAttempt?.record(ConnectionDiagnosticPhase.ATTEMPT, ConnectionDiagnosticOutcome.CANCELLED,
+            sessionId = stoppedDiagnosticSession)
     }
 
     /**

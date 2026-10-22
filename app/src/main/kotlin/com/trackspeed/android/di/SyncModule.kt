@@ -5,6 +5,7 @@ import com.trackspeed.android.sync.BleClockSyncService
 import com.trackspeed.android.sync.ClockSyncManager
 import com.trackspeed.android.sync.CloudTimingRelay
 import com.trackspeed.android.cloud.DeviceIdProvider
+import com.trackspeed.android.diagnostics.ConnectionDiagnosticsService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -21,17 +22,19 @@ object SyncModule {
     fun provideBleClockSyncService(
         @ApplicationContext context: Context,
         cloudTimingRelay: CloudTimingRelay,
-        deviceIdProvider: DeviceIdProvider
+        deviceIdProvider: DeviceIdProvider,
+        connectionDiagnostics: ConnectionDiagnosticsService
     ): BleClockSyncService {
-        return BleClockSyncService(context, cloudTimingRelay, deviceIdProvider)
+        return BleClockSyncService(context, cloudTimingRelay, deviceIdProvider, connectionDiagnostics)
     }
 
     @Provides
     @Singleton
     fun provideClockSyncManager(
         @ApplicationContext context: Context,
-        bleClockSyncService: BleClockSyncService
+        bleClockSyncService: BleClockSyncService,
+        connectionDiagnostics: ConnectionDiagnosticsService
     ): ClockSyncManager {
-        return ClockSyncManager(context, bleClockSyncService)
+        return ClockSyncManager(context, bleClockSyncService, connectionDiagnostics)
     }
 }

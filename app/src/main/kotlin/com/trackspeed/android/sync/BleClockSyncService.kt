@@ -14,6 +14,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.trackspeed.android.cloud.DeviceIdProvider
+import com.trackspeed.android.diagnostics.*
 import com.trackspeed.android.protocol.ClockSyncTimestampTemplate
 import com.trackspeed.android.protocol.TimingMessage
 import com.trackspeed.android.protocol.TimingMessageCodec
@@ -53,7 +54,8 @@ import javax.inject.Singleton
 class BleClockSyncService @Inject constructor(
     @ApplicationContext private val context: Context,
     private val cloudTimingRelay: CloudTimingRelay,
-    private val deviceIdProvider: DeviceIdProvider
+    private val deviceIdProvider: DeviceIdProvider,
+    private val connectionDiagnostics: ConnectionDiagnosticsService
 ) {
     companion object {
         private const val TAG = "BleClockSync"
@@ -66,6 +68,34 @@ class BleClockSyncService @Inject constructor(
         private const val MAX_BOND_RETRIES = 60
         private val CLIENT_CHARACTERISTIC_CONFIG_UUID: UUID =
             UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+    }
+
+    @Volatile private var diagnosticAttempt: ConnectionDiagnosticAttempt? = null
+
+    internal fun setDiagnosticAttempt(attempt: ConnectionDiagnosticAttempt?) {
+        diagnosticAttempt = attempt
+    }
+
+    private fun recordDiagnosticSyncResult(
+        attempt: ConnectionDiagnosticAttempt?, transport: ConnectionDiagnosticTransport,
+        outcome: ConnectionDiagnosticOutcome, result: ClockSyncCalculator.SyncResult?, retry: Int = 0
+    ) {
+        val session = runCatching { UUID.fromString(sessionId) }.getOrNull()
+        attempt?.record(ConnectionDiagnosticPhase.CLOCK_SYNC, outcome, transport, session) { event ->
+            event.copy(role = ConnectionDiagnosticRole.REQUESTER, retry = retry,
+                errorDomain = if (outcome == ConnectionDiagnosticOutcome.FAILED || outcome == ConnectionDiagnosticOutcome.FALLBACK) ConnectionDiagnosticErrorDomain.CLOCK_SYNC else null,
+                errorCode = if (outcome == ConnectionDiagnosticOutcome.FAILED || outcome == ConnectionDiagnosticOutcome.FALLBACK) {
+                    if (result == null) ConnectionDiagnosticErrorCode.UNKNOWN else ConnectionDiagnosticErrorCode.QUALITY_REJECTED
+                } else null,
+                uncertaintyMs = result?.uncertaintyMs, minRttMs = result?.minRttMs, jitterMs = result?.jitterMs,
+                acceptedSamples = result?.samplesUsed, rejectedSamples = result?.let { it.totalSamples - it.samplesUsed },
+                estimator = when {
+                    transport == ConnectionDiagnosticTransport.WIFI_AWARE -> ConnectionDiagnosticEstimator.WIFI_AWARE
+                    result?.estimator == ClockSyncOneWayBoundPolicy.ESTIMATOR_NAME -> ConnectionDiagnosticEstimator.ONE_WAY_BOUND
+                    result?.estimator == ClockSyncOneWayBoundPolicy.BASELINE_ESTIMATOR_NAME -> ConnectionDiagnosticEstimator.NTP
+                    else -> ConnectionDiagnosticEstimator.UNKNOWN
+                })
+        }
     }
 
     // States
@@ -136,7 +166,7 @@ class BleClockSyncService @Inject constructor(
     @Volatile private var activeClientPeerWifiAwareCapable = false
     private val wifiAwareClockSyncService: WifiAwareClockSyncService? by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            WifiAwareClockSyncService(context)
+            WifiAwareClockSyncService(context, connectionDiagnostics.samplingGate) { diagnosticAttempt }
         } else {
             null
         }
@@ -1659,6 +1689,16 @@ class BleClockSyncService @Inject constructor(
         Log.i(TAG, "Starting clock synchronization (${ClockSyncConfig.FULL_SYNC_SAMPLES} samples, JSON protocol)...")
 
         val priorityGeneration = beginSyncConnectionPriorityWindow()
+        val diagnosticSamplingToken = connectionDiagnostics.samplingGate.begin()
+        val diagnostic = diagnosticAttempt
+        // Lane selection follows the capability exchange below; do not prematurely label it BLE.
+        diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC, ConnectionDiagnosticOutcome.STARTED,
+            ConnectionDiagnosticTransport.UNKNOWN,
+            sessionId = runCatching { UUID.fromString(sessionId) }.getOrNull()) { event ->
+            event.copy(role = ConnectionDiagnosticRole.REQUESTER,
+                capabilitySupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
+                peerCapability = activeSyncPeerSupportsWifiAware())
+        }
         syncJob = serviceScope.launch {
             var lastResult: ClockSyncCalculator.SyncResult? = null
 
@@ -1704,6 +1744,8 @@ class BleClockSyncService @Inject constructor(
                             "quality=${awareResult.quality}, " +
                             "samples=${awareResult.samplesUsed}/${awareResult.totalSamples}"
                     )
+                    recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.WIFI_AWARE,
+                        ConnectionDiagnosticOutcome.SUCCEEDED, awareResult)
                     return@launch
                 }
                 Log.w(
@@ -1711,8 +1753,14 @@ class BleClockSyncService @Inject constructor(
                     "Wi-Fi Aware clock lane did not pass; falling back to BLE " +
                         "(uncertainty=${awareResult?.uncertaintyMs ?: "none"})"
                 )
+                recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.WIFI_AWARE,
+                    ConnectionDiagnosticOutcome.FALLBACK, awareResult)
             }
 
+            diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC, ConnectionDiagnosticOutcome.STARTED,
+                ConnectionDiagnosticTransport.BLE, runCatching { UUID.fromString(sessionId) }.getOrNull()) {
+                it.copy(role = ConnectionDiagnosticRole.REQUESTER)
+            }
             val measurementCalculator = ClockSyncCalculator(isFullSync = true)
             syncCalculator = measurementCalculator
 
@@ -1763,6 +1811,8 @@ class BleClockSyncService @Inject constructor(
                         "samples=${result.samplesUsed}/${result.totalSamples}, " +
                         "minRTT=${String.format(Locale.US, "%.2f", result.minRttMs)}ms, " +
                         "jitter=${String.format(Locale.US, "%.2f", result.jitterMs)}ms")
+                    recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.BLE,
+                        ConnectionDiagnosticOutcome.SUCCEEDED, result, attempt - 1)
                     return@launch
                 }
 
@@ -1779,9 +1829,19 @@ class BleClockSyncService @Inject constructor(
                 "(quality: ${lastResult?.quality ?: "none"}, " +
                 "uncertainty: ${lastResult?.let { String.format(Locale.US, "%.1f", it.uncertaintyMs) } ?: "?"}ms)"
             )
+            recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.BLE,
+                ConnectionDiagnosticOutcome.FAILED, lastResult, ClockSyncConfig.MAX_SYNC_RETRIES - 1)
         }
-        syncJob?.invokeOnCompletion {
-            endSyncConnectionPriorityWindow(priorityGeneration)
+        syncJob?.invokeOnCompletion { cause ->
+            try { endSyncConnectionPriorityWindow(priorityGeneration) }
+            finally { connectionDiagnostics.samplingGate.end(diagnosticSamplingToken) }
+            if (cause != null) {
+                diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC,
+                    if (cause is CancellationException) ConnectionDiagnosticOutcome.CANCELLED else ConnectionDiagnosticOutcome.FAILED) { event ->
+                    event.copy(errorDomain = ConnectionDiagnosticErrorDomain.LIFECYCLE,
+                        errorCode = if (cause is CancellationException) ConnectionDiagnosticErrorCode.CANCELLED else ConnectionDiagnosticErrorCode.UNKNOWN)
+                }
+            }
         }
     }
 
@@ -1807,6 +1867,7 @@ class BleClockSyncService @Inject constructor(
 
         syncJob?.cancel()
         val priorityGeneration = beginSyncConnectionPriorityWindow()
+        val diagnosticSamplingToken = connectionDiagnostics.samplingGate.begin()
         syncJob = serviceScope.launch {
             val miniCalc = ClockSyncCalculator(
                 isFullSync = false,
@@ -1848,7 +1909,8 @@ class BleClockSyncService @Inject constructor(
             }
         }
         syncJob?.invokeOnCompletion {
-            endSyncConnectionPriorityWindow(priorityGeneration)
+            try { endSyncConnectionPriorityWindow(priorityGeneration) }
+            finally { connectionDiagnostics.samplingGate.end(diagnosticSamplingToken) }
         }
     }
 

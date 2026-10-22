@@ -30,10 +30,12 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import com.trackspeed.android.diagnostics.*
 import com.trackspeed.android.protocol.TimingMessage
 import com.trackspeed.android.protocol.TimingMessageCodec
 import com.trackspeed.android.protocol.TimingPayload
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -48,6 +50,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -62,7 +65,11 @@ import java.util.concurrent.atomic.AtomicReference
  * encrypted BLE link. Only clock samples move to the secured NDP-bound socket.
  */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-internal class WifiAwareClockSyncService(context: Context) {
+internal class WifiAwareClockSyncService(
+    context: Context,
+    private val diagnosticSamplingGate: ConnectionDiagnosticSamplingGate? = null,
+    private val diagnosticAttempt: () -> ConnectionDiagnosticAttempt? = { null }
+) {
     data class AttemptKey(
         val attemptId: String,
         val passphrase: String
@@ -77,6 +84,44 @@ internal class WifiAwareClockSyncService(context: Context) {
 
     @Volatile
     private var referenceJob: Job? = null
+
+    private fun recordDiagnosticAvailability(attempt: ConnectionDiagnosticAttempt?, sessionId: String, role: ConnectionDiagnosticRole) {
+        attempt?.record(ConnectionDiagnosticPhase.CAPABILITY, ConnectionDiagnosticOutcome.UNAVAILABLE,
+            ConnectionDiagnosticTransport.WIFI_AWARE, runCatching { UUID.fromString(sessionId) }.getOrNull()) { event ->
+            val supported = appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE)
+            val granted = ContextCompat.checkSelfPermission(appContext, Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED
+            val available = manager?.isAvailable == true
+            event.copy(role = role, capabilitySupported = supported, permissionGranted = granted, radioAvailable = available,
+                errorDomain = if (!granted) ConnectionDiagnosticErrorDomain.PERMISSION else ConnectionDiagnosticErrorDomain.CAPABILITY,
+                errorCode = when {
+                    !supported -> ConnectionDiagnosticErrorCode.UNSUPPORTED
+                    !granted -> ConnectionDiagnosticErrorCode.PERMISSION_DENIED
+                    !available -> ConnectionDiagnosticErrorCode.DISABLED
+                    connectivityManager == null -> ConnectionDiagnosticErrorCode.NETWORK_UNAVAILABLE
+                    else -> ConnectionDiagnosticErrorCode.CIPHER_UNAVAILABLE
+                })
+        }
+    }
+
+    private fun recordDiagnosticCompletion(
+        attempt: ConnectionDiagnosticAttempt?, sessionId: String, role: ConnectionDiagnosticRole,
+        passed: Boolean, failure: Throwable?, result: ClockSyncCalculator.SyncResult? = null
+    ) {
+        attempt?.record(ConnectionDiagnosticPhase.CLOCK_SYNC,
+            when { failure is CancellationException -> ConnectionDiagnosticOutcome.CANCELLED
+                passed -> ConnectionDiagnosticOutcome.READY
+                else -> ConnectionDiagnosticOutcome.FAILED },
+            ConnectionDiagnosticTransport.WIFI_AWARE, runCatching { UUID.fromString(sessionId) }.getOrNull()) { event ->
+            event.copy(role = role, timeoutMs = (EXCHANGE_TIMEOUT_SECONDS * 1_000L).toInt(),
+                errorDomain = if (!passed) ConnectionDiagnosticErrorDomain.WIFI_AWARE else null,
+                errorCode = when { failure is CancellationException -> ConnectionDiagnosticErrorCode.CANCELLED
+                    !passed -> ConnectionDiagnosticErrorCode.UNKNOWN
+                    else -> null },
+                uncertaintyMs = result?.uncertaintyMs, minRttMs = result?.minRttMs, jitterMs = result?.jitterMs,
+                acceptedSamples = result?.samplesUsed, rejectedSamples = result?.let { it.totalSamples - it.samplesUsed },
+                estimator = ConnectionDiagnosticEstimator.WIFI_AWARE)
+        }
+    }
 
     fun isAvailable(): Boolean {
         return appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE) &&
@@ -97,15 +142,26 @@ internal class WifiAwareClockSyncService(context: Context) {
         onProgress: (Float) -> Unit,
         onComplete: (Boolean) -> Unit = {}
     ): Boolean {
-        if (!isAvailable()) return false
+        val diagnostic = runCatching { diagnosticAttempt() }.getOrNull()
+        if (!isAvailable()) {
+            recordDiagnosticAvailability(diagnostic, sessionId, ConnectionDiagnosticRole.REFERENCE)
+            return false
+        }
         val key = deriveAttemptKey(sessionId, requesterId, referenceId)
         referenceJob?.cancel()
+        val diagnosticSamplingToken = diagnosticSamplingGate?.begin()
         referenceJob = scope.launch {
+            diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC, ConnectionDiagnosticOutcome.STARTED,
+                ConnectionDiagnosticTransport.WIFI_AWARE, runCatching { UUID.fromString(sessionId) }.getOrNull()) {
+                it.copy(role = ConnectionDiagnosticRole.REFERENCE)
+            }
+            var diagnosticFailure: Throwable? = null
             val passed = runCatching {
                 runInterruptible {
                     runReferenceBlocking(key, requesterId, referenceId, onProgress)
                 }
             }.onFailure { throwable ->
+                diagnosticFailure = throwable
                 Log.w(TAG, "[AWARE_CLOCK_REFERENCE] attempt=${key.attemptId} failed", throwable)
             }.getOrDefault(false)
             Log.i(
@@ -113,6 +169,10 @@ internal class WifiAwareClockSyncService(context: Context) {
                 "[AWARE_CLOCK_REFERENCE] attempt=${key.attemptId} complete=$passed"
             )
             onComplete(passed)
+            recordDiagnosticCompletion(diagnostic, sessionId, ConnectionDiagnosticRole.REFERENCE, passed, diagnosticFailure)
+        }
+        referenceJob?.invokeOnCompletion {
+            diagnosticSamplingToken?.let { token -> diagnosticSamplingGate?.end(token) }
         }
         return true
     }
@@ -123,15 +183,32 @@ internal class WifiAwareClockSyncService(context: Context) {
         referenceId: String,
         onProgress: (Float) -> Unit
     ): ClockSyncCalculator.SyncResult? {
-        if (!isAvailable()) return null
+        val diagnostic = runCatching { diagnosticAttempt() }.getOrNull()
+        if (!isAvailable()) {
+            recordDiagnosticAvailability(diagnostic, sessionId, ConnectionDiagnosticRole.REQUESTER)
+            return null
+        }
         val key = deriveAttemptKey(sessionId, requesterId, referenceId)
-        return runCatching {
-            runInterruptible(Dispatchers.IO) {
-                runRequesterBlocking(key, requesterId, referenceId, onProgress)
-            }
-        }.onFailure { throwable ->
-            Log.w(TAG, "[AWARE_CLOCK_REQUESTER] attempt=${key.attemptId} failed", throwable)
-        }.getOrNull()
+        diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC, ConnectionDiagnosticOutcome.STARTED,
+            ConnectionDiagnosticTransport.WIFI_AWARE, runCatching { UUID.fromString(sessionId) }.getOrNull()) {
+            it.copy(role = ConnectionDiagnosticRole.REQUESTER)
+        }
+        var diagnosticFailure: Throwable? = null
+        val diagnosticSamplingToken = diagnosticSamplingGate?.begin()
+        val result = try {
+            runCatching {
+                runInterruptible(Dispatchers.IO) {
+                    runRequesterBlocking(key, requesterId, referenceId, onProgress)
+                }
+            }.onFailure { throwable ->
+                diagnosticFailure = throwable
+                Log.w(TAG, "[AWARE_CLOCK_REQUESTER] attempt=${key.attemptId} failed", throwable)
+            }.getOrNull()
+        } finally {
+            diagnosticSamplingToken?.let { token -> diagnosticSamplingGate?.end(token) }
+        }
+        recordDiagnosticCompletion(diagnostic, sessionId, ConnectionDiagnosticRole.REQUESTER, result != null, diagnosticFailure, result)
+        return result
     }
 
     fun close() {
