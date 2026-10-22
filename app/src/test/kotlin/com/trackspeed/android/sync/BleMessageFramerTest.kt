@@ -144,6 +144,56 @@ class BleMessageFramerTest {
     }
 
     @Test
+    fun iosAbortMarkerDiscardsPartialFrameBeforeRawControlArrives() {
+        val receiver = BleMessageFramer { 1L }
+        val firstPacket = BleMessageFramer.packets(ByteArray(300) { 7 }, 40).first()
+        val abortMarker = byteArrayOf(0x53, 0x54, 0x42, 0x31, 0, 0, 0, 0)
+        val control = "{\"ready\":true}".toByteArray()
+
+        assertTrue(receiver.receive(firstPacket).isEmpty())
+        assertTrue(receiver.receive(abortMarker).isEmpty())
+        assertFalse(receiver.hasBufferedFrame)
+        assertArrayEquals(control, receiver.receive(control).single())
+    }
+
+    @Test
+    fun newCompleteFrameHeaderRecoversWithoutWaitingForInactivityTimeout() {
+        val receiver = BleMessageFramer { 1L }
+        receiver.receive(BleMessageFramer.packets(ByteArray(300) { 7 }, 40).first())
+        val replacement = ByteArray(100) { 9 }
+
+        val decoded = BleMessageFramer.packets(replacement, 40).flatMap(receiver::receive)
+
+        assertArrayEquals(replacement, decoded.single())
+        assertFalse(receiver.hasBufferedFrame)
+    }
+
+    @Test
+    fun abortMarkerWhileIdleIsConsumedWithoutEmptyJsonDelivery() {
+        val receiver = BleMessageFramer { 1L }
+        val abortMarker = byteArrayOf(0x53, 0x54, 0x42, 0x31, 0, 0, 0, 0)
+
+        assertTrue(receiver.receive(abortMarker).isEmpty())
+        assertFalse(receiver.hasBufferedFrame)
+    }
+
+    @Test
+    fun printableMagicInContinuationDoesNotDiscardAnIntactTransfer() {
+        val receiver = BleMessageFramer { 1L }
+        val payload = ByteArray(100) { 7 }
+        // The first 40-byte ATT packet contains an 8-byte header and 32 body
+        // bytes; this printable prefix starts the second ATT packet.
+        "STB1QUJD".toByteArray().copyInto(payload, destinationOffset = 32)
+        val packets = BleMessageFramer.packets(payload, 40)
+        assertTrue(BleMessageFramer.isFramedPacketStart(packets[1]))
+
+        val decoded = packets.flatMap(receiver::receive)
+
+        assertArrayEquals(payload, decoded.single())
+        assertFalse(receiver.hasBufferedFrame)
+    }
+
+    @Test
     fun repeatedFramedAndRawTransfersDoNotLeakState() {
         val receiver = BleMessageFramer()
         repeat(300) { index ->

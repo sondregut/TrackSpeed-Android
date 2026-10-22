@@ -30,7 +30,8 @@ internal class BleMessageFramer(private val nowNanos: () -> Long = System::nanoT
     fun receive(packet: ByteArray): List<ByteArray> {
         val now = nowNanos()
         if (buffer.isNotEmpty() &&
-            (now < lastProgressAtNanos ||
+            (isValidFrameHeader(packet) ||
+                now < lastProgressAtNanos ||
                 now - lastProgressAtNanos >= INACTIVITY_TIMEOUT_NANOS ||
                 now - frameStartedAtNanos >= MAX_FRAME_LIFETIME_NANOS)
         ) {
@@ -73,7 +74,11 @@ internal class BleMessageFramer(private val nowNanos: () -> Long = System::nanoT
             val frameLength = HEADER_BYTE_COUNT + length.toInt()
             if (buffer.size < frameLength) break
 
-            payloads += buffer.copyOfRange(HEADER_BYTE_COUNT, frameLength)
+            // Current iPhone peers send a zero-length STB1 frame to abort a
+            // partial message. Consume it without delivering empty JSON.
+            if (length > 0) {
+                payloads += buffer.copyOfRange(HEADER_BYTE_COUNT, frameLength)
+            }
             buffer = buffer.copyOfRange(frameLength, buffer.size)
             frameStartedAtNanos = now
         }
@@ -102,6 +107,21 @@ internal class BleMessageFramer(private val nowNanos: () -> Long = System::nanoT
         fun isFramedPacketStart(data: ByteArray): Boolean {
             if (data.size < MAGIC.size) return false
             return MAGIC.indices.all { data[it] == MAGIC[it] }
+        }
+
+        /**
+         * Both apps send a complete 8-byte header in the first ATT packet.
+         * Check its length too: a base64/JSON continuation can begin with the
+         * four printable magic bytes without actually being a fresh frame.
+         */
+        private fun isValidFrameHeader(data: ByteArray): Boolean {
+            if (data.size < HEADER_BYTE_COUNT || !isFramedPacketStart(data)) return false
+            val length =
+                ((data[4].toLong() and 0xffL) shl 24) or
+                    ((data[5].toLong() and 0xffL) shl 16) or
+                    ((data[6].toLong() and 0xffL) shl 8) or
+                    (data[7].toLong() and 0xffL)
+            return length <= MAXIMUM_PAYLOAD_BYTES.toLong()
         }
 
         fun packets(payload: ByteArray, maximumPacketBytes: Int): List<ByteArray> {

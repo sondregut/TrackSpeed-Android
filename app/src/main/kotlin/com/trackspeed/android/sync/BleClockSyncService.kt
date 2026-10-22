@@ -225,7 +225,7 @@ class BleClockSyncService @Inject constructor(
 
     private data class ServerPacket(val deviceAddress: String, val data: ByteArray)
 
-    private val serverNotificationQueue = ConcurrentLinkedQueue<ServerPacket>()
+    private val serverNotificationQueue = ConcurrentLinkedDeque<ServerPacket>()
     private val isServerNotificationPending = AtomicBoolean(false)
     private val serverMaximumPacketBytes = ConcurrentHashMap<String, Int>()
     private val serverInboundFramers = ConcurrentHashMap<String, BleMessageFramer>()
@@ -1000,8 +1000,8 @@ class BleClockSyncService @Inject constructor(
                 return
             }
             if (!queued) {
+                serverNotificationQueue.addFirst(packet)
                 isServerNotificationPending.set(false)
-                serverNotificationQueue.add(packet)
                 handler.postDelayed({ drainServerNotificationQueue() }, 25L)
             }
             return
