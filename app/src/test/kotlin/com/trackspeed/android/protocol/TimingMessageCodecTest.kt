@@ -214,6 +214,16 @@ class TimingMessageCodecTest {
     }
 
     @Test
+    fun iosRoleRequestAllowsIndependentEnvelopeSenderAndStableDeviceIdentity() {
+        val request = TimingPayload.RoleRequest(deviceId = "11111111-1111-4111-8111-111111111111")
+        val senderId = "22222222-2222-4222-8222-222222222222"
+        assertTrue(TimingBootstrapPolicy.acceptsPhysicallyTargetedRoleRequest(request, senderId, true))
+        assertFalse(TimingBootstrapPolicy.acceptsPhysicallyTargetedRoleRequest(request, senderId, false))
+        assertFalse(TimingBootstrapPolicy.acceptsPhysicallyTargetedRoleRequest(TimingPayload.StartTiming(), senderId, true))
+        assertFalse(TimingBootstrapPolicy.acceptsPhysicallyTargetedRoleRequest(request.copy(deviceId = ""), senderId, true))
+    }
+
+    @Test
     fun encryptedClientRouteOnlyAcceptsReservedPreSessionRoleAssignment() {
         val assignment = TimingPayload.RoleAssigned(
             role = TimingRole.START_LINE,

@@ -8,9 +8,19 @@ object TimingBootstrapPolicy {
         hasDirectEncryptedGattRoute: Boolean
     ): Boolean {
         val request = payload as? TimingPayload.RoleRequest ?: return false
-        return hasDirectEncryptedGattRoute &&
-            request.deviceId.equals(senderId, ignoreCase = true)
+        // iOS JoinSessionView/RaceSession use a fresh sender UUID, while
+        // roleRequest.deviceId is the persistent DeviceIdentity. Equality is
+        // not part of the v7 wire contract. The direct encrypted route is the
+        // bootstrap authority; the transport separately binds the announcement
+        // to that route and rejects conflicting live peer identities.
+        return hasDirectEncryptedGattRoute && request.deviceId.isNotBlank() &&
+            (request.deviceId.equals(senderId, ignoreCase = true) ||
+                (isCanonicalUuid(request.deviceId) && isCanonicalUuid(senderId)))
     }
+
+    private fun isCanonicalUuid(value: String): Boolean =
+        runCatching { java.util.UUID.fromString(value).toString().equals(value, ignoreCase = true) }
+            .getOrDefault(false)
 
     fun isPreSessionRoleAssignment(sequence: Long): Boolean =
         sequence == TimingProtocolSequence.PRE_SESSION_ROLE_ASSIGNMENT

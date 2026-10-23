@@ -139,6 +139,7 @@ class ClockSyncManager @Inject constructor(
     data class ClientState(
         val deviceAddress: String,
         val senderId: String? = null,
+        val stableDeviceId: String? = null,
         val gateIndex: Int,
         val initialSessionConfigSent: Boolean = false,
         val handshakeComplete: Boolean = false,
@@ -418,7 +419,7 @@ class ClockSyncManager @Inject constructor(
      * Server mode: called when a client disconnects.
      */
     private fun onClientDisconnected(deviceAddress: String) {
-        val disconnectedSenderId = connectedClients[deviceAddress]?.senderId
+        val disconnectedSenderId = connectedClients[deviceAddress]?.stableDeviceId
         connectedClients.remove(deviceAddress)
         if (disconnectedSenderId != null) {
             clientClockOffsetsBySender.remove(disconnectedSenderId)
@@ -550,12 +551,11 @@ class ClockSyncManager @Inject constructor(
 
             // ── Host receives RoleRequest from joiner ──
             is TimingPayload.RoleRequest -> {
-                if (!payload.deviceId.equals(message.senderId, ignoreCase = true)) {
-                    Log.w(
-                        TAG,
-                        "Ignoring RoleRequest with sender/device mismatch: " +
-                            "sender=${message.senderId.take(8)} device=${payload.deviceId.take(8)}"
+                if (!_isServer.value || !payload.deviceId.equals(
+                        bleClockSyncService.stableDeviceIdForSender(message.senderId), ignoreCase = true
                     )
+                ) {
+                    Log.w(TAG, "Ignoring RoleRequest without a bound encrypted GATT peer identity")
                     return
                 }
                 Log.i(TAG, "Host: Received RoleRequest from ${payload.deviceId}" +
@@ -566,8 +566,8 @@ class ClockSyncManager @Inject constructor(
                 val clientState = senderAddress?.let { connectedClients[it] }
                 if (ClockSyncHandshakeReplayPolicy.isCompletedDuplicateRoleRequest(
                         handshakeComplete = clientState?.handshakeComplete == true,
-                        existingSenderId = clientState?.senderId,
-                        incomingSenderId = message.senderId
+                        existingSenderId = clientState?.stableDeviceId,
+                        incomingSenderId = payload.deviceId
                     )
                 ) {
                     Log.i(
@@ -577,21 +577,22 @@ class ClockSyncManager @Inject constructor(
                     )
                     return
                 }
-                val gateIndex = gateIndexBySenderId[message.senderId]
+                val gateIndex = gateIndexBySenderId[payload.deviceId]
                     ?: clientState?.gateIndex
                     ?: firstAvailableClientGateIndex()
-                gateIndexBySenderId[message.senderId] = gateIndex
+                gateIndexBySenderId[payload.deviceId] = gateIndex
 
                 // Update client state with senderId mapping
                 if (senderAddress != null && clientState != null) {
                     connectedClients[senderAddress] = clientState.copy(
                         senderId = message.senderId,
+                        stableDeviceId = payload.deviceId,
                         gateIndex = gateIndex
                     )
                 }
                 refreshStableTimingGateIds()
                 if (senderAddress != null && clientState != null &&
-                    ClockSyncHandshakeReplayPolicy.shouldReplayConfigForIdentity(clientState.senderId)
+                    ClockSyncHandshakeReplayPolicy.shouldReplayConfigForIdentity(clientState.stableDeviceId)
                 ) {
                     // The first config may predate the stable identity mapping.
                     // Re-send it exactly once before assignment so current
@@ -636,29 +637,29 @@ class ClockSyncManager @Inject constructor(
                     if (assignedRole == TimingRole.START_LINE &&
                         sessionConfig.hostRole != TimingRole.START_LINE
                     ) {
-                        val shouldStartReferenceSync = !message.senderId.equals(
+                        val shouldStartReferenceSync = !payload.deviceId.equals(
                             activeServerSyncReferenceSenderId,
                             ignoreCase = true
                         )
-                        activeServerSyncReferenceSenderId = message.senderId
+                        activeServerSyncReferenceSenderId = payload.deviceId
                         activeServerSyncReferenceAddress = senderAddress
                         bleClockSyncService.configureClockReference(
                             isReference = false,
-                            referenceDeviceId = message.senderId
+                            referenceDeviceId = payload.deviceId
                         )
                         bleClockSyncService.sendMessageToDevice(
                             payload = TimingPayload.SyncRequest(),
                             deviceAddress = senderAddress,
-                            targetDeviceId = message.senderId
+                            targetDeviceId = payload.deviceId
                         )
                         if (shouldStartReferenceSync) scope.launch {
                             // Let config + assignment notifications drain and
                             // let the joiner install its reference role first.
                             delay(350L)
                             val current = connectedClients[senderAddress]
-                            if (current?.senderId.equals(message.senderId, ignoreCase = true)) {
+                            if (current?.stableDeviceId.equals(payload.deviceId, ignoreCase = true)) {
                                 bleClockSyncService.startSync(
-                                    referenceDeviceId = message.senderId,
+                                    referenceDeviceId = payload.deviceId,
                                     referenceDeviceAddress = senderAddress
                                 )
                                 Log.i(
@@ -817,7 +818,8 @@ class ClockSyncManager @Inject constructor(
                             syncComplete = true
                         )
                     }
-                    clientClockOffsetsBySender[message.senderId] = payload.offsetNanos
+                    val stableId = connectedClients[senderAddress]?.stableDeviceId ?: message.senderId
+                    clientClockOffsetsBySender[stableId] = payload.offsetNanos
                     updateHostGateCounts()
                     val syncedCount = connectedClients.values.count { it.syncComplete }
                     Log.i(TAG, "Host: $syncedCount/${connectedClients.size} clients synced")
@@ -1340,6 +1342,7 @@ class ClockSyncManager @Inject constructor(
             return false
         }
         val clientState = connectedClients[address]
+        val targetIdentity = clientState?.stableDeviceId ?: return false
         val gateAssignment = clientState?.let { assignmentForGateIndex(it.gateIndex) }
 
         sendSessionConfigToDevice(address, forceReplay = true)
@@ -1347,18 +1350,18 @@ class ClockSyncManager @Inject constructor(
         if (gateAssignment != null) {
             bleClockSyncService.sendCriticalMessageToDevice(
                 TimingPayload.GateAssigned(
-                    assignment = gateAssignment.copy(targetDeviceId = senderId)
+                    assignment = gateAssignment.copy(targetDeviceId = targetIdentity)
                 ),
                 address,
-                targetDeviceId = senderId
+                targetDeviceId = targetIdentity
             )
             bleClockSyncService.sendCriticalMessageToDevice(
                 TimingPayload.RoleAssigned(
                     role = gateAssignment.role,
-                    targetDeviceId = senderId
+                    targetDeviceId = targetIdentity
                 ),
                 address,
-                targetDeviceId = senderId
+                targetDeviceId = targetIdentity
             )
         }
 
@@ -1367,7 +1370,7 @@ class ClockSyncManager @Inject constructor(
             bleClockSyncService.sendCriticalMessageToDevice(
                 TimingPayload.SupabaseSession(sessionId = effectiveSupabaseSessionId),
                 address,
-                targetDeviceId = senderId
+                targetDeviceId = targetIdentity
             )
         }
 
@@ -1574,11 +1577,13 @@ class ClockSyncManager @Inject constructor(
      * reference_time = client_local_time + offset.
      */
     fun toReferenceTime(senderId: String, senderLocalNanos: Long): Long {
-        return senderLocalNanos + (clientClockOffsetsBySender[senderId] ?: 0L)
+        val stableId = bleClockSyncService.stableDeviceIdForSender(senderId) ?: senderId
+        return senderLocalNanos + (clientClockOffsetsBySender[stableId] ?: 0L)
     }
 
     fun referenceTimeIfKnown(senderId: String, senderLocalNanos: Long): Long? {
-        val offset = clientClockOffsetsBySender[senderId] ?: return null
+        val stableId = bleClockSyncService.stableDeviceIdForSender(senderId) ?: senderId
+        val offset = clientClockOffsetsBySender[stableId] ?: return null
         return try { Math.addExact(senderLocalNanos, offset).takeIf { it > 0 } }
         catch (_: ArithmeticException) { null }
     }
@@ -1635,9 +1640,9 @@ class ClockSyncManager @Inject constructor(
                 add(bleClockSyncService.localDeviceId)
             }
             connectedClients.values
-                .filter { it.senderId != null }
+                .filter { it.stableDeviceId != null }
                 .sortedBy { it.gateIndex }
-                .forEach { add(it.senderId!!) }
+                .forEach { add(it.stableDeviceId!!) }
         }.distinct()
         sessionConfig = sessionConfig.copy(timingGateDeviceIds = timingGateIds)
     }

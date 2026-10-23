@@ -182,6 +182,7 @@ class BleClockSyncService @Inject constructor(
 
     // Map from TimingMessage senderId → BLE device address (populated on server receiving writes)
     private val senderDeviceMap = ConcurrentHashMap<String, String>()
+    private val peerIdentityBindings = BlePeerIdentityBindings()
 
     data class ConnectionEvent(val device: BluetoothDevice, val connected: Boolean)
 
@@ -420,8 +421,12 @@ class BleClockSyncService @Inject constructor(
      * Look up the BLE device address for a given TimingMessage senderId.
      * Only populated in server mode when messages are received from clients.
      */
-    fun getDeviceAddress(senderId: String): String? = senderDeviceMap[senderId]
+    fun getDeviceAddress(senderId: String): String? = (senderDeviceMap[senderId]
+        ?: senderDeviceMap.entries.firstOrNull { it.key.equals(senderId, true) }?.value)
         ?.takeIf(protocolReadyDevices::contains)
+
+    fun stableDeviceIdForSender(senderId: String): String? = getDeviceAddress(senderId)
+        ?.let(peerIdentityBindings::stableId)
 
     fun hasDirectGattRouteForSender(senderId: String): Boolean = getDeviceAddress(senderId) != null
 
@@ -518,6 +523,7 @@ class BleClockSyncService @Inject constructor(
         activeClientPeerAdvertisesAndroid = false
         activeClientPeerWifiAwareCapable = false
         senderDeviceMap.clear()
+        peerIdentityBindings.clear()
         pendingPings.clear()
         reverseProbes.clear()
         localIsClockReference = false
@@ -594,6 +600,7 @@ class BleClockSyncService @Inject constructor(
         activeClientPeerWifiAwareCapable = false
         connectedDevices.clear()
         senderDeviceMap.clear()
+        peerIdentityBindings.clear()
         cloudTimingRelay.stop(deviceId, isHost = wasServer)
         sessionId = UUID.randomUUID().toString().uppercase()
 
@@ -727,6 +734,7 @@ class BleClockSyncService @Inject constructor(
                         .keys
                         .toSet()
                     senderDeviceMap.entries.removeIf { it.value == device.address }
+                    peerIdentityBindings.remove(device.address)
                     serverNotificationQueue.removeIf { it.deviceAddress == device.address }
                     criticalMessageRetries.forgetPeer(device.address, senderIds)
                     if (wasProtocolReady) {
@@ -851,6 +859,7 @@ class BleClockSyncService @Inject constructor(
                         .keys
                         .toSet()
                     senderDeviceMap.entries.removeIf { it.value == device.address }
+                    peerIdentityBindings.remove(device.address)
                     serverNotificationQueue.removeIf { it.deviceAddress == device.address }
                     criticalMessageRetries.forgetPeer(device.address, senderIds)
                     _connectionEvents.tryEmit(ConnectionEvent(device, false))
@@ -879,10 +888,22 @@ class BleClockSyncService @Inject constructor(
         }
         if (!acceptCompatibleProtocol(message, "BLE server")) return
 
+        if (message.payload is TimingPayload.RoleRequest) {
+            val request = message.payload
+            val directRouteReady = protocolReadyDevices.contains(device.address)
+            if (!TimingBootstrapPolicy.acceptsPhysicallyTargetedRoleRequest(
+                    request, message.senderId, directRouteReady
+                ) || !peerIdentityBindings.bind(device.address, request.deviceId, deviceId)
+            ) {
+                Log.w(TAG, "Server: Rejected conflicting or invalid peer identity announcement")
+                return
+            }
+            senderDeviceMap[request.deviceId] = device.address
+        }
         senderDeviceMap[message.senderId] = device.address
 
         if (!isEnvelopeForLocalDevice(message, allowDirectGattRoleRequest = true)) {
-            Log.d(TAG, "Server: Ignoring message targeted to ${message.targetDeviceId?.take(8)}")
+            Log.d(TAG, "Server: Ignoring ${message.payload::class.simpleName}: target mismatch")
             return
         }
         handleCriticalResponse(message, device.address)
@@ -919,7 +940,7 @@ class BleClockSyncService @Inject constructor(
                     sendMessageToDevice(
                         payload = TimingPayload.Ack(messageId = message.messageId),
                         deviceAddress = device.address,
-                        targetDeviceId = message.senderId
+                        targetDeviceId = stableDeviceIdForSender(message.senderId) ?: message.senderId
                     )
                 }
                 Log.d(TAG, "Server: Forwarding ${payload::class.simpleName} to app")
@@ -2161,7 +2182,7 @@ class BleClockSyncService @Inject constructor(
                         wifiAwareClockSync = localWifiAwareClockSyncAvailable()
                     ),
                     deviceAddress = senderAddress,
-                    targetDeviceId = message.senderId
+                    targetDeviceId = stableDeviceIdForSender(message.senderId) ?: message.senderId
                 )
                 Log.i(
                     TAG,
@@ -2406,12 +2427,12 @@ class BleClockSyncService @Inject constructor(
                 sendMessageToDevice(
                     payload = TimingPayload.Ack(messageId = message.messageId),
                     deviceAddress = senderAddress,
-                    targetDeviceId = message.senderId
+                    targetDeviceId = stableDeviceIdForSender(message.senderId) ?: message.senderId
                 )
             } else {
                 sendMessage(
                     payload = TimingPayload.Ack(messageId = message.messageId),
-                    targetDeviceId = message.senderId
+                    targetDeviceId = stableDeviceIdForSender(message.senderId) ?: message.senderId
                 )
             }
         }
