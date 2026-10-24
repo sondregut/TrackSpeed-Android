@@ -37,6 +37,7 @@ val hasReleaseSigning = releaseStoreFilePath.isNotBlank() &&
 android {
     namespace = "com.trackspeed.android"
     compileSdk = 36
+    buildToolsVersion = "36.1.0" // Existing installed stable tools; avoid implicit SDK downloads.
 
     defaultConfig {
         applicationId = "com.trackspeed.android"
@@ -98,10 +99,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -113,6 +110,12 @@ android {
         language {
             enableSplit = false
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 

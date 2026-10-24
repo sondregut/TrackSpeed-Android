@@ -94,13 +94,17 @@ class NeutralActionChromeRenderTest {
             return matched
         }
         val initial = matchedPixels()
-        if (initial < minimumPixels) {
+        var matched = initial
+        if (matched < minimumPixels) {
             save("neutral-transient-$tag-${expected.toArgb()}")
-            // RenderThread ripple completion can follow Compose idleness. Keep the
-            // exact colour/area assertion, but wait for the settled control pixels.
-            compose.waitUntil(timeoutMillis = 3_000) { matchedPixels() >= minimumPixels }
+            // RenderThread ripples can change between captures after Compose is idle.
+            // Assert the exact colour/area of the captured frame that satisfied the
+            // wait, rather than recapturing a later animation frame (a TOCTOU race).
+            compose.waitUntil(timeoutMillis = 3_000) {
+                matched = matchedPixels()
+                matched >= minimumPixels
+            }
         }
-        val matched = matchedPixels()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         File(context.getExternalFilesDir(null), "neutral-action-chrome/settling.txt").apply {
             parentFile?.mkdirs()

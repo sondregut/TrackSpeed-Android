@@ -1,15 +1,15 @@
 [versions]
-agp = "8.7.3"
-kotlin = "2.0.21"
+agp = "8.11.1"
+kotlin = "2.2.21"
 coreKtx = "1.15.0"
 lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.9.3"
 composeBom = "2024.12.01"
 navigationCompose = "2.8.5"
-hilt = "2.54"
+hilt = "2.58"
 hiltNavigationCompose = "1.2.0"
-room = "2.6.1"
-ksp = "2.0.21-1.0.28"
+room = "2.8.5"
+ksp = "2.2.21-2.0.5"
 supabase = "3.1.1"
 ktor = "3.0.3"
 kotlinxSerialization = "1.7.3"
@@ -22,8 +22,8 @@ googleId = "1.1.1"
 splashscreen = "1.0.1"
 media3 = "1.10.1"
 posthog = "3.49.0"
-# Firebase Analytics 23.2.0 in the current BoM uses Kotlin 2.2 metadata;
-# keep the pre-23 Analytics line until this project upgrades from Kotlin 2.0.
+# Keep the current Firebase family through the toolchain bridge; update and
+# validate analytics separately after the compiler/generated-code checks pass.
 firebaseBom = "33.16.0"
 googleServices = "4.5.0"
 
