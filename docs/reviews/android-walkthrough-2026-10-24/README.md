@@ -1,16 +1,46 @@
-# TrackSpeed Android: connection fix and screen-review checkpoint
+# TrackSpeed Android — actual screen walkthrough, 24 October 2026
 
-24 October 2026. This is a verified software increment, **not full iPhone parity or a completed actual-screen walkthrough**.
+This is a verified increment, not a claim of complete iPhone parity or physical timing acceptance. The gallery distinguishes actual app navigation, navigation using synthetic local training data, isolated production Composable renders, and decoded actual synthetic-video exports. Every screenshot retains its source fingerprint in screen-inventory.json.
 
-## Candidate and validation
+## Changes and validation
 
-- Existing branch: `codex/android-onboarding-visual-parity-20261022`; continued from `1db4621d89c09306e3310491ad3b8828ee05fdf4`. No rewrite, reset, unrelated staging or iOS changes.
-- Version remains `1.0.10 (11)`. Distinguish the build by source fingerprint **`6bd08d717e672e4e`** and APK SHA-256 **`3d58bfd215141fbff33a26325a557144e0b2ed14a24012f96e030e6de2412565`**.
-- `testDebugUnitTest`, `lintDebug`, `assembleDebug`, `assembleDebugAndroidTest`: **passed**, cached/offline Gradle, 1m51s. **332 tests, zero failures/errors/skips**. Lint: zero errors, 817 warning entries, 3 information entries.
-- Debug APK and instrumentation APK preserved with hashes and all main-source input hashes in the sibling `artifact/` folder. Native screenshot tests compiled but **did not execute**.
-- No remote CI launched, no installation, no physical connection test, no publication to a store, and no change to iOS 134 approvals.
+Source fixes committed as `08548d3`; original published base: `8ad2b20d66f55576fd8af242d40fcd532e4be067`, branch `codex/android-onboarding-visual-parity-20261022`. Its three handshake corrections preserve pending configuration during provisional reference pings, preserve early reference completion through role assignment, and restart synchronization on a new link while keeping duplicate callbacks idempotent. The strict uncertainty <10.0 ms requirement remains unchanged. Physical iPhone↔Android and Android↔Android tests remain required; stale GATT-handle recovery remains separate.
 
-## Diagnosed and corrected
+The real walkthrough found and corrected three additional UI defects:
+1. The unavailable-camera onboarding card drew the same error twice and overlapped a disabled camera-switch control. It now displays one padded, readable error and omits the unusable control.
+2. Profile displayed a hardcoded v1.0.0. It now uses the installed version/build through the existing localized format.
+3. Run details labelled every run 1-Phone. The mode now uses the recorded run phone count and existing localized plurals.
+
+AGP now selects the isolated UI runner explicitly with `-Ptrackspeed.uiParity=true`. Default instrumentation keeps AndroidJUnitRunner. The onboarding guide test selects the visible pager button instead of matching retained offscreen pages; assertions were not weakened. A separate fixture is opt-in, requires an offline ranchu emulator and airplane mode, inserts only its named synthetic session/runs, and never clears existing data. The emulator must remain offline.
+
+Final local verification: **332 unit tests passed**, 0 failures/errors/skips; lint **0 errors, 817 warnings, 3 information**; debug and instrumentation APKs built. Native execution: **19 UI/export regression checks passed plus one explicit fixture preparation check**, 20/20 total. The earlier 13/14 native run and its offscreen-selector failure remain in validation/native-ui-tests.log. Three current synthetic MP4 exports passed preview/export comparisons and safe-area assertions. No new remote CI was launched.
+
+Final app version **1.0.10 (11)**, source fingerprint **7fe3fd06c2207dff**; APK SHA-256 **3ebccd12b501fa95555cc9adbcec77c257fd010cc77cd68c61977366121ee19b**. Full hashes and sizes are in artifact/final-manifest.json. This version number is reused; fingerprint and APK hash identify this candidate. The APK was installed as an update and cold-launched on task-owned `emulator-5580`, Android 16 / API 36. Pixel was unavailable; no physical installation or phone access occurred.
+
+## Capture conditions
+
+Final coverage: **75 actual runtime screenshots**, **18 native component renders** and **29 native overlay/export images**, plus **3 synthetic exported MP4s**. Every declared route is inventoried; partial state coverage remains explicit.
+
+720×1280 headless task-owned AVD, airplane mode enabled and no active default network. Actual onboarding, guest flow, native camera and nearby-device prompts, guide Back/Continue, coachmarks, Home, Templates, session setup, host/join permission failures/help, solo camera-error/empty results, empty/populated History and filters, Stats, Profile, Settings, notifications-disabled, athlete list/form, calculators, result/session share previews, and video import/preview/unit selection were exercised. Results labelled `fixture` are actual app screens with synthetic values, not measured runs. No account, purchase, invite, code redemption, external share, or production upload was performed.
+
+The native video player can prevent UiAutomator from becoming idle. The capture helper now refuses stale hierarchy data; such editor captures use actual pixels with an explicitly unavailable hierarchy. Earlier picker/transition XML can lag the screenshot and is not relied upon as evidence of the displayed editor state. No desktop or browser input was used.
+
+The old AVD registration was incorrectly generated as target android-0 by installed command-line tools 12.0 despite an Android 36.1 image and newer XML metadata. Correcting that task-only registration removed the HVF warning but did not make that AVD usable. An existing task-owned TrackSpeedReview AVD with a correct target booted. No data wipe, global security change, cache deletion or physical-device reset was used.
+
+## Remaining gaps
+
+- Full current iOS visual/asset parity is unfinished: the current iOS tour sequence and new preview assets differ; those assets contain iOS chrome and cannot simply be pasted into Android. The route inventory records all 32 declared Screen objects / 28 registered destinations, with partial/conditional coverage rather than claiming every state.
+- Physical BLE/config/sync readiness, accepted timing precision, reconnection/stale GATT handles, live camera crossings, recorded crossing-frame scrubber, and landscape-camera acceptance require real hardware. Headless camera failure is expected here.
+- The current early-release configuration replaces promo/paywall routes with free-access messaging. Billing loading/unavailable components were rendered, but real offerings, discounts, purchases, signed-in account flows and backend errors were not forced.
+- Join's denial screenshot still says “Scanning with Bluetooth” alongside the permission-required error; troubleshooting also uses older Location wording. These are now evidenced follow-up UX gaps, not proof scanning occurred.
+- The compact final Home coachmark has cramped bottom controls. Settings top/inset appearance needs full-device visual comparison. Complete sharing-editor option interactions and landscape recording remain partial; actual export renderer/unit checks passed.
+- Android dependency updates remain separate: current AGP 8.7.3, Kotlin 2.0.21, Compose BOM 2024.12.01 have not been upgraded by this increment. No premature transport replacement or unsupported Reaction Start claim was introduced.
+
+## Delivery and scope
+
+The HTML is self-contained for screenshots, searchable by screen and evidence class, with full-size image viewing. The ZIP contains screenshots, route inventory, report, source provenance and three synthetic exported MP4s. Install-ready APKs are preserved separately because of size. No Google Play release, production backend/security/credential changes, extra CI spending, iOS source mutation, or Sondre17 access occurred. Draft PR creation remains under its prior unresolved approval; no denied PR operation was retried.
+
+## Original handshake diagnosis
 
 1. iOS may send provisional reference-clock pings before authoritative session configuration. Android overwrote its pending handshake phase with `SYNCING`; its replay policy then rejected the first configuration and assignment handlers no longer accepted the pending role. Clock progress now preserves unfinished handshake phases.
 2. Valid early reference synchronization was overwritten by the later role request. The validated clock result now survives until authoritative assignment; setup is still required before protocol readiness.
@@ -19,30 +49,3 @@
 Nine focused policy tests pass, including six new regressions. Replacing the new policy transitions with the previous inline behavior causes five failures. Native full-unit compilation also passed. The estimator, four timestamps, monotonic clocks, and strict **less-than-10-ms** acceptance boundary are unchanged. The UI still requires configuration, authoritative role, start authorization and acceptable synchronization together.
 
 These defects are demonstrated in source/tests. They are not proof that every earlier physical stall had this cause. The recorded ATT Invalid Handle issue remains separate: stale GATT characteristic recovery/onServiceChanged is not fixed or hardware-validated in this increment.
-
-## Screen walkthrough status
-
-- **0 current-build runtime screenshots.** ADB found no connected Pixel. The task-owned headless `codex_trackspeed_parity_20261022` emulator remained offline and logged `qemu_mprotect__osdep: mprotect failed: Permission denied`. Its process was stopped and verified absent host-side. No security settings or emulator/user data were changed to bypass the failure.
-- There are **28 registered NavHost destinations and 32 declared Screen objects**. Calibration, active timing, device pairing and legacy results declarations are not independent registered routes; several states are embedded in solo/race flows. `screen-inventory.json` names each route and required conditional/empty/error states.
-- New `ScreenWalkthroughRenderTest` covers production Composables with explicit synthetic offline state: welcome, role/sport, how-it-works, attribution, camera preprompt, early-release, home empty, settings/units, tools/calculators and paywall loading/unavailable-pricing. It uses `UiParityTestRunner` to avoid analytics, billing and cloud SDK initialization. It is **compiled, not run**, and would provide component renders rather than real navigation/hardware acceptance.
-- The HTML gallery contains **8 historical native captures/decoded exports from baseline `498e862`, 22 October**, visibly labelled as older evidence. They are not counted toward current coverage. No mockup is presented as an app screenshot.
-- A usable emulator or connected/unlocked Pixel is the immediate blocker for fresh captures. Pixel capture must first confirm no active session, preserve app data, and obtain runtime/source identity before walkthrough actions. No Sondre17 monitoring, screenshots, mirroring, polling or control occurred.
-
-## Fresh iPhone comparison and remaining parity
-
-Read-only iOS reference: checkout HEAD `e545b471e` with concurrent uncommitted edits. No assertion that this entire tree is released. Its feature tour now includes solo laps, connected gates, sport tests and proof/review, plus conditional one-camera/Watch stories. Android still uses the older setup/connect/alignment/start/automatic/proof tour.
-
-The current tour references four new iPhone screen-preview assets. The inspected solo-preview image includes iOS status/navigation chrome; these previews need Android adaptation and were not copied as purported Android screenshots. The asset audit found only one exact byte match among 17 Android onboarding/proof resources against the **current** iOS asset tree; the earlier eleven-match claim belonged to the older reference. Lack of a byte match alone does not prove different visual content, but current asset parity has not been re-established.
-
-Still required: current onboarding sequence/story layout/assets; full home/setup/roles/calibration/live/results/history/auth/settings/paywall/media/share editor visual comparisons; saved-result and failure-state walkthroughs; native unit-option persistence and actual exports on the candidate; stale-handle recovery diagnosis and both host-role hardware retests. Apple Watch and unsupported Apple transport APIs must stay platform-specific. Reaction Start remains unadvertised until measured onset validation exists.
-
-The dependency stack is not all current: AGP 8.7.3/Kotlin 2.0.21/Compose 2024.12.01 remain. Prior compatible SDK updates are preserved; a broad toolchain/camera migration was not combined with this handshake correction. Hardware BLE interoperability, clock accuracy and camera performance are still acceptance requirements.
-
-## Safe next test
-
-1. Connect/unlock Pixel; confirm its identity/ADB authorization and no active timing session. Install the exact candidate as a data-preserving update only if authorized, then verify installed hash/fingerprint and a fresh process.
-2. With the user coordinating a named iPhone (Sondre17 remains off limits), test existing pairings first, both host roles. Record link → notification readiness → config → authoritative role → sync uncertainty → start/ready. Preserve a failure before retrying. Do not relax timing bounds.
-3. Capture real reachable routes and conditional states. Use an isolated offline emulator/test fixture for synthetic results/paywall states; do not alter real purchases, pairing data or saved sessions to manufacture screens.
-4. Regenerate the gallery with exact capture build and provenance. Keep unavailable states explicit until captured.
-
-No cache or user files were deleted. The build used the shared native slot after checking competing processes; it released the slot on completion. Last measured free space before validation was about 52 GiB.
