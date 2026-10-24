@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Valmistellaan kuvaa…</string>
+    <string name="image_share_failed">Kuvaa ei voitu valmistella tai jakaa. Yritä uudelleen.</string>
+    <string name="image_share_save_unconfirmed">Tallennusta ei voitu vahvistaa. Tarkista galleriasi ennen kuin yrität uudelleen.</string>
+</resources>

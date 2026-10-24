@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">กำลังเตรียมรูปภาพ…</string>
+    <string name="image_share_failed">เตรียมหรือแชร์รูปภาพไม่ได้ ลองอีกครั้ง</string>
+    <string name="image_share_save_unconfirmed">ยืนยันการบันทึกไม่ได้ ตรวจสอบแกลเลอรีก่อนลองอีกครั้ง</string>
+</resources>

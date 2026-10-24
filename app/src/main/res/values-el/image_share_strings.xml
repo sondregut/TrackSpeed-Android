@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Προετοιμασία εικόνας…</string>
+    <string name="image_share_failed">Δεν ήταν δυνατή η προετοιμασία ή η κοινοποίηση της εικόνας. Δοκιμάστε ξανά.</string>
+    <string name="image_share_save_unconfirmed">Δεν ήταν δυνατή η επιβεβαίωση της αποθήκευσης. Ελέγξτε τη συλλογή σας πριν δοκιμάσετε ξανά.</string>
+</resources>

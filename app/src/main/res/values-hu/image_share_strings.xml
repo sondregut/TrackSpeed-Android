@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Kép előkészítése…</string>
+    <string name="image_share_failed">Nem sikerült előkészíteni vagy megosztani a képet. Próbáld újra.</string>
+    <string name="image_share_save_unconfirmed">Nem sikerült megerősíteni a mentést. Mielőtt újra próbálkozol, ellenőrizd a galériát.</string>
+</resources>

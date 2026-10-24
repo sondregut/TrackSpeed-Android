@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.ui.share.ImageShareController
 import com.trackspeed.android.data.local.entities.RunEntity
 import com.trackspeed.android.data.local.entities.TrainingSessionEntity
 import com.trackspeed.android.data.repository.SessionRepository
@@ -30,8 +31,7 @@ import javax.inject.Inject
 data class ShareSessionUiState(
     val cardData: ShareSessionCardData? = null,
     val selectedTheme: ShareCardTheme = ShareCardTheme.MIDNIGHT,
-    val isLoading: Boolean = true,
-    val isSavedToGallery: Boolean = false
+    val isLoading: Boolean = true
 )
 
 @HiltViewModel
@@ -44,6 +44,7 @@ class ShareSessionViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ShareSessionUiState())
     val uiState: StateFlow<ShareSessionUiState> = _uiState.asStateFlow()
+    internal val imageShare = ImageShareController(viewModelScope)
 
     init {
         viewModelScope.launch {
@@ -68,10 +69,6 @@ class ShareSessionViewModel @Inject constructor(
         _uiState.update { it.copy(selectedTheme = theme) }
     }
 
-    fun onSavedToGallery() {
-        _uiState.update { it.copy(isSavedToGallery = true) }
-    }
-
     private suspend fun buildCardData(
         session: TrainingSessionEntity,
         runs: List<RunEntity>
@@ -82,7 +79,6 @@ class ShareSessionViewModel @Inject constructor(
             session.distance > 0.0 -> session.distance
             else -> runs.firstOrNull { it.distance > 0.0 }?.distance ?: 0.0
         }
-        val athleteName = runs.firstOrNull { !it.athleteName.isNullOrBlank() }?.athleteName
 
         val shareRuns = withContext(Dispatchers.IO) {
             runs.mapIndexed { index, run ->
@@ -94,7 +90,8 @@ class ShareSessionViewModel @Inject constructor(
                     } else {
                         null
                     },
-                    segments = parseSegmentSplits(run.splitsJson)
+                    segments = parseSegmentSplits(run.splitsJson),
+                    athleteName = run.athleteName
                 )
             }
         }
@@ -102,7 +99,6 @@ class ShareSessionViewModel @Inject constructor(
         return ShareSessionCardData(
             distance = displayDistance,
             dateFormatted = dateFormatted,
-            athleteName = athleteName,
             runs = shareRuns
         )
     }

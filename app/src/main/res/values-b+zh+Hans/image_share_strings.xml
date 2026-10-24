@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">正在准备图片…</string>
+    <string name="image_share_failed">无法准备或分享图片。请重试。</string>
+    <string name="image_share_save_unconfirmed">无法确认是否已保存。请先查看图库，再决定是否重试。</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Görsel hazırlanıyor…</string>
+    <string name="image_share_failed">Görsel hazırlanamadı veya paylaşılamadı. Tekrar deneyin.</string>
+    <string name="image_share_save_unconfirmed">Kaydetme işlemi doğrulanamadı. Tekrar denemeden önce galerinizi kontrol edin.</string>
+</resources>

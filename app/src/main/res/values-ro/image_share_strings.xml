@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Se pregătește imaginea…</string>
+    <string name="image_share_failed">Nu am putut pregăti sau partaja imaginea. Încearcă din nou.</string>
+    <string name="image_share_save_unconfirmed">Nu am putut confirma salvarea. Verifică galeria înainte de a încerca din nou.</string>
+</resources>

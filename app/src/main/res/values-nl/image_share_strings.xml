@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Afbeelding voorbereiden…</string>
+    <string name="image_share_failed">De afbeelding kon niet worden voorbereid of gedeeld. Probeer het opnieuw.</string>
+    <string name="image_share_save_unconfirmed">Het opslaan kon niet worden bevestigd. Controleer je galerij voordat je het opnieuw probeert.</string>
+</resources>

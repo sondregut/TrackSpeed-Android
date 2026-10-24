@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">तस्वीर तैयार हो रही है…</string>
+    <string name="image_share_failed">तस्वीर तैयार या शेयर नहीं की जा सकी। फिर कोशिश करें।</string>
+    <string name="image_share_save_unconfirmed">तस्वीर सहेजे जाने की पुष्टि नहीं हो सकी। फिर कोशिश करने से पहले अपनी गैलरी देखें।</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Menyediakan imej…</string>
+    <string name="image_share_failed">Imej tidak dapat disediakan atau dikongsi. Cuba lagi.</string>
+    <string name="image_share_save_unconfirmed">Tidak dapat mengesahkan imej telah disimpan. Semak galeri anda sebelum mencuba lagi.</string>
+</resources>

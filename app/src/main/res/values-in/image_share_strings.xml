@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Menyiapkan gambar…</string>
+    <string name="image_share_failed">Tidak dapat menyiapkan atau membagikan gambar. Coba lagi.</string>
+    <string name="image_share_save_unconfirmed">Belum dapat memastikan gambar tersimpan. Periksa galeri sebelum mencoba lagi.</string>
+</resources>

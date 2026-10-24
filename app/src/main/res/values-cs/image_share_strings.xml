@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Příprava obrázku…</string>
+    <string name="image_share_failed">Obrázek se nepodařilo připravit nebo sdílet. Zkuste to znovu.</string>
+    <string name="image_share_save_unconfirmed">Uložení se nepodařilo potvrdit. Než to zkusíte znovu, zkontrolujte galerii.</string>
+</resources>

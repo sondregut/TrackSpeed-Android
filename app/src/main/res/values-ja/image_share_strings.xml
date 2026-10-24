@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">画像を準備中…</string>
+    <string name="image_share_failed">画像の準備または共有ができませんでした。もう一度お試しください。</string>
+    <string name="image_share_save_unconfirmed">保存を確認できませんでした。もう一度試す前にギャラリーを確認してください。</string>
+</resources>

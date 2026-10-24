@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -38,6 +39,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.share.SessionShareNaming
+import com.trackspeed.android.ui.share.sessionShareNaming
 import com.trackspeed.android.model.StartType
 import com.trackspeed.android.protocol.SegmentSplit
 import com.trackspeed.android.ui.util.formatDistance
@@ -117,7 +120,6 @@ data class ShareCardData(
 data class ShareSessionCardData(
     val distance: Double,
     val dateFormatted: String,
-    val athleteName: String? = null,
     val runs: List<ShareSessionRunData>
 ) {
     val runCount: Int = runs.size
@@ -131,7 +133,8 @@ data class ShareSessionRunData(
     val runNumber: Int,
     val timeSeconds: Double,
     val thumbnail: Bitmap? = null,
-    val segments: List<SegmentSplit> = emptyList()
+    val segments: List<SegmentSplit> = emptyList(),
+    val athleteName: String? = null
 )
 
 /**
@@ -249,6 +252,7 @@ fun ShareableSessionCard(
 ) {
     val textLight = Color.White
     val bestTime = data.bestTimeSeconds
+    val naming = sessionShareNaming(data.runs.map { it.athleteName })
     val compact = data.runs.size > 5
     val visibleRuns = data.runs.take(if (compact) 8 else 6)
     val hiddenRunCount = data.runs.size - visibleRuns.size
@@ -322,6 +326,7 @@ fun ShareableSessionCard(
                         isBest = bestTime != null && run.timeSeconds == bestTime,
                         showSplits = !compact,
                         showThumbnail = true,
+                        showName = naming == SessionShareNaming.PerRow,
                         textColor = textLight,
                         accentColor = theme.speedColor
                     )
@@ -341,7 +346,7 @@ fun ShareableSessionCard(
             }
 
             SessionShareFooter(
-                athleteName = data.athleteName,
+                athleteName = (naming as? SessionShareNaming.Footer)?.name,
                 textColor = textLight
             )
 
@@ -410,6 +415,7 @@ private fun ShareSessionRunRow(
     isBest: Boolean,
     showSplits: Boolean,
     showThumbnail: Boolean,
+    showName: Boolean,
     textColor: Color,
     accentColor: Color
 ) {
@@ -438,15 +444,18 @@ private fun ShareSessionRunRow(
                 ShareSessionThumbnail(bitmap = run.thumbnail)
             }
 
-            Text(
-                text = stringResource(R.string.session_detail_run_number, run.runNumber),
-                color = textColor.copy(alpha = 0.82f),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.session_detail_run_number, run.runNumber),
+                    color = textColor.copy(alpha = 0.82f), fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                if (showName) run.athleteName?.trim()?.takeIf { it.isNotEmpty() }?.let { name ->
+                    Text(text = name, color = textColor.copy(alpha = 0.72f), fontSize = 11.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("session-share-row-name-${run.runNumber}"))
+                }
+            }
 
             if (isBest) {
                 Text(
@@ -550,7 +559,8 @@ private fun SessionShareFooter(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("session-share-footer-name")
             )
             Spacer(modifier = Modifier.height(9.dp))
         }

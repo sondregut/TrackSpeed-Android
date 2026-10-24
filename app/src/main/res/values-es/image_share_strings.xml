@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Preparando imagen…</string>
+    <string name="image_share_failed">No se pudo preparar o compartir la imagen. Inténtalo de nuevo.</string>
+    <string name="image_share_save_unconfirmed">No se pudo confirmar si se guardó la imagen. Revisa tu galería antes de volver a intentarlo.</string>
+</resources>

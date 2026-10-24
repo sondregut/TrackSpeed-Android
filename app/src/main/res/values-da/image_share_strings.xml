@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Klargør billede …</string>
+    <string name="image_share_failed">Kunne ikke klargøre eller dele billedet. Prøv igen.</string>
+    <string name="image_share_save_unconfirmed">Kunne ikke bekræfte, at billedet blev gemt. Tjek galleriet, før du prøver igen.</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Подготовка изображения…</string>
+    <string name="image_share_failed">Не удалось подготовить изображение или поделиться им. Попробуйте ещё раз.</string>
+    <string name="image_share_save_unconfirmed">Не удалось подтвердить сохранение. Проверьте галерею, прежде чем повторить попытку.</string>
+</resources>

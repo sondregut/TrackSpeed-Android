@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">جارٍ تجهيز الصورة…</string>
+    <string name="image_share_failed">تعذّر تجهيز الصورة أو مشاركتها. حاول مجددًا.</string>
+    <string name="image_share_save_unconfirmed">تعذّر تأكيد الحفظ. تحقّق من معرض الصور قبل المحاولة مجددًا.</string>
+</resources>

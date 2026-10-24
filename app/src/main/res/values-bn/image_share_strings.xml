@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">ছবি প্রস্তুত হচ্ছে…</string>
+    <string name="image_share_failed">ছবিটি প্রস্তুত বা শেয়ার করা যায়নি। আবার চেষ্টা করুন।</string>
+    <string name="image_share_save_unconfirmed">ছবিটি সংরক্ষিত হয়েছে কি না নিশ্চিত করা যায়নি। আবার চেষ্টা করার আগে গ্যালারি দেখুন।</string>
+</resources>

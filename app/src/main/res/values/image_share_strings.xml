@@ -1,0 +1,5 @@
+<resources>
+    <string name="image_share_preparing">Preparing image…</string>
+    <string name="image_share_failed">Couldn’t prepare or share the image. Try again.</string>
+    <string name="image_share_save_unconfirmed">Couldn’t confirm the save. Check your gallery before trying again.</string>
+</resources>

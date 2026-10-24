@@ -3,6 +3,7 @@ package com.trackspeed.android.ui.screens.history
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trackspeed.android.ui.share.ImageShareController
 import com.trackspeed.android.data.local.entities.RunEntity
 import com.trackspeed.android.data.local.entities.TrainingSessionEntity
 import com.trackspeed.android.data.repository.SessionRepository
@@ -25,9 +26,7 @@ import javax.inject.Inject
 data class ShareResultUiState(
     val cardData: ShareCardData? = null,
     val selectedTheme: ShareCardTheme = ShareCardTheme.MIDNIGHT,
-    val isLoading: Boolean = true,
-    val isSavedToGallery: Boolean = false,
-    val saveError: String? = null
+    val isLoading: Boolean = true
 )
 
 @HiltViewModel
@@ -42,6 +41,7 @@ class ShareResultViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ShareResultUiState())
     val uiState: StateFlow<ShareResultUiState> = _uiState.asStateFlow()
+    internal val imageShare = ImageShareController(viewModelScope)
 
     init {
         viewModelScope.launch {
@@ -65,18 +65,6 @@ class ShareResultViewModel @Inject constructor(
 
     fun selectTheme(theme: ShareCardTheme) {
         _uiState.update { it.copy(selectedTheme = theme) }
-    }
-
-    fun onSavedToGallery() {
-        _uiState.update { it.copy(isSavedToGallery = true) }
-    }
-
-    fun onSaveError(message: String) {
-        _uiState.update { it.copy(saveError = message) }
-    }
-
-    fun clearSaveError() {
-        _uiState.update { it.copy(saveError = null) }
     }
 
     private fun buildCardData(

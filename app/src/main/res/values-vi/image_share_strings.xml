@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_preparing">Đang chuẩn bị ảnh…</string>
+    <string name="image_share_failed">Không thể chuẩn bị hoặc chia sẻ ảnh. Hãy thử lại.</string>
+    <string name="image_share_save_unconfirmed">Chưa thể xác nhận ảnh đã được lưu. Hãy kiểm tra thư viện ảnh trước khi thử lại.</string>
+</resources>

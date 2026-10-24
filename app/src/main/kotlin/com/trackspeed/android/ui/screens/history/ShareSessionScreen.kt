@@ -2,8 +2,6 @@ package com.trackspeed.android.ui.screens.history
 
 import com.trackspeed.android.ui.theme.*
 
-import android.content.Intent
-import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -18,16 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.outlined.SaveAlt
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -35,7 +27,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberCompositionContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.trackspeed.android.ui.share.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -47,11 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.R
-import com.trackspeed.android.ui.components.ComposeCapture
 import com.trackspeed.android.ui.components.ShareableSessionCard
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 private const val SESSION_CARD_WIDTH_PX = 1080
 private const val SESSION_CARD_HEIGHT_PX = 1920
@@ -64,7 +55,12 @@ fun ShareSessionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val compositionContext = rememberCompositionContext()
+    val exportState by viewModel.imageShare.state.collectAsStateWithLifecycle()
+    val configuration = LocalConfiguration.current
+    val environment = "${configuration.locales.toLanguageTags()}:${configuration.densityDpi}:${configuration.fontScale}"
+    val outputKey = uiState.cardData?.outputKey(uiState.selectedTheme, environment)
+    val back = imageShareBackAction(viewModel.imageShare, outputKey, onNavigateBack)
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -78,7 +74,7 @@ fun ShareSessionScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = back) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.share_back_cd),
@@ -161,122 +157,22 @@ fun ShareSessionScreen(
 
             ThemeSelector(
                 selectedTheme = uiState.selectedTheme,
-                onThemeSelected = { viewModel.selectTheme(it) },
+                onThemeSelected = { viewModel.imageShare.cancel(); viewModel.selectTheme(it) },
                 modifier = Modifier.padding(horizontal = 32.dp)
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Button(
-                onClick = {
-                    scope.launch {
-                        val bitmap = withContext(Dispatchers.Main) {
-                            ComposeCapture.captureToBitmap(
-                                context = context,
-                                widthPx = SESSION_CARD_WIDTH_PX,
-                                heightPx = SESSION_CARD_HEIGHT_PX
-                            ) {
-                                ShareableSessionCard(
-                                    data = cardData,
-                                    theme = uiState.selectedTheme
-                                )
-                            }
-                        }
-                        val uri = ComposeCapture.saveToCacheForSharing(context, bitmap)
-                        val intent = ComposeCapture.createShareIntent(uri)
-                        context.startActivity(
-                            Intent.createChooser(
-                                intent,
-                                context.getString(R.string.share_session_chooser_title)
-                            )
-                        )
+            val key = checkNotNull(outputKey)
+            val theme = uiState.selectedTheme
+            val chooserTitle = stringResource(R.string.share_session_chooser_title)
+            ImageShareActions(key, exportState, onAction = { action ->
+                viewModel.imageShare.perform(key, action) {
+                    exportShareImage(context, key, action, chooserTitle, SESSION_CARD_WIDTH_PX, SESSION_CARD_HEIGHT_PX, compositionContext) {
+                        ShareableSessionCard(data = cardData, theme = theme)
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = stringResource(R.string.share_button),
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        val bitmap = withContext(Dispatchers.Main) {
-                            ComposeCapture.captureToBitmap(
-                                context = context,
-                                widthPx = SESSION_CARD_WIDTH_PX,
-                                heightPx = SESSION_CARD_HEIGHT_PX
-                            ) {
-                                ShareableSessionCard(
-                                    data = cardData,
-                                    theme = uiState.selectedTheme
-                                )
-                            }
-                        }
-                        val success = ComposeCapture.saveToGallery(context, bitmap)
-                        if (success) {
-                            viewModel.onSavedToGallery()
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.share_saved_toast),
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        } else {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.share_save_failed_toast),
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-            ) {
-                Icon(
-                    imageVector = if (uiState.isSavedToGallery) Icons.Default.Check else Icons.Outlined.SaveAlt,
-                    contentDescription = null,
-                    tint = if (uiState.isSavedToGallery) Color(0xFF4CAF50) else TextPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (uiState.isSavedToGallery) {
-                        stringResource(R.string.share_saved)
-                    } else {
-                        stringResource(R.string.share_save_to_gallery)
-                    },
-                    color = if (uiState.isSavedToGallery) Color(0xFF4CAF50) else TextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+                }
+            }, onCancel = viewModel.imageShare::cancel, modifier = Modifier.padding(horizontal = 32.dp))
 
             Spacer(modifier = Modifier.height(32.dp))
         }
