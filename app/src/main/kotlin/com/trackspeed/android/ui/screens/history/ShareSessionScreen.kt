@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,14 +90,19 @@ fun ShareSessionScreen(
             )
         }
     ) { paddingValues ->
-        if (uiState.isLoading) {
+        if (uiState.cardData == null && (uiState.isLoading || uiState.loadFailed)) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = TextPrimary)
+                DetailLoadFeedback(
+                    isLoading = uiState.isLoading,
+                    failed = uiState.loadFailed,
+                    hasLoadedData = false,
+                    onRetry = viewModel::retryLoading
+                )
             }
             return@Scaffold
         }
@@ -127,6 +131,15 @@ fun ShareSessionScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            if (uiState.isLoading || uiState.loadFailed) {
+                DetailLoadFeedback(
+                    isLoading = uiState.isLoading,
+                    failed = uiState.loadFailed,
+                    hasLoadedData = true,
+                    onRetry = viewModel::retryLoading
+                )
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             ShareableSessionCard(

@@ -15,13 +15,16 @@ import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.ui.components.ShareCardTheme
 import com.trackspeed.android.ui.components.ShareSessionCardData
 import com.trackspeed.android.ui.components.ShareSessionRunData
+import com.trackspeed.android.ui.util.RetainedFlowLoader
 import com.trackspeed.android.ui.util.parseSegmentSplits
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,7 +38,8 @@ data class ShareSessionUiState(
     val cardData: ShareSessionCardData? = null,
     val selectedTheme: ShareCardTheme = ShareCardTheme.MIDNIGHT,
     val imageOptions: SessionImageOptions = SessionImageOptions(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val loadFailed: Boolean = false
 )
 
 @HiltViewModel
@@ -52,24 +56,26 @@ class ShareSessionViewModel @Inject constructor(
     val uiState: StateFlow<ShareSessionUiState> = _uiState.asStateFlow()
     internal val imageShare = ImageShareController(viewModelScope)
 
+    private val cardLoader = RetainedFlowLoader(viewModelScope) {
+        flow {
+            val session = sessionRepository.getSession(sessionId)
+            val cardData = if (session != null) {
+                val runs = sessionRepository.getRunsForSession(sessionId).first().sortedBy { it.runNumber }
+                buildCardData(session, runs)
+            } else null
+            emit(ShareCardLoadSnapshot(cardData))
+        }
+    }
+
     init {
         viewModelScope.launch {
-            val session = sessionRepository.getSession(sessionId)
-            val runs = sessionRepository.getRunsForSession(sessionId).first().sortedBy { it.runNumber }
-
-            if (session != null) {
-                val cardData = buildCardData(session, runs)
-                _uiState.update {
-                    it.copy(
-                        cardData = cardData,
-                        isLoading = false
-                    )
-                }
-            } else {
-                _uiState.update { it.copy(isLoading = false) }
+            cardLoader.state.collect { loaded ->
+                _uiState.update { previous -> mergeShareSessionLoadState(previous, loaded) }
             }
         }
     }
+
+    fun retryLoading() = cardLoader.retry()
 
     fun selectImageOptions(options: SessionImageOptions) {
         imageShare.cancel()

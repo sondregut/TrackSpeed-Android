@@ -21,12 +21,15 @@ import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.data.repository.SettingsRepository
 import com.trackspeed.android.ui.components.ShareCardData
 import com.trackspeed.android.ui.components.ShareCardTheme
+import com.trackspeed.android.ui.util.RetainedFlowLoader
 import com.trackspeed.android.ui.util.parseSegmentSplits
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -38,7 +41,8 @@ data class ShareResultUiState(
     val cardData: ShareCardData? = null,
     val selectedTheme: ShareCardTheme = ShareCardTheme.MIDNIGHT,
     val imageOptions: RunImageOptions = RunImageOptions(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val loadFailed: Boolean = false
 )
 
 @HiltViewModel
@@ -57,25 +61,31 @@ class ShareResultViewModel @Inject constructor(
     val uiState: StateFlow<ShareResultUiState> = _uiState.asStateFlow()
     internal val imageShare = ImageShareController(viewModelScope)
 
+    private val cardLoader = RetainedFlowLoader(viewModelScope) {
+        flow {
+            val run = sessionRepository.getRunById(runId)
+            val session = if (run != null) sessionRepository.getSession(sessionId) else null
+            val cardData = if (run != null && session != null) {
+                val speedUnit = savedStateHandle.get<String>("imageShareSpeedUnit")
+                    ?: settingsRepository.speedUnit.first()
+                buildCardData(run, session, speedUnit)
+            } else null
+            emit(ShareCardLoadSnapshot(cardData))
+        }
+    }
+
     init {
         viewModelScope.launch {
-            val run = sessionRepository.getRunById(runId)
-            val session = sessionRepository.getSession(sessionId)
-            val speedUnit = savedStateHandle.get<String>("imageShareSpeedUnit") ?: settingsRepository.speedUnit.first()
-
-            if (run != null && session != null) {
-                val cardData = buildCardData(run, session, speedUnit)
-                _uiState.update {
-                    it.copy(
-                        cardData = cardData,
-                        isLoading = false
-                    )
+            cardLoader.state.collect { loaded ->
+                _uiState.update { previous ->
+                    // A unit chosen during photo decoding takes precedence over that read's unit.
+                    mergeShareResultLoadState(previous, loaded, savedStateHandle["imageShareSpeedUnit"])
                 }
-            } else {
-                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
+
+    fun retryLoading() = cardLoader.retry()
 
     fun selectImageSpeedUnit(unit: OverlaySpeedUnit) {
         val card = _uiState.value.cardData ?: return
