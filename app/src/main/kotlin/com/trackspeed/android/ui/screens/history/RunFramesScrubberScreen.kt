@@ -59,7 +59,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -91,6 +91,7 @@ import com.trackspeed.android.ui.theme.TextMuted
 import com.trackspeed.android.ui.theme.TextPrimary
 import com.trackspeed.android.ui.theme.TextSecondary
 import com.trackspeed.android.ui.theme.gradientBackground
+import com.trackspeed.android.ui.util.RetainedFlowLoader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
 import java.util.Locale
@@ -100,12 +101,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
 import com.trackspeed.android.R
 
 private val ScrubberGreen = Color(0xFF4CAF50)
@@ -117,7 +117,9 @@ data class RunFramesScrubberUiState(
     val run: RunEntity? = null,
     val frames: List<LocalGateFrameData> = emptyList(),
     val calibrationSnapshots: List<LocalGateCalibrationSnapshot> = emptyList(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val hasLoadedData: Boolean = run != null,
+    val loadFailed: Boolean = false
 )
 
 @Serializable
@@ -161,20 +163,20 @@ class RunFramesScrubberViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(RunFramesScrubberUiState())
     val uiState: StateFlow<RunFramesScrubberUiState> = _uiState.asStateFlow()
 
+    private val detailLoader = RetainedFlowLoader(viewModelScope) {
+        flow { emit(loadedFrameScrubberState(sessionRepository.getRunById(runId))) }
+    }
+
     init {
         viewModelScope.launch {
-            val run = sessionRepository.getRunById(runId)
-            val payload = parseLocalGateFramePayload(run?.localGateFramesDataJson)
-            _uiState.update {
-                it.copy(
-                    run = run,
-                    frames = payload.frames,
-                    calibrationSnapshots = payload.calibrationSnapshots,
-                    isLoading = false
-                )
+            detailLoader.state.collect { loaded ->
+                _uiState.update { previous -> mergeFrameScrubberLoadState(previous, loaded) }
             }
         }
     }
+
+    fun retryLoading() = detailLoader.retry()
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -184,10 +186,22 @@ fun RunFramesScrubberScreen(
     viewModel: RunFramesScrubberViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    RunFramesScrubberScreenContent(uiState, onNavigateBack, viewModel::retryLoading)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun RunFramesScrubberScreenContent(
+    uiState: RunFramesScrubberUiState,
+    onNavigateBack: () -> Unit,
+    onRetry: () -> Unit
+) {
     var showOverlays by rememberSaveable { mutableStateOf(true) }
     var currentIndex by remember { mutableIntStateOf(0) }
 
     val frames = uiState.frames
+    // A refreshed list may shrink before the selection effect runs.
+    val selectedIndex = currentIndex.coerceIn(0, (frames.size - 1).coerceAtLeast(0))
     val crossingFrameIndex = remember(frames) {
         frames.indices.maxByOrNull { frames[it].occupancy } ?: 0
     }
@@ -241,45 +255,46 @@ fun RunFramesScrubberScreen(
             )
         }
     ) { paddingValues ->
-        val run = uiState.run
-        when {
-            uiState.isLoading -> LoadingScrubber(paddingValues)
-            run == null -> EmptyScrubberState(
-                paddingValues = paddingValues,
-                title = stringResource(R.string.frame_scrubber_run_missing_title),
-                message = stringResource(R.string.frame_scrubber_run_missing_body)
-            )
-            frames.isNotEmpty() -> FrameScrubberContent(
-                paddingValues = paddingValues,
-                run = run,
-                frames = frames,
-                currentIndex = currentIndex,
-                crossingFrameIndex = crossingFrameIndex,
-                showOverlays = showOverlays,
-                onIndexChange = { currentIndex = it.coerceIn(0, frames.lastIndex) }
-            )
-            uiState.calibrationSnapshots.isNotEmpty() -> CalibrationSnapshotContent(
-                paddingValues = paddingValues,
-                snapshots = uiState.calibrationSnapshots
-            )
-            else -> EmptyScrubberState(
-                paddingValues = paddingValues,
-                title = stringResource(R.string.frame_scrubber_no_data_title),
-                message = stringResource(R.string.frame_scrubber_no_data_body)
-            )
+        Column(Modifier.fillMaxSize().padding(paddingValues)) {
+            if (!uiState.hasLoadedData) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    DetailLoadFeedback(uiState.isLoading, uiState.loadFailed, false, onRetry)
+                }
+            } else {
+                if (uiState.isLoading || uiState.loadFailed) {
+                    DetailLoadFeedback(uiState.isLoading, uiState.loadFailed, true, onRetry)
+                }
+                Box(Modifier.fillMaxWidth().weight(1f)) {
+                    val contentPadding = PaddingValues(0.dp)
+                    val run = uiState.run
+                    when {
+                        run == null -> EmptyScrubberState(
+                            paddingValues = contentPadding,
+                            title = stringResource(R.string.frame_scrubber_run_missing_title),
+                            message = stringResource(R.string.frame_scrubber_run_missing_body)
+                        )
+                        frames.isNotEmpty() -> FrameScrubberContent(
+                            paddingValues = contentPadding,
+                            run = run,
+                            frames = frames,
+                            currentIndex = selectedIndex,
+                            crossingFrameIndex = crossingFrameIndex,
+                            showOverlays = showOverlays,
+                            onIndexChange = { currentIndex = it.coerceIn(0, frames.lastIndex) }
+                        )
+                        uiState.calibrationSnapshots.isNotEmpty() -> CalibrationSnapshotContent(
+                            paddingValues = contentPadding,
+                            snapshots = uiState.calibrationSnapshots
+                        )
+                        else -> EmptyScrubberState(
+                            paddingValues = contentPadding,
+                            title = stringResource(R.string.frame_scrubber_no_data_title),
+                            message = stringResource(R.string.frame_scrubber_no_data_body)
+                        )
+                    }
+                }
+            }
         }
-    }
-}
-
-@Composable
-private fun LoadingScrubber(paddingValues: PaddingValues) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator(color = TextPrimary)
     }
 }
 
@@ -321,7 +336,6 @@ private fun EmptyScrubberState(
     }
 }
 
-@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 private fun FrameScrubberContent(
     paddingValues: PaddingValues,
@@ -334,12 +348,15 @@ private fun FrameScrubberContent(
 ) {
     val context = LocalContext.current
     val frame = frames[currentIndex]
-    val bitmap by produceState<Bitmap?>(null, frame.imagePath) {
-        val loadedBitmap = withContext(Dispatchers.IO) {
-            frame.loadBitmap(context)
+    val scope = rememberCoroutineScope()
+    val imageLoader = remember(context, scope) {
+        ScrubberImageLoader<Bitmap>(scope) { imagePath ->
+            withContext(Dispatchers.IO) { loadFrameBitmap(context, imagePath) }
         }
-        value = loadedBitmap
     }
+    val imageState by imageLoader.state.collectAsState()
+    LaunchedEffect(frame.imagePath, imageLoader) { imageLoader.select(frame.imagePath) }
+    val selectedImage = imageState.forSelection(frame.imagePath)
     val gatePosition = remember(run.localGateRole, run.startGatePosition, run.finishGatePosition, run.gatePosition) {
         gatePositionForRun(run)
     }
@@ -363,7 +380,9 @@ private fun FrameScrubberContent(
             verticalArrangement = Arrangement.spacedBy(sectionSpacing)
         ) {
             FrameImagePanel(
-                bitmap = bitmap,
+                bitmap = selectedImage.image,
+                isLoading = selectedImage.isLoading,
+                onRetry = imageLoader::retry,
                 frame = frame,
                 run = run,
                 gatePosition = gatePosition,
@@ -395,6 +414,8 @@ private fun FrameScrubberContent(
 @Composable
 private fun FrameImagePanel(
     bitmap: Bitmap?,
+    isLoading: Boolean,
+    onRetry: () -> Unit,
     frame: LocalGateFrameData,
     run: RunEntity,
     gatePosition: Float,
@@ -457,8 +478,11 @@ private fun FrameImagePanel(
                         }
                     }
                 }
+            } else if (isLoading) {
+                CircularProgressIndicator(color = TextPrimary)
             } else {
                 Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp).verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -469,6 +493,7 @@ private fun FrameImagePanel(
                         modifier = Modifier.size(36.dp)
                     )
                     Text(stringResource(R.string.frame_scrubber_image_unavailable), color = TextSecondary)
+                    Button(onClick = onRetry) { Text(stringResource(R.string.paywall_retry)) }
                     Text(
                         text = stringResource(R.string.parity_replay_image_missing),
                         style = MaterialTheme.typography.labelSmall,
@@ -480,7 +505,7 @@ private fun FrameImagePanel(
                 }
             }
 
-            if (showOverlays && isCrossingFrame) {
+            if (currentBitmap != null && showOverlays && isCrossingFrame) {
                 CrossingMetricsStrip(
                     run = run,
                     frame = frame,
@@ -766,36 +791,9 @@ private fun SnapshotMetric(label: String, value: String) {
     }
 }
 
-private data class LocalGateFramePayload(
-    val frames: List<LocalGateFrameData> = emptyList(),
-    val calibrationSnapshots: List<LocalGateCalibrationSnapshot> = emptyList()
-)
-
-private val localGateJson = Json {
-    ignoreUnknownKeys = true
-    isLenient = true
-}
-
 fun RunEntity.hasFrameScrubberPayload(): Boolean = !localGateFramesDataJson.isNullOrBlank()
 
-private fun parseLocalGateFramePayload(raw: String?): LocalGateFramePayload {
-    if (raw.isNullOrBlank()) return LocalGateFramePayload()
-
-    val frames = runCatching {
-        localGateJson.decodeFromString<List<LocalGateFrameData>>(raw)
-    }.getOrDefault(emptyList())
-        .filter { it.imagePath.isNotBlank() }
-    if (frames.isNotEmpty()) {
-        return LocalGateFramePayload(frames = frames)
-    }
-
-    val calibrationSnapshots = runCatching {
-        localGateJson.decodeFromString<List<LocalGateCalibrationSnapshot>>(raw)
-    }.getOrDefault(emptyList())
-    return LocalGateFramePayload(calibrationSnapshots = calibrationSnapshots)
-}
-
-private fun LocalGateFrameData.loadBitmap(context: Context): Bitmap? {
+private fun loadFrameBitmap(context: Context, imagePath: String): Bitmap? {
     val candidates = buildList {
         if (imagePath.startsWith("file://")) {
             Uri.parse(imagePath).path?.let { add(File(it)) }
