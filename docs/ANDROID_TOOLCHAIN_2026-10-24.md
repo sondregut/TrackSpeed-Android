@@ -1,3 +1,5 @@
+> Latest follow-up: coroutines 1.11.0 now passes 492 JVM and 94 applicable native tests in one complete native run, with unchanged permissions/signing/SDK targets. See [sharing recovery](ANDROID_SHARING_RECOVERY_2026-10-24.md). Other latest major migrations remain staged; earlier validation below is preserved as historical evidence.
+
 # Supported Android toolchain checkpoint — 24 October 2026
 
 The parity branch now uses AGP8.11.1, Gradle8.13, Kotlin2.2.21, KSP2.2.21-2.0.5 (KSP2), Hilt2.58 and Room2.8.5. This is a staged compatible checkpoint, not a claim that every library is latest. Compile/target36, minimum26, JVM17, signing and timing policies are unchanged.

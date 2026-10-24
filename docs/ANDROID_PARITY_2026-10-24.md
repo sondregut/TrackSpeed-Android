@@ -1,3 +1,5 @@
+> Latest verified follow-up: still-image formats/privacy/export fixes are complete at b7e790a; sharing initial-read recovery and coroutines 1.11.0 are now verified with 492 JVM and 94 native tests. See [sharing recovery](ANDROID_SHARING_RECOVERY_2026-10-24.md). The dated counts and open software items below describe the earlier checkpoint, not current status.
+
 # Android parity increment — 24 October 2026
 
 Reference: released iOS 1.0.23 (134), source de9cd581, plus the separately tested editable video-overlay work. Existing Android timing/session changes remain intact. This checkpoint is not a full parity or physical timing acceptance claim.
