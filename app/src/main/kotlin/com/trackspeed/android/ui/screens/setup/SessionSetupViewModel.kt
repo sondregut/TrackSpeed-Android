@@ -95,7 +95,7 @@ class SessionSetupViewModel @Inject constructor(
     private val preset = presetId?.let { TestPreset.preset(it) }
 
     private val initialDistance = savedStateHandle.get<Float>("distance")
-        ?.toDouble()?.takeIf { it > 0 }
+        ?.toDouble()?.takeIf(SessionDistanceInput::isValidMeters)
     private val initialStartType = savedStateHandle.get<String>("startType")?.ifBlank { null }
     private val routeMinPhones = savedStateHandle.get<Int>("minPhones") ?: 2
     private val allowsSolo = savedStateHandle.get<Boolean>("allowsSolo") ?: false
@@ -214,8 +214,9 @@ class SessionSetupViewModel @Inject constructor(
             gatePositions = gatePositionsFor(gateCount, distance),
             selectedHostRole = selection.hostRole,
             isReady = gateCount == 1 ||
-                ((customText.isBlank() || customText.toDoubleOrNull()?.let { it > 0 } == true) &&
-                    (preset?.isSinglePhone == true || distance > 0))
+                ((preset?.isSinglePhone == true &&
+                    (customText.isBlank() || SessionDistanceInput.parseMeters(customText) != null)) ||
+                    SessionDistanceInput.permitsSelection(customText, distance))
         )
     }.stateIn(
         scope = viewModelScope,
@@ -291,14 +292,15 @@ class SessionSetupViewModel @Inject constructor(
     }
 
     fun selectDistance(meters: Double) {
+        if (!SessionDistanceInput.isValidMeters(meters)) return
         _selectedDistance.value = meters
         _customDistanceText.value = ""
     }
 
     fun setCustomDistance(text: String) {
         _customDistanceText.value = text
-        text.toDoubleOrNull()?.let { value ->
-            if (value > 0) _selectedDistance.value = value
+        SessionDistanceInput.parseMeters(text)?.let { meters ->
+            _selectedDistance.value = meters
         }
     }
 
