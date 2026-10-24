@@ -64,6 +64,7 @@ class BleClockSyncService @Inject constructor(
         private const val PRE_GATT_BOND_TIMEOUT_MS = 60_000L
         private const val BOND_STATE_POLL_MS = 250L
         private const val DEFAULT_ATT_PAYLOAD_BYTES = 20
+        private const val ATT_INVALID_HANDLE = 0x01
         private const val BOND_RETRY_DELAY_MS = 1_000L
         private const val MAX_BOND_RETRIES = 60
         private val CLIENT_CHARACTERISTIC_CONFIG_UUID: UUID =
@@ -134,6 +135,8 @@ class BleClockSyncService @Inject constructor(
     // GATT components
     @Volatile private var gattServer: BluetoothGattServer? = null
     @Volatile private var gattClient: BluetoothGatt? = null
+    private val clientRecovery = BleClientRecoveryPolicy()
+    @Volatile private var clientGattGeneration = 0L
     @Volatile private var pendingGattService: BluetoothGattService? = null
     private val acceptingServerConnections = AtomicBoolean(false)
     // Multi-client: map of device address -> BluetoothDevice
@@ -216,7 +219,8 @@ class BleClockSyncService @Inject constructor(
     private data class ClientWritePacket(
         val data: ByteArray,
         val writeType: Int,
-        val retryAfterBond: Boolean = true
+        val retryAfterBond: Boolean = true,
+        val generation: Long
     )
 
     private val clientWriteQueue = ConcurrentLinkedDeque<ClientWritePacket>()
@@ -255,7 +259,10 @@ class BleClockSyncService @Inject constructor(
         serviceScope.launch {
             while (isActive) {
                 delay(CriticalMessageRetryTracker.CHECK_INTERVAL_MS)
-                criticalMessageRetries.poll().forEach(::processCriticalRetryAction)
+                val generation = clientRecovery.generation()
+                clientRecovery.runIfCurrent(generation) {
+                    criticalMessageRetries.poll().forEach(::processCriticalRetryAction)
+                }
             }
         }
     }
@@ -446,11 +453,16 @@ class BleClockSyncService @Inject constructor(
         val awareService = wifiAwareClockSyncService
         if (!peerSupportsAware || awareService?.isAvailable() != true) return false
 
+        val clockGeneration = clientRecovery.generation()
         val started = awareService.startReference(
             sessionId = sessionId,
             requesterId = requesterDeviceId,
             referenceId = deviceId,
-            onProgress = ::publishWifiAwareReferenceProgress
+            onProgress = { progress ->
+                clientRecovery.runIfCurrent(clockGeneration) {
+                    publishWifiAwareReferenceProgress(progress)
+                }
+            }
         )
         if (started) {
             Log.i(
@@ -499,6 +511,8 @@ class BleClockSyncService @Inject constructor(
     @SuppressLint("MissingPermission")
     private fun prepareForNewTransportStart() {
         transportGeneration.incrementAndGet()
+        clientRecovery.reset()
+        syncConnectionPriorityGeneration.incrementAndGet()
         val previousWasServer = role == Role.Server
         role = null
         syncJob?.cancel()
@@ -555,6 +569,8 @@ class BleClockSyncService @Inject constructor(
     @SuppressLint("MissingPermission")
     fun stop() {
         transportGeneration.incrementAndGet()
+        clientRecovery.reset()
+        syncConnectionPriorityGeneration.incrementAndGet()
         val wasServer = role == Role.Server
         role = null
         syncJob?.cancel()
@@ -1342,6 +1358,7 @@ class BleClockSyncService @Inject constructor(
         Log.i(TAG, "Connecting to server: ${device.address}")
 
         scheduleGattReadyTimeout(device.address)
+        clientGattGeneration = clientRecovery.generation()
         gattClient = try {
             device.connectGatt(
                 context,
@@ -1374,24 +1391,22 @@ class BleClockSyncService @Inject constructor(
         gattReadyTimeoutRunnable = null
     }
 
+    /** Drop only this central connection. Peripheral/host peers are not affected. */
     @SuppressLint("MissingPermission")
-    private fun restartClientDiscovery(reason: String) {
-        Log.i(TAG, "Restarting BLE client discovery: $reason")
+    private fun clearClientConnection() {
         cancelBondPreparation()
         cancelGattReadyTimeout()
         connectingDeviceAddress = null
-        try {
-            gattClient?.disconnect()
-        } catch (e: Exception) {
-            Log.w(TAG, "disconnect during restart failed: ${e.message}")
+        val client = gattClient
+        // Detach before disconnect/close so late callbacks fail the object-identity guard.
+        gattClient = null
+        client?.device?.address?.let { address ->
+            connectedDevices.remove(address)
+            protocolReadyDevices.remove(address)
         }
-        closeGattClient()
-        connectedDevices.clear()
-        protocolReadyDevices.clear()
-        activeClientPeerAdvertisesAndroid = false
-        activeClientPeerWifiAwareCapable = false
         txCharacteristic = null
         rxCharacteristic = null
+        activeClientPeerWifiAwareCapable = false
         clientWriteQueue.clear()
         isClientWritePending.set(false)
         clientWriteInFlight = null
@@ -1400,44 +1415,120 @@ class BleClockSyncService @Inject constructor(
         notificationBondRetryCount = 0
         criticalMessageRetries.clear()
 
-        if (bluetoothAdapter?.isEnabled == true && role == Role.Client) {
+        // Invalidation already advanced the generation. Cancellation alone cannot
+        // prevent an old result callback from restoring the new link's readiness.
+        syncConnectionPriorityGeneration.incrementAndGet()
+        syncJob?.cancel()
+        syncJob = null
+        reverseProbeJob?.cancel()
+        reverseProbeJob = null
+        lowLatencyPriorityReassertJob?.cancel()
+        lowLatencyPriorityReassertJob = null
+        cancelWifiAwareClockReference()
+        syncCalculator = null
+        _syncResult.value = null
+        pendingPings.clear()
+        reverseProbes.clear()
+        localIsClockReference = false
+        authorizedReferenceDeviceId = null
+        activeSyncTargetAddress = null
+        measurementStartedAtNanos = 0L
+        lastForwardPingReceivedAtNanos.set(0L)
+        referenceSyncPingCount.set(0)
+        referenceSetupProgressOpen.set(false)
+
+        runCatching { client?.disconnect() }
+            .onFailure { Log.w(TAG, "Client disconnect during recovery failed: ${it.message}") }
+        runCatching { client?.close() }
+            .onFailure { Log.w(TAG, "Client close during recovery failed: ${it.message}") }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun restartClientDiscovery(reason: String) {
+        if (role != Role.Client) return
+        Log.i(TAG, "Restarting BLE client discovery: $reason")
+        val recoveryFailed = clientRecovery.isRecovering()
+        if (recoveryFailed) clientRecovery.fail() else clientRecovery.invalidateConnection()
+        clearClientConnection()
+        activeClientPeerAdvertisesAndroid = false
+        if (recoveryFailed) {
+            _state.value = State.Error("Bluetooth couldn't send the session setup. Reconnect and try again.")
+            return
+        }
+        if (bluetoothAdapter?.isEnabled == true) {
             _state.value = State.Scanning
             startScanning()
-        } else if (bluetoothAdapter?.isEnabled != true) {
+        } else {
             _state.value = State.Error("Bluetooth is not enabled")
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun recoverClientGatt(gatt: BluetoothGatt, reason: String) {
+        if (role != Role.Client || gattClient !== gatt) return
+        val decision = clientRecovery.recover(clientGattGeneration)
+        if (decision == BleClientRecoveryPolicy.Decision.IGNORE) return
+        val device = gatt.device
+        Log.w(TAG, "Client: Invalidating GATT session after $reason ($decision)")
+        clearClientConnection()
+        if (decision == BleClientRecoveryPolicy.Decision.FAIL_CLOSED) {
+            _state.value = State.Error("Bluetooth couldn't send the session setup. Reconnect and try again.")
+            return
+        }
+        _state.value = State.Connecting
+        val generation = clientRecovery.generation()
+        handler.post {
+            clientRecovery.runIfCurrent(generation) {
+                if (role == Role.Client) {
+                    // A new public GATT connection rejects all old callbacks by
+                    // object identity, then repeats MTU/discovery/encrypted CCC.
+                    connectToServer(device)
+                }
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun hasReadyClientRoute(): Boolean = gattClient?.let {
+        protocolReadyDevices.contains(it.device.address) &&
+            clientRecovery.isProtocolReady(clientGattGeneration)
+    } == true
+
+    private fun withCurrentClientGatt(gatt: BluetoothGatt, action: () -> Unit) {
+        val generation = clientGattGeneration
+        clientRecovery.runIfCurrent(generation) {
+            if (gattClient === gatt) action()
         }
     }
 
     private val gattClientCallback = object : BluetoothGattCallback() {
         @SuppressLint("MissingPermission")
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-            if (gattClient !== gatt) {
-                runCatching { gatt.close() }
-                return
-            }
-            when (newState) {
-                BluetoothProfile.STATE_CONNECTED -> {
-                    Log.i(TAG, "Client: Connected to server")
-                    connectedDevices[gatt.device.address] = gatt.device
-                    requestLowLatencyClientLink("connected", gatt)
-                    // Request large MTU for JSON messages (~250-400 bytes)
-                    if (!gatt.requestMtu(ClockSyncConfig.PREFERRED_MTU)) {
-                        Log.w(TAG, "Client: MTU request was not queued; discovering services at default MTU")
-                        if (!gatt.discoverServices()) {
-                            restartClientDiscovery("service_discovery_not_queued")
+            withCurrentClientGatt(gatt) {
+                when (newState) {
+                    BluetoothProfile.STATE_CONNECTED -> {
+                        Log.i(TAG, "Client: Connected to server")
+                        connectedDevices[gatt.device.address] = gatt.device
+                        requestLowLatencyClientLink("connected", gatt)
+                        // Request large MTU for JSON messages (~250-400 bytes)
+                        if (!gatt.requestMtu(ClockSyncConfig.PREFERRED_MTU)) {
+                            Log.w(TAG, "Client: MTU request was not queued; discovering services at default MTU")
+                            if (!gatt.discoverServices()) {
+                                restartClientDiscovery("service_discovery_not_queued")
+                            }
                         }
                     }
-                }
-                BluetoothProfile.STATE_DISCONNECTED -> {
-                    Log.i(TAG, "Client: Disconnected from server")
-                    connectedDevices.remove(gatt.device.address)
-                    protocolReadyDevices.remove(gatt.device.address)
-                    activeClientPeerAdvertisesAndroid = false
-                    activeClientPeerWifiAwareCapable = false
-                    if (role == Role.Client) {
-                        restartClientDiscovery("client_disconnected")
-                    } else {
-                        closeGattClient()
+                    BluetoothProfile.STATE_DISCONNECTED -> {
+                        Log.i(TAG, "Client: Disconnected from server")
+                        connectedDevices.remove(gatt.device.address)
+                        protocolReadyDevices.remove(gatt.device.address)
+                        activeClientPeerAdvertisesAndroid = false
+                        activeClientPeerWifiAwareCapable = false
+                        if (role == Role.Client) {
+                            restartClientDiscovery("client_disconnected")
+                        } else {
+                            closeGattClient()
+                        }
                     }
                 }
             }
@@ -1445,18 +1536,16 @@ class BleClockSyncService @Inject constructor(
 
         @SuppressLint("MissingPermission")
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-            if (gattClient !== gatt) {
-                runCatching { gatt.close() }
-                return
-            }
-            Log.i(TAG, "Client: MTU changed to $mtu (status=$status)")
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                clientMaximumPacketBytes = BleMessageFramer.maximumPacketBytesForMtu(mtu)
-                Log.i(TAG, "Client: GATT value cap=${clientMaximumPacketBytes}B")
-            }
-            // Proceed with service discovery regardless of MTU result
-            if (!gatt.discoverServices()) {
-                restartClientDiscovery("service_discovery_not_queued")
+            withCurrentClientGatt(gatt) {
+                Log.i(TAG, "Client: MTU changed to $mtu (status=$status)")
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    clientMaximumPacketBytes = BleMessageFramer.maximumPacketBytesForMtu(mtu)
+                    Log.i(TAG, "Client: GATT value cap=${clientMaximumPacketBytes}B")
+                }
+                // Proceed with service discovery regardless of MTU result
+                if (!gatt.discoverServices()) {
+                    restartClientDiscovery("service_discovery_not_queued")
+                }
             }
         }
 
@@ -1473,62 +1562,68 @@ class BleClockSyncService @Inject constructor(
             )
         }
 
+        override fun onServiceChanged(gatt: BluetoothGatt) {
+            withCurrentClientGatt(gatt) {
+                // API 31+: the database is out of sync. Reconnect and rediscover
+                // using public APIs; never keep using the old characteristic handles.
+                recoverClientGatt(gatt, "service_changed")
+            }
+        }
+
         @SuppressLint("MissingPermission")
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-            if (gattClient !== gatt) {
-                runCatching { gatt.close() }
-                return
-            }
-            if (status != BluetoothGatt.GATT_SUCCESS) {
-                Log.w(TAG, "Service discovery failed: status=$status")
-                restartClientDiscovery("service_discovery_failed")
-                return
-            }
+            withCurrentClientGatt(gatt) {
+                if (status != BluetoothGatt.GATT_SUCCESS) {
+                    Log.w(TAG, "Service discovery failed: status=$status")
+                    restartClientDiscovery("service_discovery_failed")
+                    return@withCurrentClientGatt
+                }
 
-            val service = gatt.getService(ClockSyncConfig.SERVICE_UUID)
-            if (service == null) {
-                Log.w(TAG, "Clock sync service not found")
-                restartClientDiscovery("service_not_found")
-                return
-            }
+                val service = gatt.getService(ClockSyncConfig.SERVICE_UUID)
+                if (service == null) {
+                    Log.w(TAG, "Clock sync service not found")
+                    restartClientDiscovery("service_not_found")
+                    return@withCurrentClientGatt
+                }
 
-            // TX characteristic (host -> joiner): we subscribe to notifications on this
-            // RX characteristic (joiner -> host): we write ping messages to this
-            txCharacteristic = service.getCharacteristic(ClockSyncConfig.PING_CHARACTERISTIC_UUID)
-            rxCharacteristic = service.getCharacteristic(ClockSyncConfig.PONG_CHARACTERISTIC_UUID)
+                // TX characteristic (host -> joiner): we subscribe to notifications on this
+                // RX characteristic (joiner -> host): we write ping messages to this
+                txCharacteristic = service.getCharacteristic(ClockSyncConfig.PING_CHARACTERISTIC_UUID)
+                rxCharacteristic = service.getCharacteristic(ClockSyncConfig.PONG_CHARACTERISTIC_UUID)
 
-            if (txCharacteristic == null || rxCharacteristic == null) {
-                Log.w(TAG, "Required characteristics not found")
-                restartClientDiscovery("characteristics_not_found")
-                return
-            }
-            // Enable notifications on TX characteristic (host -> joiner)
-            // This is where we receive pong responses
-            if (!gatt.setCharacteristicNotification(txCharacteristic, true)) {
-                Log.w(TAG, "Client: Failed to enable local notification routing")
-                restartClientDiscovery("notification_routing_failed")
-                return
-            }
-            val descriptor = txCharacteristic?.getDescriptor(
-                CLIENT_CHARACTERISTIC_CONFIG_UUID
-            )
-            if (descriptor == null) {
-                Log.w(TAG, "Client: Notification descriptor not found")
-                restartClientDiscovery("notification_descriptor_not_found")
-                return
-            }
-            if (!writeDescriptorCompat(
-                    gatt,
-                    descriptor,
-                    BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                if (txCharacteristic == null || rxCharacteristic == null) {
+                    Log.w(TAG, "Required characteristics not found")
+                    restartClientDiscovery("characteristics_not_found")
+                    return@withCurrentClientGatt
+                }
+                // Enable notifications on TX characteristic (host -> joiner)
+                // This is where we receive pong responses
+                if (!gatt.setCharacteristicNotification(txCharacteristic, true)) {
+                    Log.w(TAG, "Client: Failed to enable local notification routing")
+                    restartClientDiscovery("notification_routing_failed")
+                    return@withCurrentClientGatt
+                }
+                val descriptor = txCharacteristic?.getDescriptor(
+                    CLIENT_CHARACTERISTIC_CONFIG_UUID
                 )
-            ) {
-                Log.w(TAG, "Client: Failed to start notification descriptor write")
-                restartClientDiscovery("notification_descriptor_write_failed")
-                return
-            }
+                if (descriptor == null) {
+                    Log.w(TAG, "Client: Notification descriptor not found")
+                    restartClientDiscovery("notification_descriptor_not_found")
+                    return@withCurrentClientGatt
+                }
+                if (!writeDescriptorCompat(
+                        gatt,
+                        descriptor,
+                        BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    )
+                ) {
+                    Log.w(TAG, "Client: Failed to start notification descriptor write")
+                    restartClientDiscovery("notification_descriptor_write_failed")
+                    return@withCurrentClientGatt
+                }
 
-            Log.i(TAG, "Client: Services discovered, enabling encrypted notifications")
+                Log.i(TAG, "Client: Services discovered, enabling encrypted notifications")
+            }
         }
 
         @SuppressLint("MissingPermission")
@@ -1537,40 +1632,39 @@ class BleClockSyncService @Inject constructor(
             descriptor: BluetoothGattDescriptor,
             status: Int
         ) {
-            if (gattClient !== gatt) {
-                runCatching { gatt.close() }
-                return
-            }
-            if (descriptor.uuid != CLIENT_CHARACTERISTIC_CONFIG_UUID ||
-                descriptor.characteristic.uuid != ClockSyncConfig.PING_CHARACTERISTIC_UUID
-            ) {
-                Log.w(TAG, "Client: Ignoring unexpected descriptor callback for ${descriptor.uuid}")
-                return
-            }
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                notificationBondRetryCount = 0
-                cancelGattReadyTimeout()
-                connectingDeviceAddress = null
-                protocolReadyDevices.add(gatt.device.address)
-                Log.i(TAG, "Client: Encrypted notifications enabled, ready for protocol handshake")
-                _state.value = State.Connected
-                if (activeClientPeerAdvertisesAndroid) {
-                    sendMessage(
-                        TimingPayload.AndroidTransportCapabilities(
-                            wifiAwareClockSync = localWifiAwareClockSyncAvailable()
-                        )
-                    )
-                    Log.i(
-                        TAG,
-                        "Client: Sent Android transport capabilities " +
-                            "(wifiAware=${localWifiAwareClockSyncAvailable()})"
-                    )
+            withCurrentClientGatt(gatt) {
+                if (descriptor.uuid != CLIENT_CHARACTERISTIC_CONFIG_UUID ||
+                    descriptor.characteristic.uuid != ClockSyncConfig.PING_CHARACTERISTIC_UUID
+                ) {
+                    Log.w(TAG, "Client: Ignoring unexpected descriptor callback for ${descriptor.uuid}")
+                    return@withCurrentClientGatt
                 }
-            } else if (isAuthenticationFailure(status)) {
-                retryEncryptedNotificationSetup(gatt, descriptor)
-            } else {
-                Log.w(TAG, "Client: Notification descriptor write failed: status=$status")
-                restartClientDiscovery("notification_descriptor_status_$status")
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    if (!clientRecovery.notificationsReady(clientGattGeneration)) return@withCurrentClientGatt
+                    notificationBondRetryCount = 0
+                    cancelGattReadyTimeout()
+                    connectingDeviceAddress = null
+                    protocolReadyDevices.add(gatt.device.address)
+                    Log.i(TAG, "Client: Encrypted notifications enabled, ready for protocol handshake")
+                    _state.value = State.Connected
+                    if (activeClientPeerAdvertisesAndroid) {
+                        sendMessage(
+                            TimingPayload.AndroidTransportCapabilities(
+                                wifiAwareClockSync = localWifiAwareClockSyncAvailable()
+                            )
+                        )
+                        Log.i(
+                            TAG,
+                            "Client: Sent Android transport capabilities " +
+                                "(wifiAware=${localWifiAwareClockSyncAvailable()})"
+                        )
+                    }
+                } else if (isAuthenticationFailure(status)) {
+                    retryEncryptedNotificationSetup(gatt, descriptor)
+                } else {
+                    Log.w(TAG, "Client: Notification descriptor write failed: status=$status")
+                    restartClientDiscovery("notification_descriptor_status_$status")
+                }
             }
         }
 
@@ -1580,25 +1674,27 @@ class BleClockSyncService @Inject constructor(
             characteristic: BluetoothGattCharacteristic,
             status: Int
         ) {
-            if (gattClient !== gatt) {
-                runCatching { gatt.close() }
-                return
-            }
-            isClientWritePending.set(false)
-            val inFlight = clientWriteInFlight
-            clientWriteInFlight = null
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                drainClientWriteQueue()
-            } else if (isAuthenticationFailure(status) && inFlight != null) {
-                Log.w(TAG, "Client: Encrypted write requires bonding; retrying after bond")
-                // A clock packet's captured t1/t3 must never survive a bond
-                // retry delay. The requester will sample again with a new ID.
-                if (inFlight.retryAfterBond) clientWriteQueue.addFirst(inFlight)
-                runCatching { gatt.device.createBond() }
-                handler.postDelayed({ drainClientWriteQueue() }, BOND_RETRY_DELAY_MS)
-            } else {
-                Log.w(TAG, "Client: Write failed: status=$status; clearing queued packets")
-                clientWriteQueue.clear()
+            withCurrentClientGatt(gatt) {
+                if (status == ATT_INVALID_HANDLE) {
+                    recoverClientGatt(gatt, "invalid_handle")
+                    return@withCurrentClientGatt
+                }
+                isClientWritePending.set(false)
+                val inFlight = clientWriteInFlight
+                clientWriteInFlight = null
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    drainClientWriteQueue()
+                } else if (isAuthenticationFailure(status) && inFlight != null) {
+                    Log.w(TAG, "Client: Encrypted write requires bonding; retrying after bond")
+                    // A clock packet's captured t1/t3 must never survive a bond
+                    // retry delay. The requester will sample again with a new ID.
+                    if (inFlight.retryAfterBond) clientWriteQueue.addFirst(inFlight)
+                    runCatching { gatt.device.createBond() }
+                    handler.postDelayed({ drainClientWriteQueue() }, BOND_RETRY_DELAY_MS)
+                } else {
+                    Log.w(TAG, "Client: Write failed: status=$status; clearing queued packets")
+                    clientWriteQueue.clear()
+                }
             }
         }
 
@@ -1607,9 +1703,11 @@ class BleClockSyncService @Inject constructor(
             characteristic: BluetoothGattCharacteristic
         ) {
             val receivedAtNanos = SystemClock.elapsedRealtimeNanos()
-            if (gattClient !== gatt) return
-            if (characteristic.uuid == ClockSyncConfig.PING_CHARACTERISTIC_UUID) {
-                handleClientPacket(characteristic.value, receivedAtNanos)
+            withCurrentClientGatt(gatt) {
+                if (!hasReadyClientRoute()) return@withCurrentClientGatt
+                if (characteristic.uuid == ClockSyncConfig.PING_CHARACTERISTIC_UUID) {
+                    handleClientPacket(characteristic.value, receivedAtNanos)
+                }
             }
         }
 
@@ -1620,9 +1718,11 @@ class BleClockSyncService @Inject constructor(
             value: ByteArray
         ) {
             val receivedAtNanos = SystemClock.elapsedRealtimeNanos()
-            if (gattClient !== gatt) return
-            if (characteristic.uuid == ClockSyncConfig.PING_CHARACTERISTIC_UUID) {
-                handleClientPacket(value, receivedAtNanos)
+            withCurrentClientGatt(gatt) {
+                if (!hasReadyClientRoute()) return@withCurrentClientGatt
+                if (characteristic.uuid == ClockSyncConfig.PING_CHARACTERISTIC_UUID) {
+                    handleClientPacket(value, receivedAtNanos)
+                }
             }
         }
     }
@@ -1687,180 +1787,199 @@ class BleClockSyncService @Inject constructor(
         referenceDeviceId: String? = authorizedReferenceDeviceId,
         referenceDeviceAddress: String? = null
     ) {
-        if (localIsClockReference) {
-            Log.i(TAG, "Reference clock is waiting for peer pings; requester sync was not started")
-            return
-        }
-        authorizedReferenceDeviceId = referenceDeviceId ?: authorizedReferenceDeviceId
-        activeSyncTargetAddress = referenceDeviceAddress
-            ?: activeSyncTargetAddress
-            ?: connectedDevice?.address
-        if (role == Role.Server && activeSyncTargetAddress == null) {
-            _state.value = State.Error("Clock sync couldn't find the assigned start phone.")
-            return
-        }
-        syncJob?.cancel()
-        syncJob = null
-        syncCalculator = null
-        _syncResult.value = null
-        pendingPings.clear()
-        reverseProbes.clear()
-        measurementStartedAtNanos = SystemClock.elapsedRealtimeNanos()
-        _state.value = State.Syncing(0f)
-        Log.i(TAG, "Starting clock synchronization (${ClockSyncConfig.FULL_SYNC_SAMPLES} samples, JSON protocol)...")
-
-        val priorityGeneration = beginSyncConnectionPriorityWindow()
-        val diagnosticSamplingToken = connectionDiagnostics.samplingGate.begin()
-        val diagnostic = diagnosticAttempt
-        // Lane selection follows the capability exchange below; do not prematurely label it BLE.
-        diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC, ConnectionDiagnosticOutcome.STARTED,
-            ConnectionDiagnosticTransport.UNKNOWN,
-            sessionId = runCatching { UUID.fromString(sessionId) }.getOrNull()) { event ->
-            event.copy(role = ConnectionDiagnosticRole.REQUESTER,
-                capabilitySupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
-                peerCapability = activeSyncPeerSupportsWifiAware())
-        }
-        syncJob = serviceScope.launch {
-            var lastResult: ClockSyncCalculator.SyncResult? = null
-
-            // A current Android client advertises its platform token before
-            // connecting, then both apps exchange an explicit capability over
-            // the encrypted GATT link. Give that reply one bounded moment to
-            // arrive so an Android pair does not race straight into BLE sync.
-            if (role == Role.Client &&
-                activeClientPeerAdvertisesAndroid &&
-                !activeClientPeerWifiAwareCapable
-            ) {
-                repeat(10) {
-                    if (activeClientPeerWifiAwareCapable) return@repeat
-                    delay(100L)
-                }
+        val clockGeneration = clientRecovery.generation()
+        clientRecovery.runIfCurrent(clockGeneration) setup@{
+            if (role == Role.Client && !hasReadyClientRoute()) {
+                Log.i(TAG, "Requester sync is waiting for fresh encrypted GATT readiness")
+                return@setup
             }
+            if (localIsClockReference) {
+                Log.i(TAG, "Reference clock is waiting for peer pings; requester sync was not started")
+                return@setup
+            }
+            authorizedReferenceDeviceId = referenceDeviceId ?: authorizedReferenceDeviceId
+            activeSyncTargetAddress = referenceDeviceAddress
+                ?: activeSyncTargetAddress
+                ?: connectedDevice?.address
+            if (role == Role.Server && activeSyncTargetAddress == null) {
+                _state.value = State.Error("Clock sync couldn't find the assigned start phone.")
+                return@setup
+            }
+            syncJob?.cancel()
+            syncJob = null
+            syncCalculator = null
+            _syncResult.value = null
+            pendingPings.clear()
+            reverseProbes.clear()
+            measurementStartedAtNanos = SystemClock.elapsedRealtimeNanos()
+            _state.value = State.Syncing(0f)
+            Log.i(TAG, "Starting clock synchronization (${ClockSyncConfig.FULL_SYNC_SAMPLES} samples, JSON protocol)...")
 
-            val referenceId = authorizedReferenceDeviceId
-            val awareService = wifiAwareClockSyncService
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                referenceId != null &&
-                activeSyncPeerSupportsWifiAware() &&
-                awareService?.isAvailable() == true
-            ) {
-                Log.i(TAG, "Trying secured Wi-Fi Aware clock lane before BLE sampling")
-                val awareResult = awareService.measureAsRequester(
-                    sessionId = sessionId,
-                    requesterId = deviceId,
-                    referenceId = referenceId
-                ) { progress ->
-                    val current = (_state.value as? State.Syncing)?.progress ?: 0f
-                    _state.value = State.Syncing(maxOf(current, progress))
+            val priorityGeneration = beginSyncConnectionPriorityWindow()
+            val diagnosticSamplingToken = connectionDiagnostics.samplingGate.begin()
+            val diagnostic = diagnosticAttempt
+            // Lane selection follows the capability exchange below; do not prematurely label it BLE.
+            diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC, ConnectionDiagnosticOutcome.STARTED,
+                ConnectionDiagnosticTransport.UNKNOWN,
+                sessionId = runCatching { UUID.fromString(sessionId) }.getOrNull()) { event ->
+                event.copy(role = ConnectionDiagnosticRole.REQUESTER,
+                    capabilitySupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
+                    peerCapability = activeSyncPeerSupportsWifiAware())
+            }
+            syncJob = serviceScope.launch {
+                var lastResult: ClockSyncCalculator.SyncResult? = null
+
+                // A current Android client advertises its platform token before
+                // connecting, then both apps exchange an explicit capability over
+                // the encrypted GATT link. Give that reply one bounded moment to
+                // arrive so an Android pair does not race straight into BLE sync.
+                if (role == Role.Client &&
+                    activeClientPeerAdvertisesAndroid &&
+                    !activeClientPeerWifiAwareCapable
+                ) {
+                    repeat(10) {
+                        if (activeClientPeerWifiAwareCapable) return@repeat
+                        delay(100L)
+                    }
                 }
-                lastResult = awareResult
-                if (awareResult != null && awareResult.isSetupAcceptable()) {
-                    _syncResult.value = awareResult
-                    _state.value = State.Synced(awareResult)
-                    Log.i(
+
+                val referenceId = authorizedReferenceDeviceId
+                val awareService = wifiAwareClockSyncService
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    referenceId != null &&
+                    activeSyncPeerSupportsWifiAware() &&
+                    awareService?.isAvailable() == true
+                ) {
+                    Log.i(TAG, "Trying secured Wi-Fi Aware clock lane before BLE sampling")
+                    val awareResult = awareService.measureAsRequester(
+                        sessionId = sessionId,
+                        requesterId = deviceId,
+                        referenceId = referenceId
+                    ) { progress ->
+                        clientRecovery.runIfCurrent(clockGeneration) {
+                            val current = (_state.value as? State.Syncing)?.progress ?: 0f
+                            _state.value = State.Syncing(maxOf(current, progress))
+                        }
+                    }
+                    lastResult = awareResult
+                    if (awareResult != null && awareResult.isSetupAcceptable()) {
+                        if (!clientRecovery.runIfCurrent(clockGeneration) {
+                                _syncResult.value = awareResult
+                                _state.value = State.Synced(awareResult)
+                            }) return@launch
+                        Log.i(
+                            TAG,
+                            "Wi-Fi Aware sync complete: " +
+                                "offset=${String.format(Locale.US, "%.2f", awareResult.offsetMs)}ms, " +
+                                "uncertainty=${String.format(Locale.US, "%.2f", awareResult.uncertaintyMs)}ms, " +
+                                "quality=${awareResult.quality}, " +
+                                "samples=${awareResult.samplesUsed}/${awareResult.totalSamples}"
+                        )
+                        recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.WIFI_AWARE,
+                            ConnectionDiagnosticOutcome.SUCCEEDED, awareResult)
+                        return@launch
+                    }
+                    Log.w(
                         TAG,
-                        "Wi-Fi Aware sync complete: " +
-                            "offset=${String.format(Locale.US, "%.2f", awareResult.offsetMs)}ms, " +
-                            "uncertainty=${String.format(Locale.US, "%.2f", awareResult.uncertaintyMs)}ms, " +
-                            "quality=${awareResult.quality}, " +
-                            "samples=${awareResult.samplesUsed}/${awareResult.totalSamples}"
+                        "Wi-Fi Aware clock lane did not pass; falling back to BLE " +
+                            "(uncertainty=${awareResult?.uncertaintyMs ?: "none"})"
                     )
                     recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.WIFI_AWARE,
-                        ConnectionDiagnosticOutcome.SUCCEEDED, awareResult)
-                    return@launch
+                        ConnectionDiagnosticOutcome.FALLBACK, awareResult)
                 }
-                Log.w(
-                    TAG,
-                    "Wi-Fi Aware clock lane did not pass; falling back to BLE " +
-                        "(uncertainty=${awareResult?.uncertaintyMs ?: "none"})"
-                )
-                recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.WIFI_AWARE,
-                    ConnectionDiagnosticOutcome.FALLBACK, awareResult)
+
+                diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC, ConnectionDiagnosticOutcome.STARTED,
+                    ConnectionDiagnosticTransport.BLE, runCatching { UUID.fromString(sessionId) }.getOrNull()) {
+                    it.copy(role = ConnectionDiagnosticRole.REQUESTER)
+                }
+                val measurementCalculator = ClockSyncCalculator(isFullSync = true)
+                if (!clientRecovery.runIfCurrent(clockGeneration) {
+                        syncCalculator = measurementCalculator
+                    }) return@launch
+
+                // Auto-retry up to MAX_SYNC_RETRIES times. Keep accepted samples
+                // across attempts: both rounds share the same monotonic clock window,
+                // and the one-way estimator's drift margin covers the full duration.
+                // Pooling independent extrema tightens the safe bound instead of
+                // discarding a useful first round when it narrowly misses the gate.
+                for (attempt in 1..ClockSyncConfig.MAX_SYNC_RETRIES) {
+                    if (!clientRecovery.runIfCurrent(clockGeneration) { pendingPings.clear() }) return@launch
+
+                    Log.i(TAG, "Sync attempt $attempt/${ClockSyncConfig.MAX_SYNC_RETRIES}")
+
+                    repeat(ClockSyncConfig.FULL_SYNC_SAMPLES) { i ->
+                        if (!isActive) return@launch
+
+                        delay(ClockSyncLaunchPhasePolicy.delayMs(Math.random()))
+                        if (!clientRecovery.runIfCurrent(clockGeneration) { sendPing() }) return@launch
+                        delay(ClockSyncConfig.FULL_SYNC_INTERVAL_MS)
+
+                        // Update progress
+                        val completedSamples =
+                            ((attempt - 1) * ClockSyncConfig.FULL_SYNC_SAMPLES) + i + 1
+                        val sampleProgress = ClockSyncSetupProgress.fromCompletedSamples(completedSamples)
+                        if (!clientRecovery.runIfCurrent(clockGeneration) {
+                                val currentProgress = (_state.value as? State.Syncing)?.progress ?: 0f
+                                _state.value = State.Syncing(maxOf(currentProgress, sampleProgress))
+                            }) return@launch
+                    }
+
+                    // Keep the forward lane quiet until the reference's reverse-probe
+                    // burst has observed its idle timeout and exited. Those tail probes
+                    // avoid forward/pong contention and are the cleanest lower-bound
+                    // observations on Android links that stay at a 30 ms interval.
+                    delay(ClockSyncReverseProbeSchedulePolicy.RESULT_SETTLE_MS)
+
+                    // Calculate result
+                    val baseline = measurementCalculator.calculateOffset()
+                    val result = baseline?.let(::selectOneWayBoundIfTighter)
+                    lastResult = result
+
+                    if (result != null && result.isSetupAcceptable()) {
+                        if (!clientRecovery.runIfCurrent(clockGeneration) {
+                                _syncResult.value = result
+                                _state.value = State.Synced(result)
+                            }) return@launch
+                        Log.i(TAG, "Sync complete (attempt $attempt): " +
+                            "offset=${String.format(Locale.US, "%.2f", result.offsetMs)}ms, " +
+                            "uncertainty=${String.format(Locale.US, "%.2f", result.uncertaintyMs)}ms, " +
+                            "quality=${result.quality}, " +
+                            "estimator=${result.estimator}, " +
+                            "samples=${result.samplesUsed}/${result.totalSamples}, " +
+                            "minRTT=${String.format(Locale.US, "%.2f", result.minRttMs)}ms, " +
+                            "jitter=${String.format(Locale.US, "%.2f", result.jitterMs)}ms")
+                        recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.BLE,
+                            ConnectionDiagnosticOutcome.SUCCEEDED, result, attempt - 1)
+                        return@launch
+                    }
+
+                    Log.w(TAG, "Sync attempt $attempt failed: ${result?.quality ?: "no result"}, " +
+                        "samples=${result?.samplesUsed ?: 0}/${result?.totalSamples ?: 0}")
+
+                    if (attempt < ClockSyncConfig.MAX_SYNC_RETRIES) {
+                        delay(ClockSyncConfig.RETRY_DELAY_MS)
+                    }
+                }
+
+                if (!clientRecovery.runIfCurrent(clockGeneration) {
+                        _state.value = State.Error(
+                            "Sync failed after ${ClockSyncConfig.MAX_SYNC_RETRIES} attempts " +
+                            "(quality: ${lastResult?.quality ?: "none"}, " +
+                            "uncertainty: ${lastResult?.let { String.format(Locale.US, "%.1f", it.uncertaintyMs) } ?: "?"}ms)"
+                        )
+                    }) return@launch
+                recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.BLE,
+                    ConnectionDiagnosticOutcome.FAILED, lastResult, ClockSyncConfig.MAX_SYNC_RETRIES - 1)
             }
-
-            diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC, ConnectionDiagnosticOutcome.STARTED,
-                ConnectionDiagnosticTransport.BLE, runCatching { UUID.fromString(sessionId) }.getOrNull()) {
-                it.copy(role = ConnectionDiagnosticRole.REQUESTER)
-            }
-            val measurementCalculator = ClockSyncCalculator(isFullSync = true)
-            syncCalculator = measurementCalculator
-
-            // Auto-retry up to MAX_SYNC_RETRIES times. Keep accepted samples
-            // across attempts: both rounds share the same monotonic clock window,
-            // and the one-way estimator's drift margin covers the full duration.
-            // Pooling independent extrema tightens the safe bound instead of
-            // discarding a useful first round when it narrowly misses the gate.
-            for (attempt in 1..ClockSyncConfig.MAX_SYNC_RETRIES) {
-                pendingPings.clear()
-
-                Log.i(TAG, "Sync attempt $attempt/${ClockSyncConfig.MAX_SYNC_RETRIES}")
-
-                repeat(ClockSyncConfig.FULL_SYNC_SAMPLES) { i ->
-                    if (!isActive) return@launch
-
-                    delay(ClockSyncLaunchPhasePolicy.delayMs(Math.random()))
-                    sendPing()
-                    delay(ClockSyncConfig.FULL_SYNC_INTERVAL_MS)
-
-                    // Update progress
-                    val completedSamples =
-                        ((attempt - 1) * ClockSyncConfig.FULL_SYNC_SAMPLES) + i + 1
-                    val sampleProgress = ClockSyncSetupProgress.fromCompletedSamples(completedSamples)
-                    val currentProgress = (_state.value as? State.Syncing)?.progress ?: 0f
-                    _state.value = State.Syncing(maxOf(currentProgress, sampleProgress))
-                }
-
-                // Keep the forward lane quiet until the reference's reverse-probe
-                // burst has observed its idle timeout and exited. Those tail probes
-                // avoid forward/pong contention and are the cleanest lower-bound
-                // observations on Android links that stay at a 30 ms interval.
-                delay(ClockSyncReverseProbeSchedulePolicy.RESULT_SETTLE_MS)
-
-                // Calculate result
-                val baseline = measurementCalculator.calculateOffset()
-                val result = baseline?.let(::selectOneWayBoundIfTighter)
-                lastResult = result
-
-                if (result != null && result.isSetupAcceptable()) {
-                    _syncResult.value = result
-                    _state.value = State.Synced(result)
-                    Log.i(TAG, "Sync complete (attempt $attempt): " +
-                        "offset=${String.format(Locale.US, "%.2f", result.offsetMs)}ms, " +
-                        "uncertainty=${String.format(Locale.US, "%.2f", result.uncertaintyMs)}ms, " +
-                        "quality=${result.quality}, " +
-                        "estimator=${result.estimator}, " +
-                        "samples=${result.samplesUsed}/${result.totalSamples}, " +
-                        "minRTT=${String.format(Locale.US, "%.2f", result.minRttMs)}ms, " +
-                        "jitter=${String.format(Locale.US, "%.2f", result.jitterMs)}ms")
-                    recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.BLE,
-                        ConnectionDiagnosticOutcome.SUCCEEDED, result, attempt - 1)
-                    return@launch
-                }
-
-                Log.w(TAG, "Sync attempt $attempt failed: ${result?.quality ?: "no result"}, " +
-                    "samples=${result?.samplesUsed ?: 0}/${result?.totalSamples ?: 0}")
-
-                if (attempt < ClockSyncConfig.MAX_SYNC_RETRIES) {
-                    delay(ClockSyncConfig.RETRY_DELAY_MS)
-                }
-            }
-
-            _state.value = State.Error(
-                "Sync failed after ${ClockSyncConfig.MAX_SYNC_RETRIES} attempts " +
-                "(quality: ${lastResult?.quality ?: "none"}, " +
-                "uncertainty: ${lastResult?.let { String.format(Locale.US, "%.1f", it.uncertaintyMs) } ?: "?"}ms)"
-            )
-            recordDiagnosticSyncResult(diagnostic, ConnectionDiagnosticTransport.BLE,
-                ConnectionDiagnosticOutcome.FAILED, lastResult, ClockSyncConfig.MAX_SYNC_RETRIES - 1)
-        }
-        syncJob?.invokeOnCompletion { cause ->
-            try { endSyncConnectionPriorityWindow(priorityGeneration) }
-            finally { connectionDiagnostics.samplingGate.end(diagnosticSamplingToken) }
-            if (cause != null) {
-                diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC,
-                    if (cause is CancellationException) ConnectionDiagnosticOutcome.CANCELLED else ConnectionDiagnosticOutcome.FAILED) { event ->
-                    event.copy(errorDomain = ConnectionDiagnosticErrorDomain.LIFECYCLE,
-                        errorCode = if (cause is CancellationException) ConnectionDiagnosticErrorCode.CANCELLED else ConnectionDiagnosticErrorCode.UNKNOWN)
+            syncJob?.invokeOnCompletion { cause ->
+                try { endSyncConnectionPriorityWindow(priorityGeneration) }
+                finally { connectionDiagnostics.samplingGate.end(diagnosticSamplingToken) }
+                if (cause != null) {
+                    diagnostic?.record(ConnectionDiagnosticPhase.CLOCK_SYNC,
+                        if (cause is CancellationException) ConnectionDiagnosticOutcome.CANCELLED else ConnectionDiagnosticOutcome.FAILED) { event ->
+                        event.copy(errorDomain = ConnectionDiagnosticErrorDomain.LIFECYCLE,
+                            errorCode = if (cause is CancellationException) ConnectionDiagnosticErrorCode.CANCELLED else ConnectionDiagnosticErrorCode.UNKNOWN)
+                    }
                 }
             }
         }
@@ -1873,65 +1992,74 @@ class BleClockSyncService @Inject constructor(
      */
     @SuppressLint("MissingPermission")
     fun performMiniSync() {
-        val hasRoute = when (role) {
-            Role.Client -> gattClient != null
-            Role.Server -> activeSyncTargetAddress?.let(protocolReadyDevices::contains) == true
-            null -> false
-        }
-        if (!hasRoute || localIsClockReference) {
-            Log.w(TAG, "Cannot mini-sync: no requester route to the start reference")
-            return
-        }
-
-        val previousResult = _syncResult.value
-        Log.i(TAG, "Starting mini-sync (${ClockSyncConfig.MINI_SYNC_SAMPLES} samples)...")
-
-        syncJob?.cancel()
-        val priorityGeneration = beginSyncConnectionPriorityWindow()
-        val diagnosticSamplingToken = connectionDiagnostics.samplingGate.begin()
-        syncJob = serviceScope.launch {
-            val miniCalc = ClockSyncCalculator(
-                isFullSync = false,
-                baselineOffsetNanos = previousResult?.offsetNanos,
-                baselineEstimator = previousResult?.estimator,
-                baselineUncertaintyNanos = previousResult?.uncertaintyMs
-                    ?.times(1_000_000.0)
-                    ?.toLong()
-                    ?: 0L
-            )
-            // Point syncCalculator to miniCalc so pong responses are added to the right calculator
-            syncCalculator = miniCalc
-            pendingPings.clear()
-            reverseProbes.clear()
-            measurementStartedAtNanos = SystemClock.elapsedRealtimeNanos()
-
-            repeat(ClockSyncConfig.MINI_SYNC_SAMPLES) { i ->
-                if (!isActive) return@launch
-
-                delay(ClockSyncLaunchPhasePolicy.delayMs(Math.random()))
-                sendPing()
-                delay(ClockSyncConfig.MINI_SYNC_INTERVAL_MS)
+        val clockGeneration = clientRecovery.generation()
+        clientRecovery.runIfCurrent(clockGeneration) setup@{
+            val hasRoute = when (role) {
+                Role.Client -> hasReadyClientRoute()
+                Role.Server -> activeSyncTargetAddress?.let(protocolReadyDevices::contains) == true
+                null -> false
+            }
+            if (!hasRoute || localIsClockReference) {
+                Log.w(TAG, "Cannot mini-sync: no requester route to the start reference")
+                return@setup
             }
 
-            delay(200)
+            val previousResult = _syncResult.value
+            Log.i(TAG, "Starting mini-sync (${ClockSyncConfig.MINI_SYNC_SAMPLES} samples)...")
 
-            val result = miniCalc.calculateOffset()?.let(::selectOneWayBoundIfTighter)
-            if (result != null && result.isSetupAcceptable()) {
-                _syncResult.value = result
-                _state.value = State.Synced(result)
-                Log.i(TAG, "Mini-sync complete: offset=${String.format(Locale.US, "%.2f", result.offsetMs)}ms, " +
-                    "quality=${result.quality}")
-            } else {
-                // Keep previous result if mini-sync fails
-                Log.w(TAG, "Mini-sync failed, keeping previous offset")
-                if (previousResult != null) {
-                    _syncResult.value = previousResult
+            syncJob?.cancel()
+            val priorityGeneration = beginSyncConnectionPriorityWindow()
+            val diagnosticSamplingToken = connectionDiagnostics.samplingGate.begin()
+            syncJob = serviceScope.launch {
+                val miniCalc = ClockSyncCalculator(
+                    isFullSync = false,
+                    baselineOffsetNanos = previousResult?.offsetNanos,
+                    baselineEstimator = previousResult?.estimator,
+                    baselineUncertaintyNanos = previousResult?.uncertaintyMs
+                        ?.times(1_000_000.0)
+                        ?.toLong()
+                        ?: 0L
+                )
+                // Point syncCalculator to miniCalc so pong responses are added to the right calculator
+                if (!clientRecovery.runIfCurrent(clockGeneration) {
+                        syncCalculator = miniCalc
+                        pendingPings.clear()
+                        reverseProbes.clear()
+                        measurementStartedAtNanos = SystemClock.elapsedRealtimeNanos()
+                    }) return@launch
+
+                repeat(ClockSyncConfig.MINI_SYNC_SAMPLES) { i ->
+                    if (!isActive) return@launch
+
+                    delay(ClockSyncLaunchPhasePolicy.delayMs(Math.random()))
+                    if (!clientRecovery.runIfCurrent(clockGeneration) { sendPing() }) return@launch
+                    delay(ClockSyncConfig.MINI_SYNC_INTERVAL_MS)
+                }
+
+                delay(200)
+
+                val result = miniCalc.calculateOffset()?.let(::selectOneWayBoundIfTighter)
+                if (result != null && result.isSetupAcceptable()) {
+                    if (!clientRecovery.runIfCurrent(clockGeneration) {
+                            _syncResult.value = result
+                            _state.value = State.Synced(result)
+                        }) return@launch
+                    Log.i(TAG, "Mini-sync complete: offset=${String.format(Locale.US, "%.2f", result.offsetMs)}ms, " +
+                        "quality=${result.quality}")
+                } else {
+                    // Keep previous result if mini-sync fails
+                    Log.w(TAG, "Mini-sync failed, keeping previous offset")
+                    if (previousResult != null) {
+                        clientRecovery.runIfCurrent(clockGeneration) {
+                            _syncResult.value = previousResult
+                        }
+                    }
                 }
             }
-        }
-        syncJob?.invokeOnCompletion {
-            try { endSyncConnectionPriorityWindow(priorityGeneration) }
-            finally { connectionDiagnostics.samplingGate.end(diagnosticSamplingToken) }
+            syncJob?.invokeOnCompletion {
+                try { endSyncConnectionPriorityWindow(priorityGeneration) }
+                finally { connectionDiagnostics.samplingGate.end(diagnosticSamplingToken) }
+            }
         }
     }
 
@@ -2310,6 +2438,7 @@ class BleClockSyncService @Inject constructor(
 
     private fun scheduleReverseProbeBurst(targetDeviceAddress: String?) {
         if (reverseProbeJob?.isActive == true) return
+        val clockGeneration = clientRecovery.generation()
         reverseProbeJob = serviceScope.launch {
             var sentCount = 0
             var busyLaneSkips = 0
@@ -2326,7 +2455,10 @@ class BleClockSyncService @Inject constructor(
                     break
                 }
 
-                val sent = sendReverseProbeAtTransmitBoundary(targetDeviceAddress)
+                var sent = false
+                if (!clientRecovery.runIfCurrent(clockGeneration) {
+                        sent = sendReverseProbeAtTransmitBoundary(targetDeviceAddress)
+                    }) return@launch
                 if (sent) sentCount++
                 else if (role == Role.Client) busyLaneSkips++
             }
@@ -2529,17 +2661,22 @@ class BleClockSyncService @Inject constructor(
         requestLowLatencyClientLink(reason)
         if (gattClient == null) return
         lowLatencyPriorityReassertJob?.cancel()
+        val clockGeneration = clientRecovery.generation()
         lowLatencyPriorityReassertJob = serviceScope.launch {
             for (delayMs in listOf(600L, 900L, 1_500L)) {
                 delay(delayMs)
                 if (!isActive || gattClient == null) return@launch
-                requestLowLatencyClientLink("${reason}_reassert")
+                if (!clientRecovery.runIfCurrent(clockGeneration) {
+                        requestLowLatencyClientLink("${reason}_reassert")
+                    }) return@launch
             }
             delay(15_000L)
-            val accepted = gattClient?.requestConnectionPriority(
-                BluetoothGatt.CONNECTION_PRIORITY_BALANCED
-            ) ?: false
-            Log.i(TAG, "Client: Low-latency setup window expired; restored balanced priority (accepted=$accepted)")
+            clientRecovery.runIfCurrent(clockGeneration) {
+                val accepted = gattClient?.requestConnectionPriority(
+                    BluetoothGatt.CONNECTION_PRIORITY_BALANCED
+                ) ?: false
+                Log.i(TAG, "Client: Low-latency setup window expired; restored balanced priority (accepted=$accepted)")
+            }
         }
     }
 
@@ -2603,13 +2740,15 @@ class BleClockSyncService @Inject constructor(
         data: ByteArray,
         writeType: Int = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
     ) {
+        if (!hasReadyClientRoute()) return
+        val generation = clientGattGeneration
         val packets = try {
             BleMessageFramer.packets(data, clientMaximumPacketBytes)
         } catch (e: IllegalArgumentException) {
             Log.w(TAG, "Client: Failed to frame BLE payload: ${e.message}")
             return
         }
-        clientWriteQueue.addAll(packets.map { ClientWritePacket(it, writeType) })
+        clientWriteQueue.addAll(packets.map { ClientWritePacket(it, writeType, generation = generation) })
         drainClientWriteQueue()
     }
 
@@ -2626,6 +2765,8 @@ class BleClockSyncService @Inject constructor(
         pongReceivedAtNanos: Long? = null,
         onTimestampCaptured: (Long) -> Unit = {}
     ): Boolean {
+        if (!hasReadyClientRoute()) return false
+        val generation = clientGattGeneration
         if (!ClockSyncTransmitBoundaryPolicy.canSubmitServerNotificationDirectly(
                 encodedSize = template.encodedSize,
                 maximumPacketBytes = clientMaximumPacketBytes,
@@ -2663,7 +2804,9 @@ class BleClockSyncService @Inject constructor(
         onTimestampCaptured(sentAtNanos)
         // Size was checked before acquiring the lane: one raw JSON ATT value,
         // with no JSON serialization or fragmentation after the timestamp.
-        val packet = ClientWritePacket(template.stamp(sentAtNanos), writeType, retryAfterBond = false)
+        val packet = ClientWritePacket(
+            template.stamp(sentAtNanos), writeType, retryAfterBond = false, generation = generation
+        )
         clientWriteInFlight = packet
         if (!writeCharacteristicCompat(
                 client,
@@ -2687,30 +2830,38 @@ class BleClockSyncService @Inject constructor(
 
     @SuppressLint("MissingPermission")
     private fun drainClientWriteQueue() {
-        if (isClientWritePending.compareAndSet(false, true)) {
-            val packet = clientWriteQueue.poll()
-            if (packet != null) {
-                val client = gattClient
-                val char = rxCharacteristic
-                if (client == null || char == null) {
-                    isClientWritePending.set(false)
-                    return
+        val generation = clientGattGeneration
+        clientRecovery.runIfCurrent(generation) {
+            if (!hasReadyClientRoute()) return@runIfCurrent
+            if (isClientWritePending.compareAndSet(false, true)) {
+                var packet = clientWriteQueue.poll()
+                // Never send queued fragments from the invalidated connection.
+                while (packet != null && !clientRecovery.isProtocolReady(packet.generation)) {
+                    packet = clientWriteQueue.poll()
                 }
-                clientWriteInFlight = packet
-                if (!writeCharacteristicCompat(
-                        client,
-                        char,
-                        packet.data,
-                        packet.writeType
-                    )
-                ) {
-                    clientWriteInFlight = null
-                    clientWriteQueue.addFirst(packet)
+                if (packet != null) {
+                    val client = gattClient
+                    val char = rxCharacteristic
+                    if (client == null || char == null) {
+                        isClientWritePending.set(false)
+                        return@runIfCurrent
+                    }
+                    clientWriteInFlight = packet
+                    if (!writeCharacteristicCompat(
+                            client,
+                            char,
+                            packet.data,
+                            packet.writeType
+                        )
+                    ) {
+                        clientWriteInFlight = null
+                        clientWriteQueue.addFirst(packet)
+                        isClientWritePending.set(false)
+                        handler.postDelayed({ drainClientWriteQueue() }, 25L)
+                    }
+                } else {
                     isClientWritePending.set(false)
-                    handler.postDelayed({ drainClientWriteQueue() }, 25L)
                 }
-            } else {
-                isClientWritePending.set(false)
             }
         }
     }
@@ -3081,7 +3232,7 @@ class BleClockSyncService @Inject constructor(
                 }
             }
             Role.Client -> {
-                if (gattClient == null) {
+                if (!hasReadyClientRoute()) {
                     false
                 } else {
                     val writeType = when (message.payload) {
