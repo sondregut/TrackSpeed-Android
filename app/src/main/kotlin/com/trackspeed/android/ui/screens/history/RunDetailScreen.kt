@@ -403,6 +403,7 @@ fun RunDetailScreen(
                 InfoCard(
                     session = uiState.session,
                     startType = run.startType,
+                    numberOfPhones = run.numberOfPhones,
                     isWatchStart = run.cloudSyncPolicy == "localOnlyWatchBeta"
                 )
             }
@@ -963,6 +964,7 @@ private fun com.trackspeed.android.data.local.entities.RunEntity.toDetectionRevi
 private fun InfoCard(
     session: com.trackspeed.android.data.local.entities.TrainingSessionEntity?,
     startType: String,
+    numberOfPhones: Int,
     isWatchStart: Boolean = false
 ) {
     val dateFormat = SimpleDateFormat("EEEE, MMM d, yyyy  HH:mm", Locale.getDefault())
@@ -1003,7 +1005,9 @@ private fun InfoCard(
 
             InfoRow(
                 label = stringResource(R.string.run_detail_mode_label),
-                value = stringResource(R.string.run_detail_mode_value)
+                value = androidx.compose.ui.res.pluralStringResource(
+                    R.plurals.session_mode_phone_count, numberOfPhones, numberOfPhones
+                )
             )
         }
     }

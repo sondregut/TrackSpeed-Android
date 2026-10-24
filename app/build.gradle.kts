@@ -47,7 +47,13 @@ android {
         buildConfigField("String", "BUILD_MARKER", "\"android-iphone-visual-parity-2026-10-22\"")
         buildConfigField("String", "SOURCE_FINGERPRINT", "\"$sourceFingerprint\"")
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // AGP generates the instrumentation entry; an androidTest manifest entry
+        // cannot add a second runner. Keep UI-only captures explicitly opt-in.
+        testInstrumentationRunner = if (providers.gradleProperty("trackspeed.uiParity").orNull == "true") {
+            "com.trackspeed.android.ui.UiParityTestRunner"
+        } else {
+            "androidx.test.runner.AndroidJUnitRunner"
+        }
 
         // Supabase configuration - will be loaded from local.properties
         buildConfigField("String", "SUPABASE_URL", "\"https://hkvrttatbpjwzuuckbqj.supabase.co\"")

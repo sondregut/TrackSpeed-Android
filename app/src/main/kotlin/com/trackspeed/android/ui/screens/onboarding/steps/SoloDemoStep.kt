@@ -40,7 +40,6 @@ import com.trackspeed.android.R
 import com.trackspeed.android.camera.CameraManager
 import com.trackspeed.android.detection.PhotoFinishDetector
 import com.trackspeed.android.ui.components.CameraPreview
-import com.trackspeed.android.ui.components.CameraPreviewPlaceholder
 import com.trackspeed.android.ui.theme.*
 
 @Composable
@@ -180,7 +179,7 @@ private fun SetupHint() {
 }
 
 @Composable
-private fun CameraDemoCard(
+internal fun CameraDemoCard(
     state: SoloDemoUiState,
     onSurfaceReady: (android.view.Surface) -> Unit,
     onSurfaceDestroyed: () -> Unit,
@@ -200,9 +199,14 @@ private fun CameraDemoCard(
             .border(1.dp, BorderSubtle, RoundedCornerShape(20.dp))
     ) {
         if (state.cameraUnavailable) {
-            CameraPreviewPlaceholder(
-                modifier = Modifier.matchParentSize(),
-                message = stringResource(R.string.onboarding_solo_demo_camera_unavailable)
+            // One readable error owns this card. A second status pill and an
+            // unusable switch control would overlap it on compact screens.
+            Text(
+                text = stringResource(R.string.onboarding_solo_demo_camera_unavailable),
+                style = MaterialTheme.typography.bodyLarge,
+                color = TextSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.Center).padding(24.dp)
             )
         } else {
             CameraPreview(
@@ -227,27 +231,29 @@ private fun CameraDemoCard(
             )
         }
 
-        DemoStatusPill(
-            state = state,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp)
-        )
-
-        IconButton(
-            onClick = onSwitchCamera,
-            enabled = !state.cameraUnavailable,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(14.dp)
-                .size(44.dp)
-                .background(Color.Black.copy(alpha = 0.65f), CircleShape)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Cameraswitch,
-                contentDescription = stringResource(R.string.onboarding_solo_demo_flip_camera),
-                tint = Color.White
+        if (!state.cameraUnavailable) {
+            DemoStatusPill(
+                state = state,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp)
             )
+
+            IconButton(
+                onClick = onSwitchCamera,
+                enabled = !state.cameraUnavailable,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(14.dp)
+                    .size(44.dp)
+                    .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Cameraswitch,
+                    contentDescription = stringResource(R.string.onboarding_solo_demo_flip_camera),
+                    tint = Color.White
+                )
+            }
         }
     }
 }

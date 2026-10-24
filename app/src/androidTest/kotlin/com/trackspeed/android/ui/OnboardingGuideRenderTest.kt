@@ -27,17 +27,25 @@ class OnboardingGuideRenderTest {
             File(output,"$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
         }
     }
+    // HorizontalPager retains offscreen neighbours. Select the visible control,
+    // while still requiring exactly one match and asserting it is displayed.
+    private fun visibleText(text: String): SemanticsNodeInteraction {
+        val viewport = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        return compose.onAllNodesWithText(text).filterToOne(
+            SemanticsMatcher("intersects the viewport") { it.boundsInRoot.overlaps(viewport) }
+        )
+    }
     @Test fun fourPageGuideStartsSessionAndSupportsCompactScreen() {
         var started=false
         compose.setContent { MaterialTheme { GettingStartedGuide({}, {started=true}) } }
-        compose.onNodeWithText("Continue").assertIsDisplayed()
+        visibleText("Continue").assertIsDisplayed()
         save("onboarding-guide-1")
         repeat(3) { index ->
-            compose.onNodeWithText("Continue").performClick()
+            visibleText("Continue").performClick()
             compose.waitForIdle()
             save("onboarding-guide-${index+2}")
         }
-        compose.onNodeWithText("Start a session").assertIsDisplayed().performClick()
+        visibleText("Start a session").assertIsDisplayed().performClick()
         compose.runOnIdle { assertTrue(started) }
     }
     @Test fun largeTextKeepsSkipAndContinueReachable() {
@@ -48,10 +56,10 @@ class OnboardingGuideRenderTest {
                 MaterialTheme { GettingStartedGuide({skipped=true},{}) }
             }
         }
-        compose.onNodeWithText("Continue").assertIsDisplayed()
-        compose.onNodeWithText("Skip").assertIsDisplayed()
+        visibleText("Continue").assertIsDisplayed()
+        visibleText("Skip").assertIsDisplayed()
         save("onboarding-guide-large-text")
-        compose.onNodeWithText("Skip").performClick()
+        visibleText("Skip").performClick()
         compose.runOnIdle { assertTrue(skipped) }
     }
 }

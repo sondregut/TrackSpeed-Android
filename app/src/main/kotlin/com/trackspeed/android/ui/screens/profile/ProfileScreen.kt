@@ -80,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trackspeed.android.R
+import com.trackspeed.android.BuildConfig
 import com.trackspeed.android.billing.EarlyReleaseAccess
 import com.trackspeed.android.ui.theme.*
 
@@ -804,7 +805,7 @@ private fun ProfileScreenContent(
                 AboutRow(
                     icon = Icons.Outlined.Info,
                     label = stringResource(R.string.profile_version_label),
-                    value = stringResource(R.string.profile_version_value)
+                    value = stringResource(R.string.settings_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
                 )
 
                 SettingsDivider()

@@ -2,6 +2,10 @@ package com.trackspeed.android.ui
 
 import android.graphics.Bitmap
 import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -45,6 +49,17 @@ class ScreenWalkthroughRenderTest {
             "source=${BuildConfig.SOURCE_FINGERPRINT}\nversion=${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n" +
                 "evidence=native production Composables; synthetic offline state; not runtime navigation\n"
         )
+    }
+
+    @Test fun unavailableCameraHasOneReadableMessageAndNoSwitchControl() {
+        compose.setContent { TrackSpeedTheme {
+            CameraDemoCard(SoloDemoUiState(cameraUnavailable = true), {}, {}, {},
+                Modifier.fillMaxWidth().height(180.dp))
+        } }
+        compose.onAllNodesWithText("Camera unavailable. Skip this step and try a real run later.")
+            .assertCountEquals(1)
+        compose.onNodeWithContentDescription("Flip camera").assertDoesNotExist()
+        save("onboarding-camera-unavailable-fixed")
     }
 
     @Test fun onboardingPagesRenderWithoutAccountOrPermissionMutation() {
