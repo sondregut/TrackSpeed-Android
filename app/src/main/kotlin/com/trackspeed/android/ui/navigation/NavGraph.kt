@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.trackspeed.android.DeepLinkEvent
 import com.trackspeed.android.ui.theme.gradientBackground
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType

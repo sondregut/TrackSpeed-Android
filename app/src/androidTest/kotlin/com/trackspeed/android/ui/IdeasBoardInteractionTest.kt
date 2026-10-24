@@ -83,9 +83,18 @@ class IdeasBoardInteractionTest {
         compose.onNodeWithText("Submit feedback").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithTag("idea-title").performScrollTo().performTextInput("A synthetic idea")
         compose.onNodeWithTag("idea-details").performScrollTo().performTextInput("Make timing setup clearer")
-        compose.onNodeWithText("Submit feedback").performScrollTo().assertIsEnabled().performClick()
-        compose.onNodeWithText("Cancel").performScrollTo().performClick()
-        compose.runOnIdle { assertEquals(1, submissions); assertEquals(1, cancelled); assertEquals("", state.draft!!.publicName) }
+        compose.onNodeWithText("Submit feedback").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+        compose.onNodeWithText("Cancel").performScrollTo().assertIsDisplayed().performClick()
+        try {
+            compose.runOnIdle {
+                assertEquals("Submit callback count", 1, submissions)
+                assertEquals("Cancel callback count", 1, cancelled)
+                assertEquals("", state.draft!!.publicName)
+            }
+        } catch (failure: AssertionError) {
+            save("ui-upgrade-idea-callback-failure")
+            throw failure
+        }
         save("parity-ideas-public-composer")
     }
 

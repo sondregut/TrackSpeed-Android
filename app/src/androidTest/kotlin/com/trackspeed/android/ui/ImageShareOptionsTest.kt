@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -373,7 +373,7 @@ class ImageShareOptionsTest {
     private lateinit var scope: CoroutineScope
     private fun captureHost() {
         compose.setContent {
-            activity = LocalContext.current as ComponentActivity
+            activity = checkNotNull(LocalActivity.current) as ComponentActivity
             composition = rememberCompositionContext(); scope = rememberCoroutineScope()
             Box {}
         }

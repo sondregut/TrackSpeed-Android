@@ -1,9 +1,8 @@
 package com.trackspeed.android.ui.screens.onboarding.steps
 
-import android.app.Activity
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.ui.screens.paywall.TrackSpeedProPaywallContent
 import com.trackspeed.android.ui.screens.paywall.PaywallViewModel
@@ -22,7 +21,7 @@ fun PaywallStep(
     val offeringsError by viewModel.offeringsError.collectAsStateWithLifecycle()
     val isProUser by viewModel.isProUser.collectAsStateWithLifecycle()
     val promoSheetState by viewModel.promoSheetState.collectAsStateWithLifecycle()
-    val activity = LocalContext.current as? Activity
+    val activity = LocalActivity.current
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {

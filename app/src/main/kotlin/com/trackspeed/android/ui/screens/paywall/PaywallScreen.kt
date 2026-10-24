@@ -1,6 +1,6 @@
 package com.trackspeed.android.ui.screens.paywall
 
-import android.app.Activity
+import androidx.activity.compose.LocalActivity
 import android.content.Intent
 import android.net.Uri
 import androidx.annotation.StringRes
@@ -68,7 +68,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.R
 import com.trackspeed.android.billing.PromoCodeType
@@ -111,7 +111,7 @@ fun PaywallScreen(
     val promoSheetState by viewModel.promoSheetState.collectAsStateWithLifecycle()
     val effectivePreferDiscountPackage by viewModel.preferDiscountPackage.collectAsStateWithLifecycle()
 
-    val activity = LocalContext.current as? Activity
+    val activity = LocalActivity.current
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(preferDiscountPackage) {

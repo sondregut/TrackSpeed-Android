@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionContext
 import androidx.compose.runtime.rememberCompositionContext
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -34,7 +34,7 @@ class ComposeImageCaptureTest {
 
     private fun hostTestScreen() {
         compose.setContent {
-            activity = LocalContext.current as ComponentActivity
+            activity = checkNotNull(LocalActivity.current) as ComponentActivity
             parentComposition = rememberCompositionContext()
             scope = rememberCoroutineScope()
             Box {}
