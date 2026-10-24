@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_story_format">Ιστορία 9:16</string>
+    <string name="image_share_feed_format">Ροή 4:5</string>
+    <string name="image_share_photos">Φωτογραφίες</string>
+    <string name="image_share_name">Όνομα</string>
+    <string name="image_share_feed_splits_hint">Απενεργοποιήστε τις Φωτογραφίες για να εμφανίζονται οι ενδιάμεσοι χρόνοι στη Ροή.</string>
+</resources>

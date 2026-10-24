@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_story_format">스토리 9:16</string>
+    <string name="image_share_feed_format">피드 4:5</string>
+    <string name="image_share_photos">사진</string>
+    <string name="image_share_name">이름</string>
+    <string name="image_share_feed_splits_hint">피드에 구간 기록을 표시하려면 사진을 끄세요.</string>
+</resources>

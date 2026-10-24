@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_story_format">Story 9:16</string>
+    <string name="image_share_feed_format">Feed 4:5</string>
+    <string name="image_share_photos">Fotos</string>
+    <string name="image_share_name">Nome</string>
+    <string name="image_share_feed_splits_hint">Desative Fotos para mostrar parciais no Feed.</string>
+</resources>

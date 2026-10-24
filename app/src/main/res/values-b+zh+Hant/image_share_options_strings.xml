@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_story_format">限時動態 9:16</string>
+    <string name="image_share_feed_format">動態 4:5</string>
+    <string name="image_share_photos">照片</string>
+    <string name="image_share_name">姓名</string>
+    <string name="image_share_feed_splits_hint">關閉照片即可在動態中顯示分段。</string>
+</resources>

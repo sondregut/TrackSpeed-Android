@@ -34,6 +34,7 @@ import com.trackspeed.android.ui.share.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -59,7 +60,7 @@ fun ShareSessionScreen(
     val exportState by viewModel.imageShare.state.collectAsStateWithLifecycle()
     val configuration = LocalConfiguration.current
     val environment = "${configuration.locales.toLanguageTags()}:${configuration.densityDpi}:${configuration.fontScale}"
-    val outputKey = uiState.cardData?.outputKey(uiState.selectedTheme, environment)
+    val outputKey = uiState.cardData?.outputKey(uiState.selectedTheme, environment, uiState.imageOptions)
     val back = imageShareBackAction(viewModel.imageShare, outputKey, onNavigateBack)
 
     Scaffold(
@@ -131,8 +132,10 @@ fun ShareSessionScreen(
             ShareableSessionCard(
                 data = cardData,
                 theme = uiState.selectedTheme,
+                options = uiState.imageOptions,
                 modifier = Modifier
                     .width(270.dp)
+                    .clip(RoundedCornerShape(20.dp))
                     .shadow(
                         elevation = 20.dp,
                         shape = RoundedCornerShape(20.dp),
@@ -163,13 +166,22 @@ fun ShareSessionScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            SessionImageOptionControls(
+                options = uiState.imageOptions,
+                hasSplits = cardData.runs.any { it.segments.isNotEmpty() },
+                hasName = cardData.runs.any { !it.athleteName.isNullOrBlank() },
+                onChange = viewModel::selectImageOptions,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
+            )
+
             val key = checkNotNull(outputKey)
+            val options = uiState.imageOptions
             val theme = uiState.selectedTheme
             val chooserTitle = stringResource(R.string.share_session_chooser_title)
             ImageShareActions(key, exportState, onAction = { action ->
                 viewModel.imageShare.perform(key, action) {
                     exportShareImage(context, key, action, chooserTitle, SESSION_CARD_WIDTH_PX, SESSION_CARD_HEIGHT_PX, compositionContext) {
-                        ShareableSessionCard(data = cardData, theme = theme)
+                        ShareableSessionCard(data = cardData, theme = theme, options = options)
                     }
                 }
             }, onCancel = viewModel.imageShare::cancel, modifier = Modifier.padding(horizontal = 32.dp))

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_story_format">Story 9:16</string>
+    <string name="image_share_feed_format">Flöde 4:5</string>
+    <string name="image_share_photos">Foton</string>
+    <string name="image_share_name">Namn</string>
+    <string name="image_share_feed_splits_hint">Stäng av Foton för att visa mellantider i flödet.</string>
+</resources>

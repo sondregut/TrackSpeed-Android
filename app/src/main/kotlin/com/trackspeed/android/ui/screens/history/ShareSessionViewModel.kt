@@ -6,6 +6,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.ui.share.ImageShareController
+import com.trackspeed.android.ui.share.ImageShareSavedState
+import com.trackspeed.android.ui.share.SessionImageOptions
+import com.trackspeed.android.onephone.SingleCameraSprintPersistence
 import com.trackspeed.android.data.local.entities.RunEntity
 import com.trackspeed.android.data.local.entities.TrainingSessionEntity
 import com.trackspeed.android.data.repository.SessionRepository
@@ -31,18 +34,21 @@ import javax.inject.Inject
 data class ShareSessionUiState(
     val cardData: ShareSessionCardData? = null,
     val selectedTheme: ShareCardTheme = ShareCardTheme.MIDNIGHT,
+    val imageOptions: SessionImageOptions = SessionImageOptions(),
     val isLoading: Boolean = true
 )
 
 @HiltViewModel
 class ShareSessionViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val sessionRepository: SessionRepository
 ) : ViewModel() {
 
     private val sessionId: String = checkNotNull(savedStateHandle["sessionId"])
 
-    private val _uiState = MutableStateFlow(ShareSessionUiState())
+    private val retainedOptions = ImageShareSavedState(savedStateHandle)
+    private val _uiState = MutableStateFlow(ShareSessionUiState(
+        selectedTheme = retainedOptions.theme(), imageOptions = retainedOptions.sessionOptions()))
     val uiState: StateFlow<ShareSessionUiState> = _uiState.asStateFlow()
     internal val imageShare = ImageShareController(viewModelScope)
 
@@ -65,7 +71,15 @@ class ShareSessionViewModel @Inject constructor(
         }
     }
 
+    fun selectImageOptions(options: SessionImageOptions) {
+        imageShare.cancel()
+        retainedOptions.save(options)
+        _uiState.update { it.copy(imageOptions = options) }
+    }
+
     fun selectTheme(theme: ShareCardTheme) {
+        imageShare.cancel()
+        retainedOptions.save(theme)
         _uiState.update { it.copy(selectedTheme = theme) }
     }
 
@@ -85,6 +99,7 @@ class ShareSessionViewModel @Inject constructor(
                 ShareSessionRunData(
                     runNumber = run.runNumber,
                     timeSeconds = run.timeSeconds,
+                    timeDigits = if (run.cloudSyncPolicy == SingleCameraSprintPersistence.CLOUD_SYNC_POLICY) 2 else 3,
                     thumbnail = if (index < MAX_THUMBNAILS_TO_DECODE) {
                         decodeThumbnail(run.thumbnailPath)
                     } else {

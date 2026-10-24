@@ -4,7 +4,10 @@ import com.trackspeed.android.ui.theme.*
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +43,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trackspeed.android.ui.share.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -50,13 +57,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.res.stringResource
 import com.trackspeed.android.R
+import com.trackspeed.android.videooverlay.OverlaySpeedUnit
 import com.trackspeed.android.ui.components.ShareCardTheme
 import com.trackspeed.android.ui.components.ShareableResultCard
 
 
-// Card render size in pixels (1080x1920 = 9:16 for Instagram Stories)
-private const val CARD_WIDTH_PX = 1080
-private const val CARD_HEIGHT_PX = 1920
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,7 +75,7 @@ fun ShareResultScreen(
     val exportState by viewModel.imageShare.state.collectAsStateWithLifecycle()
     val configuration = LocalConfiguration.current
     val environment = "${configuration.locales.toLanguageTags()}:${configuration.densityDpi}:${configuration.fontScale}"
-    val outputKey = uiState.cardData?.outputKey(uiState.selectedTheme, environment)
+    val outputKey = uiState.cardData?.outputKey(uiState.selectedTheme, environment, uiState.imageOptions)
     val back = imageShareBackAction(viewModel.imageShare, outputKey, onNavigateBack)
 
     Scaffold(
@@ -143,8 +148,10 @@ fun ShareResultScreen(
             ShareableResultCard(
                 data = cardData,
                 theme = uiState.selectedTheme,
+                options = uiState.imageOptions,
                 modifier = Modifier
                     .width(270.dp)
+                    .clip(RoundedCornerShape(20.dp))
                     .shadow(
                         elevation = 20.dp,
                         shape = RoundedCornerShape(20.dp),
@@ -176,13 +183,29 @@ fun ShareResultScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            RunImageOptionControls(
+                options = uiState.imageOptions,
+                hasSplits = cardData.segments.isNotEmpty(),
+                hasPhotos = cardData.hasPhotos,
+                hasStartType = cardData.hasStartType,
+                hasName = !cardData.athleteName.isNullOrBlank(),
+                onChange = viewModel::selectImageOptions,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
+            )
+
+            if (cardData.speedValue != null) {
+                RunImageSpeedUnitControls(OverlaySpeedUnit.fromRaw(cardData.speedUnit), viewModel::selectImageSpeedUnit,
+                    Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 12.dp))
+            }
+
             val key = checkNotNull(outputKey)
+            val options = uiState.imageOptions
             val theme = uiState.selectedTheme
             val chooserTitle = stringResource(R.string.share_chooser_title)
             ImageShareActions(key, exportState, onAction = { action ->
                 viewModel.imageShare.perform(key, action) {
-                    exportShareImage(context, key, action, chooserTitle, CARD_WIDTH_PX, CARD_HEIGHT_PX, compositionContext) {
-                        ShareableResultCard(data = cardData, theme = theme)
+                    exportShareImage(context, key, action, chooserTitle, options.format.exportWidth, options.format.exportHeight, compositionContext) {
+                        ShareableResultCard(data = cardData, theme = theme, options = options)
                     }
                 }
             }, onCancel = viewModel.imageShare::cancel, modifier = Modifier.padding(horizontal = 32.dp))
@@ -195,22 +218,24 @@ fun ShareResultScreen(
 /**
  * Horizontal row of color swatches for picking the card theme.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ThemeSelector(
     selectedTheme: ShareCardTheme,
     onThemeSelected: (ShareCardTheme) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+    FlowRow(
+        modifier = modifier.fillMaxWidth().selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         ShareCardTheme.entries.forEach { theme ->
             val isSelected = theme == selectedTheme
+            val label = stringResource(theme.displayNameRes)
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(theme.swatchColor)
                     .then(
@@ -228,16 +253,15 @@ fun ThemeSelector(
                             )
                         }
                     )
-                    .clickable { onThemeSelected(theme) },
+                    .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onThemeSelected(theme) })
+                    .semantics { contentDescription = label }
+                    .testTag("image-theme-${theme.name}"),
                 contentAlignment = Alignment.Center
             ) {
                 if (isSelected) {
                     Icon(
                         imageVector = Icons.Default.Check,
-                        contentDescription = stringResource(
-                            R.string.share_theme_selected_cd,
-                            stringResource(theme.displayNameRes)
-                        ),
+                        contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(16.dp)
                     )

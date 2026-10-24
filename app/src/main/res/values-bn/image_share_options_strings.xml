@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_story_format">স্টোরি 9:16</string>
+    <string name="image_share_feed_format">ফিড 4:5</string>
+    <string name="image_share_photos">ছবি</string>
+    <string name="image_share_name">নাম</string>
+    <string name="image_share_feed_splits_hint">ফিডে স্প্লিটের সময় দেখাতে ছবি বন্ধ করুন।</string>
+</resources>

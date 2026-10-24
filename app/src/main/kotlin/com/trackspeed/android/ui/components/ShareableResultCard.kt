@@ -39,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.unit.sp
 import com.trackspeed.android.R
+import com.trackspeed.android.ui.share.*
 import com.trackspeed.android.ui.share.SessionShareNaming
 import com.trackspeed.android.ui.share.sessionShareNaming
 import com.trackspeed.android.model.StartType
@@ -114,8 +115,16 @@ data class ShareCardData(
     val isSeasonBest: Boolean = false,
     val speedValue: Double? = null,
     val speedUnit: String = "km/h",
-    val segments: List<SegmentSplit> = emptyList()
-)
+    val segments: List<SegmentSplit> = emptyList(),
+    val startPhoto: Bitmap? = null,
+    val finishPhoto: Bitmap? = null,
+    val startGatePosition: Double? = null,
+    val finishGatePosition: Double? = null,
+    val timeDigits: Int = 3
+) {
+    val hasPhotos: Boolean get() = startPhoto != null || finishPhoto != null
+    val hasStartType: Boolean get() = StartType.fromRawValue(startType) != StartType.FLYING
+}
 
 data class ShareSessionCardData(
     val distance: Double,
@@ -134,225 +143,29 @@ data class ShareSessionRunData(
     val timeSeconds: Double,
     val thumbnail: Bitmap? = null,
     val segments: List<SegmentSplit> = emptyList(),
-    val athleteName: String? = null
+    val athleteName: String? = null,
+    val timeDigits: Int = 3
 )
 
-/**
- * A shareable result card optimized for Instagram Stories (9:16 aspect ratio).
- * Renders a beautiful gradient card with the run result, matching iOS parity.
- */
+/** The same fixed logical canvas is used for the preview and full-resolution export. */
 @Composable
 fun ShareableResultCard(
     data: ShareCardData,
     theme: ShareCardTheme,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    options: RunImageOptions = RunImageOptions()
 ) {
-    val textLight = Color.White
-
-    Box(
-        modifier = modifier
-            .aspectRatio(9f / 16f)
-            .clip(RoundedCornerShape(20.dp))
-    ) {
-        // Background gradient
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.verticalGradient(colors = theme.gradientColors)
-                )
-        )
-
-        // Accent glow at top
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            theme.accentGlow.copy(alpha = theme.accentGlowAlpha),
-                            Color.Transparent
-                        ),
-                        center = Offset(0.5f, 0f),
-                        radius = 800f
-                    )
-                )
-        )
-
-        // Content
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.weight(0.08f))
-
-            // Branding header
-            BrandingHeader(textColor = textLight)
-
-            Spacer(modifier = Modifier.weight(0.12f))
-
-            // Hero time
-            HeroTimeDisplay(
-                timeSeconds = data.timeSeconds,
-                textColor = textLight
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Speed
-            if (data.speedValue != null) {
-                SpeedDisplay(
-                    speed = data.speedValue,
-                    unit = data.speedUnit,
-                    color = theme.speedColor
-                )
-            }
-
-            if (data.segments.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                SplitSummary(
-                    segments = data.segments,
-                    textColor = textLight,
-                    accentColor = theme.speedColor
-                )
-            }
-
-            // PB/SB badges
-            if (data.isPersonalBest || data.isSeasonBest) {
-                Spacer(modifier = Modifier.height(20.dp))
-                BadgesRow(
-                    isPersonalBest = data.isPersonalBest,
-                    isSeasonBest = data.isSeasonBest
-                )
-            }
-
-            Spacer(modifier = Modifier.weight(0.15f))
-
-            // Bottom section
-            BottomSection(
-                athleteName = data.athleteName,
-                distance = data.distance,
-                startType = data.startType,
-                dateFormatted = data.dateFormatted,
-                textColor = textLight
-            )
-
-            Spacer(modifier = Modifier.weight(0.05f))
-        }
-    }
+    RunImageCard(data, theme, options, modifier)
 }
 
 @Composable
 fun ShareableSessionCard(
     data: ShareSessionCardData,
     theme: ShareCardTheme,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    options: SessionImageOptions = SessionImageOptions()
 ) {
-    val textLight = Color.White
-    val bestTime = data.bestTimeSeconds
-    val naming = sessionShareNaming(data.runs.map { it.athleteName })
-    val compact = data.runs.size > 5
-    val visibleRuns = data.runs.take(if (compact) 8 else 6)
-    val hiddenRunCount = data.runs.size - visibleRuns.size
-
-    Box(
-        modifier = modifier
-            .aspectRatio(9f / 16f)
-            .clip(RoundedCornerShape(20.dp))
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.verticalGradient(theme.gradientColors))
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            theme.accentGlow.copy(alpha = theme.accentGlowAlpha),
-                            Color.Transparent
-                        ),
-                        center = Offset(0.5f, 0f),
-                        radius = 800f
-                    )
-                )
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.weight(0.05f))
-
-            BrandingHeader(textColor = textLight)
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = data.dateFormatted,
-                color = textLight.copy(alpha = 0.55f),
-                fontSize = 11.sp,
-                maxLines = 1
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            SessionStatsRow(
-                distance = data.distance,
-                runCount = data.runCount,
-                bestTimeSeconds = bestTime,
-                textColor = textLight,
-                accentColor = theme.speedColor
-            )
-
-            Spacer(modifier = Modifier.height(if (compact) 12.dp else 18.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 7.dp)
-            ) {
-                visibleRuns.forEach { run ->
-                    ShareSessionRunRow(
-                        run = run,
-                        isBest = bestTime != null && run.timeSeconds == bestTime,
-                        showSplits = !compact,
-                        showThumbnail = true,
-                        showName = naming == SessionShareNaming.PerRow,
-                        textColor = textLight,
-                        accentColor = theme.speedColor
-                    )
-                }
-
-                if (hiddenRunCount > 0) {
-                    Text(
-                        text = stringResource(R.string.share_card_more_runs, hiddenRunCount),
-                        color = textLight.copy(alpha = 0.42f),
-                        fontSize = 11.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 2.dp),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            SessionShareFooter(
-                athleteName = (naming as? SessionShareNaming.Footer)?.name,
-                textColor = textLight
-            )
-
-            Spacer(modifier = Modifier.weight(0.04f))
-        }
-    }
+    SessionImageCard(data, theme, options, modifier)
 }
 
 @Composable
@@ -872,14 +685,4 @@ private fun BottomSection(
 /**
  * Format time for the share card display.
  */
-private fun formatShareTime(seconds: Double): String {
-    if (seconds <= 0) return "0.00"
-
-    return if (seconds < 60) {
-        String.format(java.util.Locale.getDefault(), "%.2f", seconds)
-    } else {
-        val mins = (seconds / 60).toInt()
-        val secs = seconds % 60
-        String.format(java.util.Locale.getDefault(), "%d:%05.2f", mins, secs)
-    }
-}
+internal fun formatShareTime(seconds: Double): String = imageTimePresentation(seconds).value

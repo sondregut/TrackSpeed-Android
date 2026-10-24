@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_story_format">स्टोरी 9:16</string>
+    <string name="image_share_feed_format">फ़ीड 4:5</string>
+    <string name="image_share_photos">फ़ोटो</string>
+    <string name="image_share_name">नाम</string>
+    <string name="image_share_feed_splits_hint">फ़ीड में स्प्लिट दिखाने के लिए फ़ोटो बंद करें।</string>
+</resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="image_share_story_format">Hikâye 9:16</string>
+    <string name="image_share_feed_format">Akış 4:5</string>
+    <string name="image_share_photos">Fotoğraflar</string>
+    <string name="image_share_name">Ad</string>
+    <string name="image_share_feed_splits_hint">Akışta ara süreleri göstermek için Fotoğraflar seçeneğini kapatın.</string>
+</resources>
