@@ -204,6 +204,7 @@
     <string name="settings_theme">外観</string>
     <string name="theme_midnight">ミッドナイト</string>
     <string name="theme_light">ライト</string>
+    <string name="theme_dark">ダーク</string>
     <string name="theme_gold">ゴールド</string>
     <string name="settings_section_detection">検出</string>
     <string name="settings_sensitivity">感度</string>

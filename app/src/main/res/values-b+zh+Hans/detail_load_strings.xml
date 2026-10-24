@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">正在加载成绩…</string>
+    <string name="detail_load_error">无法加载这些成绩。</string>
+    <string name="detail_load_error_saved">无法刷新这些成绩。正在显示上次加载的成绩。</string>
+</resources>

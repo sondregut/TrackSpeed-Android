@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">웹 대시보드</string>
+    <string name="dashboard_description">모든 선수, 세션, 구간 기록, 사진을 컴퓨터에서 mytrackspeed.com/dashboard로 확인하세요.</string>
+    <string name="dashboard_sign_in_required">웹 대시보드를 사용하려면 로그인하세요</string>
+    <string name="dashboard_send_link">내 컴퓨터로 로그인 링크 보내기</string>
+    <string name="dashboard_open_here">여기에서 열기</string>
+    <string name="dashboard_share_chooser">본인 기기로 보내기</string>
+    <string name="dashboard_private_link_hint">로그인 링크입니다. 본인 기기로만 보내세요.</string>
+    <string name="dashboard_creating_link">로그인 링크 만드는 중…</string>
+    <string name="dashboard_offline">오프라인 상태입니다. 인터넷에 연결한 뒤 다시 시도하세요.</string>
+    <string name="dashboard_session_expired">로그인이 만료되었습니다. 로그아웃 후 다시 로그인한 다음 다시 시도하세요.</string>
+    <string name="dashboard_email_required">웹 대시보드를 사용하려면 이메일 주소가 있는 계정이 필요합니다.</string>
+    <string name="dashboard_rate_limited">링크 요청이 너무 많습니다. 1분 후에 다시 시도하세요.</string>
+    <string name="dashboard_unavailable">웹 대시보드는 아직 사용할 수 없습니다.</string>
+    <string name="dashboard_failed">로그인 링크를 만들 수 없습니다. 잠시 후 다시 시도하세요.</string>
+    <string name="dashboard_open_unavailable">이 링크를 열 수 있는 호환 앱이 없습니다. 브라우저나 공유 앱을 확인한 뒤 다시 시도하세요.</string>
+</resources>

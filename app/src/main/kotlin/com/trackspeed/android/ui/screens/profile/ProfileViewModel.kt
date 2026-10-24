@@ -13,6 +13,8 @@ import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.R
 import com.trackspeed.android.billing.SubscriptionManager
 import com.trackspeed.android.cloud.AuthState
+import com.trackspeed.android.cloud.TimingWorkloadCoordinator
+import kotlinx.coroutines.CancellationException
 import com.trackspeed.android.cloud.DeviceIdProvider
 import com.trackspeed.android.data.local.dao.AthleteDao
 import com.trackspeed.android.data.repository.AuthRepository
@@ -71,12 +73,50 @@ class ProfileViewModel @Inject constructor(
     private val athleteDao: AthleteDao,
     private val settingsRepository: SettingsRepository,
     private val authRepository: AuthRepository,
-    private val deviceIdProvider: DeviceIdProvider
+    private val deviceIdProvider: DeviceIdProvider,
+    private val profilePersonalBestStore: ProfilePersonalBestStore,
+    private val timingWorkloadCoordinator: TimingWorkloadCoordinator
 ) : ViewModel() {
 
     private val _showDeleteConfirmation = MutableStateFlow(false)
     private val _showSignOutConfirmation = MutableStateFlow(false)
     private val _accountActionError = MutableStateFlow<String?>(null)
+
+    val manualPersonalBests: StateFlow<ProfilePersonalBestValues?> =
+        profilePersonalBestStore.values.map { it as ProfilePersonalBestValues? }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    private val _savingPersonalBest = MutableStateFlow(false)
+    val savingPersonalBest: StateFlow<Boolean> = _savingPersonalBest
+    private val _personalBestError = MutableStateFlow<String?>(null)
+    val personalBestError: StateFlow<String?> = _personalBestError
+
+    fun preparePersonalBestEditor() { _personalBestError.value = null }
+
+    fun savePersonalBest(values: ProfilePersonalBestValues, onSaved: () -> Unit) {
+        if (_savingPersonalBest.value || !values.isValid) return
+        _savingPersonalBest.value = true
+        _personalBestError.value = null
+        viewModelScope.launch {
+            try {
+                profilePersonalBestStore.save(values)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _personalBestError.value = context.getString(R.string.onboarding_promo_error_generic)
+                return@launch
+            } finally {
+                _savingPersonalBest.value = false
+            }
+            onSaved()
+            // Local save is complete. Existing authenticated/offline queue owns
+            // cloud delivery; a profile edit must never add work to live timing.
+            if (!timingWorkloadCoordinator.isLiveTimingActive) {
+                try { authRepository.processPendingProfileSync() }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { /* Durable pending marker is retained. */ }
+            }
+        }
+    }
 
     private val athleteCount: StateFlow<Int> =
         athleteDao.getAthleteCount()

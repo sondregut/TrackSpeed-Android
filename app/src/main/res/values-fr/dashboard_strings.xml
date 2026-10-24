@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Tableau de bord web</string>
+    <string name="dashboard_description">Retrouvez tous vos athlètes, séances, temps intermédiaires et photos sur votre ordinateur sur mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Connectez-vous pour utiliser le tableau de bord web</string>
+    <string name="dashboard_send_link">Envoyer un lien de connexion à mon ordinateur</string>
+    <string name="dashboard_open_here">Ouvrir ici</string>
+    <string name="dashboard_share_chooser">Envoyer à votre propre appareil</string>
+    <string name="dashboard_private_link_hint">Lien de connexion. Envoie-le uniquement à tes propres appareils.</string>
+    <string name="dashboard_creating_link">Création du lien de connexion…</string>
+    <string name="dashboard_offline">Vous êtes hors ligne. Connectez-vous à Internet et réessayez.</string>
+    <string name="dashboard_session_expired">Votre connexion a expiré. Déconnectez-vous puis reconnectez-vous, puis réessayez.</string>
+    <string name="dashboard_email_required">Le tableau de bord web nécessite un compte avec une adresse e-mail.</string>
+    <string name="dashboard_rate_limited">Trop de liens demandés. Patientez une minute et réessayez.</string>
+    <string name="dashboard_unavailable">Le tableau de bord web n’est pas encore disponible.</string>
+    <string name="dashboard_failed">Impossible de créer un lien de connexion. Réessayez dans un instant.</string>
+    <string name="dashboard_open_unavailable">Aucune application compatible n’a pu ouvrir ce lien. Vérifiez votre navigateur ou vos applications de partage, puis réessayez.</string>
+</resources>

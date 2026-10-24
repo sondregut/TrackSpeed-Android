@@ -210,6 +210,7 @@
     <string name="settings_theme">Vzhled</string>
     <string name="theme_midnight">Půlnoc</string>
     <string name="theme_light">Světlo</string>
+    <string name="theme_dark">Tmavý</string>
     <string name="theme_gold">Zlato</string>
     <string name="settings_section_detection">Detekce</string>
     <string name="settings_sensitivity">Citlivost</string>

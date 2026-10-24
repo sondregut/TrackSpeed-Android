@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Weboversigt</string>
+    <string name="dashboard_description">Se alle dine atleter, træningspas, mellemtider og billeder på computeren på mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Log ind for at bruge weboversigten</string>
+    <string name="dashboard_send_link">Send loginlink til min computer</string>
+    <string name="dashboard_open_here">Åbn her</string>
+    <string name="dashboard_share_chooser">Send til din egen enhed</string>
+    <string name="dashboard_private_link_hint">Loginlink. Send kun til dine egne enheder.</string>
+    <string name="dashboard_creating_link">Opretter loginlink …</string>
+    <string name="dashboard_offline">Du er offline. Opret forbindelse til internettet, og prøv igen.</string>
+    <string name="dashboard_session_expired">Dit login er udløbet. Log ud og ind igen, og prøv derefter igen.</string>
+    <string name="dashboard_email_required">Weboversigten kræver en konto med en e-mailadresse.</string>
+    <string name="dashboard_rate_limited">Der er anmodet om for mange links. Vent et minut, og prøv igen.</string>
+    <string name="dashboard_unavailable">Weboversigten er ikke tilgængelig endnu.</string>
+    <string name="dashboard_failed">Kunne ikke oprette et loginlink. Prøv igen om lidt.</string>
+    <string name="dashboard_open_unavailable">Ingen kompatibel app kunne åbne linket. Tjek din browser eller dine delingsapps, og prøv igen.</string>
+</resources>

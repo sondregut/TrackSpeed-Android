@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.trackspeed.android.ui.screens.home.FirstSessionFinalCard
 import com.trackspeed.android.ui.screens.home.HomeContent
 import com.trackspeed.android.ui.screens.settings.SettingsScreenContent
 import com.trackspeed.android.ui.screens.settings.SettingsUiState
@@ -60,6 +61,29 @@ class DashboardParityRenderTest {
         save("parity-home-compact-empty")
         compose.onNodeWithText("Your training, saved here").performClick()
         compose.runOnIdle { assertEquals(listOf("profile", "join", "solo", "setup", "history"), actions) }
+    }
+
+    @Test fun compactTutorialKeepsActionsVisibleWhileInstructionsScroll() {
+        val actions = mutableListOf<String>()
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.6f)) {
+                TrackSpeedTheme {
+                    FirstSessionFinalCard(onBack = { actions += "back" },
+                        onDone = { actions += "done" }, onStartSetup = { actions += "setup" },
+                        modifier = Modifier.requiredSize(320.dp, 560.dp))
+                }
+            }
+        }
+        compose.onNodeWithText("Back").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Done").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Start Setup").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Joining phones can start here").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Back").assertIsDisplayed()
+        compose.onNodeWithText("Done").assertIsDisplayed()
+        compose.onNodeWithText("Start Setup").assertIsDisplayed()
+        save("parity-home-final-tutorial-compact-large-text")
+        compose.runOnIdle { assertEquals(listOf("back", "done", "setup"), actions) }
     }
 
     @Test fun settingsUnitsAndAppearanceStayReachableAtLargeText() {

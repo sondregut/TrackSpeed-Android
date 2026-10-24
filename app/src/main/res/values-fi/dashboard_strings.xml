@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Verkkonäkymä</string>
+    <string name="dashboard_description">Katso kaikki urheilijasi, harjoituksesi, väliaikasi ja kuvasi tietokoneella osoitteessa mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Kirjaudu sisään käyttääksesi verkkonäkymää</string>
+    <string name="dashboard_send_link">Lähetä kirjautumislinkki tietokoneelleni</string>
+    <string name="dashboard_open_here">Avaa tässä</string>
+    <string name="dashboard_share_chooser">Lähetä omalle laitteellesi</string>
+    <string name="dashboard_private_link_hint">Kirjautumislinkki. Lähetä vain omille laitteillesi.</string>
+    <string name="dashboard_creating_link">Luodaan kirjautumislinkkiä…</string>
+    <string name="dashboard_offline">Olet offline-tilassa. Yhdistä internetiin ja yritä uudelleen.</string>
+    <string name="dashboard_session_expired">Kirjautumisesi on vanhentunut. Kirjaudu ulos ja takaisin sisään ja yritä sitten uudelleen.</string>
+    <string name="dashboard_email_required">Verkkonäkymä edellyttää tiliä, jossa on sähköpostiosoite.</string>
+    <string name="dashboard_rate_limited">Linkkejä on pyydetty liian monta. Odota minuutti ja yritä uudelleen.</string>
+    <string name="dashboard_unavailable">Verkkonäkymä ei ole vielä käytettävissä.</string>
+    <string name="dashboard_failed">Kirjautumislinkkiä ei voitu luoda. Yritä hetken kuluttua uudelleen.</string>
+    <string name="dashboard_open_unavailable">Mikään yhteensopiva sovellus ei voinut avata linkkiä. Tarkista selain tai jakamiseen käyttämäsi sovellukset ja yritä uudelleen.</string>
+</resources>

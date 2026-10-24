@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Φόρτωση αποτελεσμάτων…</string>
+    <string name="detail_load_error">Δεν ήταν δυνατή η φόρτωση αυτών των αποτελεσμάτων.</string>
+    <string name="detail_load_error_saved">Δεν ήταν δυνατή η ανανέωση των αποτελεσμάτων. Εμφανίζονται τα τελευταία αποτελέσματα που φορτώθηκαν.</string>
+</resources>

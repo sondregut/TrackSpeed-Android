@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Bảng điều khiển web</string>
+    <string name="dashboard_description">Xem tất cả vận động viên, buổi tập, thời gian từng chặng và ảnh trên máy tính tại mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Đăng nhập để dùng bảng điều khiển web</string>
+    <string name="dashboard_send_link">Gửi liên kết đăng nhập đến máy tính của tôi</string>
+    <string name="dashboard_open_here">Mở tại đây</string>
+    <string name="dashboard_share_chooser">Gửi đến thiết bị của chính bạn</string>
+    <string name="dashboard_private_link_hint">Liên kết đăng nhập. Chỉ gửi đến thiết bị của chính bạn.</string>
+    <string name="dashboard_creating_link">Đang tạo liên kết đăng nhập…</string>
+    <string name="dashboard_offline">Bạn đang ngoại tuyến. Hãy kết nối internet rồi thử lại.</string>
+    <string name="dashboard_session_expired">Phiên đăng nhập đã hết hạn. Hãy đăng xuất rồi đăng nhập lại, sau đó thử lại.</string>
+    <string name="dashboard_email_required">Bảng điều khiển web yêu cầu tài khoản có địa chỉ email.</string>
+    <string name="dashboard_rate_limited">Đã yêu cầu quá nhiều liên kết. Hãy chờ một phút rồi thử lại.</string>
+    <string name="dashboard_unavailable">Bảng điều khiển web chưa khả dụng.</string>
+    <string name="dashboard_failed">Không thể tạo liên kết đăng nhập. Hãy thử lại sau ít phút.</string>
+    <string name="dashboard_open_unavailable">Không có ứng dụng tương thích để mở liên kết này. Hãy kiểm tra trình duyệt hoặc ứng dụng chia sẻ rồi thử lại.</string>
+</resources>

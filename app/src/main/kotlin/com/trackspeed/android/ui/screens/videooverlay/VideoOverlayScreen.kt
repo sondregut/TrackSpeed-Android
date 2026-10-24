@@ -100,6 +100,8 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.FilterChip
@@ -413,10 +415,7 @@ private fun PreviewStep(
         return
     }
 
-    var showOptions by rememberSaveable { mutableStateOf(false) }
     var showGuides by rememberSaveable { mutableStateOf(false) }
-    if (showOptions) OverlayOptionsDialog(snapshot.preferences,
-        onChange = onPreferencesChange, onDismiss = { showOptions = false })
     val player = rememberVideoPlayer(video = video, playWhenReady = true)
     var currentTime by remember(video.uri) { mutableDoubleStateOf(0.0) }
 
@@ -448,67 +447,101 @@ private fun PreviewStep(
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SurfaceDark)
-                    .heightIn(max = controlsMaxHeight)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 18.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OverlayChoiceSection(title = stringResource(R.string.overlay_canvas)) {
-                    OverlayCanvas.entries.forEach { canvas ->
-                        FilterChip(
-                            selected = snapshot.preferences.canvas == canvas,
-                            onClick = { onPreferencesChange(snapshot.preferences.copy(canvas = canvas)) },
-                            enabled = exportPhase !is VideoExportPhase.Exporting,
-                            label = { Text(stringResource(if (canvas == OverlayCanvas.SOCIAL_9_16)
-                                R.string.overlay_canvas_social else R.string.overlay_canvas_original)) }
-                        )
-                    }
-                }
-                OverlayChoiceSection(title = stringResource(R.string.overlay_speed_units)) {
-                    OverlaySpeedUnit.entries.forEach { unit ->
-                        FilterChip(
-                            selected = snapshot.preferences.speedUnit == unit,
-                            onClick = { onPreferencesChange(snapshot.preferences.copy(speedUnit = unit)) },
-                            enabled = exportPhase !is VideoExportPhase.Exporting,
-                            label = { Text(unit.label) }
-                        )
-                    }
-                }
+            OverlayPreviewControls(
+                options = snapshot.preferences,
+                exportPhase = exportPhase,
+                showGuides = showGuides,
+                onShowGuidesChange = { showGuides = it },
+                onPreferencesChange = onPreferencesChange,
+                onBack = onBack,
+                onExport = onExport,
+                onRetry = onRetry,
+                onSave = onSave,
+                onShare = onShare,
+                modifier = Modifier.heightIn(max = controlsMaxHeight)
+            )
+        }
+    }
+}
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { showOptions = true }, enabled = exportPhase !is VideoExportPhase.Exporting,
-                        modifier = Modifier.weight(1f)) { Text(stringResource(R.string.overlay_edit_metrics)) }
-                    OutlinedButton(onClick = { showGuides = !showGuides }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(if (showGuides) R.string.overlay_hide_guides else R.string.overlay_safe_guides))
-                    }
-                }
-
-                if (showGuides) {
-                    Text(stringResource(R.string.parity_overlay_guide_note), color = TextMuted,
-                        style = MaterialTheme.typography.bodySmall)
-                }
-                HorizontalDivider(color = DividerColor)
-
-                ExportActions(
-                    phase = exportPhase,
-                    onExport = onExport,
-                    onRetry = onRetry,
-                    onSave = onSave,
-                    onShare = onShare
-                )
-
-                TextButton(
-                    onClick = onBack,
+/** The real editor controls, separated from video playback for interaction/accessibility tests. */
+@Composable
+internal fun OverlayPreviewControls(
+    options: OverlayPreferences,
+    exportPhase: VideoExportPhase,
+    showGuides: Boolean,
+    onShowGuidesChange: (Boolean) -> Unit,
+    onPreferencesChange: (OverlayPreferences) -> Unit,
+    onBack: () -> Unit,
+    onExport: () -> Unit,
+    onRetry: () -> Unit,
+    onSave: () -> Unit,
+    onShare: (File) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showOptions by rememberSaveable { mutableStateOf(false) }
+    if (showOptions) {
+        OverlayOptionsDialog(options, onChange = onPreferencesChange,
+            onDismiss = { showOptions = false })
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(SurfaceDark)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        OverlayChoiceSection(title = stringResource(R.string.overlay_canvas)) {
+            OverlayCanvas.entries.forEach { canvas ->
+                FilterChip(
+                    selected = options.canvas == canvas,
+                    onClick = { onPreferencesChange(options.copy(canvas = canvas)) },
                     enabled = exportPhase !is VideoExportPhase.Exporting,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.video_overlay_back_to_marker), color = TextSecondary)
-                }
+                    label = { Text(stringResource(if (canvas == OverlayCanvas.SOCIAL_9_16)
+                        R.string.overlay_canvas_social else R.string.overlay_canvas_original)) }
+                )
             }
+        }
+        OverlayChoiceSection(title = stringResource(R.string.overlay_speed_units)) {
+            OverlaySpeedUnit.entries.forEach { unit ->
+                FilterChip(
+                    selected = options.speedUnit == unit,
+                    onClick = { onPreferencesChange(options.copy(speedUnit = unit)) },
+                    enabled = exportPhase !is VideoExportPhase.Exporting,
+                    label = { Text(unit.label) }
+                )
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { showOptions = true }, enabled = exportPhase !is VideoExportPhase.Exporting,
+                modifier = Modifier.weight(1f)) { Text(stringResource(R.string.overlay_edit_metrics)) }
+            OutlinedButton(onClick = { onShowGuidesChange(!showGuides) }, modifier = Modifier.weight(1f)) {
+                Text(stringResource(if (showGuides) R.string.overlay_hide_guides else R.string.overlay_safe_guides))
+            }
+        }
+
+        if (showGuides) {
+            Text(stringResource(R.string.parity_overlay_guide_note), color = TextMuted,
+                style = MaterialTheme.typography.bodySmall)
+        }
+        HorizontalDivider(color = DividerColor)
+
+        ExportActions(
+            phase = exportPhase,
+            onExport = onExport,
+            onRetry = onRetry,
+            onSave = onSave,
+            onShare = onShare
+        )
+
+        TextButton(
+            onClick = onBack,
+            enabled = exportPhase !is VideoExportPhase.Exporting,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.video_overlay_back_to_marker), color = TextSecondary)
         }
     }
 }
@@ -521,14 +554,19 @@ private fun ToggleRow(
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch,
+                onValueChange = onCheckedChange)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // One labelled accessibility target and a full-row touch target.
         Text(title, color = TextSecondary, modifier = Modifier.weight(1f))
         Switch(
             checked = checked,
             enabled = enabled,
-            onCheckedChange = onCheckedChange
+            onCheckedChange = null
         )
     }
 }

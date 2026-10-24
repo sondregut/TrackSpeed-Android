@@ -39,7 +39,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -190,7 +189,7 @@ fun RunDetailScreen(
                 },
                 actions = {
                     Box {
-                        IconButton(onClick = { showMenu = true }) {
+                        IconButton(onClick = { showMenu = true }, enabled = uiState.run != null) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = stringResource(R.string.session_detail_more_cd),
@@ -271,14 +270,15 @@ fun RunDetailScreen(
             )
         }
     ) { paddingValues ->
-        if (uiState.isLoading) {
+        if (uiState.run == null && (uiState.isLoading || uiState.loadFailed)) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = TextPrimary)
+                DetailLoadFeedback(uiState.isLoading, uiState.loadFailed, uiState.hasLoadedData,
+                    onRetry = viewModel::retryLoading)
             }
             return@Scaffold
         }
@@ -316,6 +316,12 @@ fun RunDetailScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(top = 24.dp, bottom = 32.dp)
         ) {
+            if (uiState.isLoading || uiState.loadFailed) {
+                item(key = "load-feedback") {
+                    DetailLoadFeedback(uiState.isLoading, uiState.loadFailed, uiState.hasLoadedData,
+                        onRetry = viewModel::retryLoading)
+                }
+            }
             // Athlete header
             if (run.athleteName != null) {
                 item {

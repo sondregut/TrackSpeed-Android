@@ -206,6 +206,7 @@
     <string name="settings_theme">Ulkonäkö</string>
     <string name="theme_midnight">Keskiyö</string>
     <string name="theme_light">Kevyt</string>
+    <string name="theme_dark">Tumma</string>
     <string name="theme_gold">Kulta</string>
     <string name="settings_section_detection">Havaitseminen</string>
     <string name="settings_sensitivity">Herkkyys</string>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Načítání výsledků…</string>
+    <string name="detail_load_error">Tyto výsledky se nepodařilo načíst.</string>
+    <string name="detail_load_error_saved">Výsledky se nepodařilo obnovit. Zobrazují se naposledy načtené výsledky.</string>
+</resources>

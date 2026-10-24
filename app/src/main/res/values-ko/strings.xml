@@ -204,6 +204,7 @@
     <string name="settings_theme">외관</string>
     <string name="theme_midnight">미드나이트</string>
     <string name="theme_light">라이트</string>
+    <string name="theme_dark">다크</string>
     <string name="theme_gold">골드</string>
     <string name="settings_section_detection">감지</string>
     <string name="settings_sensitivity">감도</string>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">กำลังโหลดผลลัพธ์…</string>
+    <string name="detail_load_error">โหลดผลลัพธ์เหล่านี้ไม่ได้</string>
+    <string name="detail_load_error_saved">รีเฟรชผลลัพธ์เหล่านี้ไม่ได้ กำลังแสดงผลลัพธ์ที่โหลดล่าสุด</string>
+</resources>

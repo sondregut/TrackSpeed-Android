@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Memuat hasil…</string>
+    <string name="detail_load_error">Tidak dapat memuat hasil ini.</string>
+    <string name="detail_load_error_saved">Tidak dapat menyegarkan hasil ini. Menampilkan hasil yang terakhir dimuat.</string>
+</resources>

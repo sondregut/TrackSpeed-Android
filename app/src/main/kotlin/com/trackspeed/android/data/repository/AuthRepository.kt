@@ -22,6 +22,7 @@ import com.trackspeed.android.cloud.safeCloudErrorCode
 import com.trackspeed.android.data.recovery.SessionStateRecoveryService
 import com.trackspeed.android.notifications.NotificationService
 import com.trackspeed.android.referral.ReferralService
+import com.trackspeed.android.ui.screens.profile.ProfilePersonalBestStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -50,7 +51,8 @@ class AuthRepository @Inject constructor(
     private val subscriptionManager: SubscriptionManager,
     private val notificationService: NotificationService,
     private val elevenLabsService: ElevenLabsService,
-    private val analyticsService: AnalyticsService
+    private val analyticsService: AnalyticsService,
+    private val profilePersonalBestStore: ProfilePersonalBestStore
 ) {
     private val preferences: Flow<Preferences> = dataStore.data.catch { error ->
         if (error is IOException) {
@@ -218,18 +220,30 @@ class AuthRepository @Inject constructor(
             return false
         }
 
+        val snapshot = profilePersonalBestStore.snapshot()
         val pending = settingsRepository.pendingProfileSync.first()
         val onboardingCompleted = settingsRepository.onboardingCompleted.first()
-        if (!force && !pending) return false
+        if (!force && !pending && snapshot.revision == null) return false
 
-        val profile = buildLocalProfileDto(state, onboardingCompleted)
-        val succeeded = profileService.syncProfile(profile)
+        // Build all four PR fields from the same snapshot used for acknowledgement.
+        val profile = buildLocalProfileDto(state, onboardingCompleted).copy(
+            primaryEvent = snapshot.values.primaryEvent.rawValue,
+            personalRecord = snapshot.values.personalRecordSeconds,
+            flyingPrDistance = snapshot.values.flyingDistance?.rawValue,
+            flyingPr = snapshot.values.flyingPrSeconds
+        )
+        val succeeded = profileService.syncProfile(profile,
+            manualPersonalBest = snapshot.values.takeIf { snapshot.revision != null },
+            expectedPersonalBest = snapshot)
+        // A response for a previous account must never acknowledge this account's queue.
+        val current = authService.authState.value as? AuthState.Authenticated
+        if (current == null || current.userId != state.userId || current.isAnonymous) return false
         if (succeeded) {
-            settingsRepository.setPendingProfileSync(false)
-        } else if (onboardingCompleted || pending) {
-            settingsRepository.setPendingProfileSync(true)
+            return profilePersonalBestStore.acknowledgeUploaded(snapshot)
+        } else if (onboardingCompleted || pending || snapshot.revision != null) {
+            profilePersonalBestStore.retainPendingAfterFailure(snapshot)
         }
-        return succeeded
+        return false
     }
 
     private suspend fun syncProfileAfterAuth() {

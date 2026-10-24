@@ -206,6 +206,7 @@
     <string name="settings_theme">Utseende</string>
     <string name="theme_midnight">Midnatt</string>
     <string name="theme_light">Ljus</string>
+    <string name="theme_dark">Mörk</string>
     <string name="theme_gold">Guld</string>
     <string name="settings_section_detection">Detektion</string>
     <string name="settings_sensitivity">Känslighet</string>

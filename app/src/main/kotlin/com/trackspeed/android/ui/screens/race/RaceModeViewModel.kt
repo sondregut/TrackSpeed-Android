@@ -534,6 +534,8 @@ class RaceModeViewModel @Inject constructor(
         viewModelScope.launch {
             bleClockSyncService.state.collect { bleState ->
                 val currentPhase = _uiState.value.phase
+                // Presentation follows the transport state, never localized status text.
+                _uiState.update { it.copy(pairingActivity = bleState.toPairingActivity()) }
                 when (bleState) {
                     is BleClockSyncService.State.Scanning -> {
                         _uiState.update {
@@ -847,8 +849,10 @@ class RaceModeViewModel @Inject constructor(
         if (!granted) {
             _uiState.update {
                 it.copy(
+                    // The screen presents permission requirements persistently.
+                    // Do not store a transient error that outlives a Settings grant.
                     pairingStatus = context.getString(R.string.race_pairing_status_permission),
-                    errorMessage = context.getString(R.string.race_error_nearby_permission)
+                    pairingActivity = RacePairingActivity.IDLE
                 )
             }
             return
@@ -6261,6 +6265,7 @@ data class RaceModeUiState(
     val isJoinMode: Boolean = false,
     val isHostingSession: Boolean = false,
     val pairingStatus: String = "",
+    val pairingActivity: RacePairingActivity = RacePairingActivity.IDLE,
     val isDeviceConnected: Boolean = false,
     val connectedDeviceCount: Int = 0,
     val syncedDeviceCount: Int = 0,

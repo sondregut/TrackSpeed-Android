@@ -210,6 +210,7 @@
     <string name="settings_theme">Внешний вид</string>
     <string name="theme_midnight">Полночь</string>
     <string name="theme_light">Светлая</string>
+    <string name="theme_dark">Тёмная</string>
     <string name="theme_gold">Золото</string>
     <string name="settings_section_detection">Обнаружение</string>
     <string name="settings_sensitivity">Чувствительность</string>

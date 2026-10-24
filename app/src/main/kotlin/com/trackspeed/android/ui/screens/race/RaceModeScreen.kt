@@ -157,6 +157,19 @@ fun RaceModeScreen(
         viewModel.onBluetoothPermissionResult(hasBluetoothPermission)
     }
 
+    RefreshPairingPermissionOnResume(
+        currentlyGranted = hasBluetoothPermission,
+        readPermission = {
+            requiredBlePermissions().all { permission ->
+                ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+            }
+        },
+        onPermissionChanged = { granted ->
+            hasBluetoothPermission = granted
+            viewModel.onBluetoothPermissionResult(granted)
+        }
+    )
+
     // Camera permission launcher
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -219,7 +232,8 @@ fun RaceModeScreen(
             // Phase content
             when (uiState.phase) {
                 RacePhase.PAIRING -> PairingContent(
-                    pairingStatus = uiState.pairingStatus,
+                    pairingActivity = uiState.pairingActivity,
+                    hasBluetoothPermission = hasBluetoothPermission,
                     connectedDeviceCount = uiState.connectedDeviceCount,
                     syncedDeviceCount = uiState.syncedDeviceCount,
                     numberOfGates = uiState.numberOfGates,
@@ -428,8 +442,9 @@ private fun RaceTopBar(
 // =============================================================================
 
 @Composable
-private fun ConnectionHelpDialog(
-    onDismiss: () -> Unit
+internal fun ConnectionHelpDialog(
+    onDismiss: () -> Unit,
+    sdkInt: Int = Build.VERSION.SDK_INT
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -448,7 +463,12 @@ private fun ConnectionHelpDialog(
                 ConnectionHelpTip(stringResource(R.string.race_connection_help_tip2))
                 ConnectionHelpTip(stringResource(R.string.race_connection_help_tip3))
                 ConnectionHelpTip(stringResource(R.string.race_connection_help_tip4))
-                ConnectionHelpTip(stringResource(R.string.race_connection_help_tip5))
+                // The manifest uses neverForLocation on Android 12+. Only older
+                // Android releases require Location for BLE discovery.
+                ConnectionHelpTip(stringResource(
+                    if (sdkInt >= Build.VERSION_CODES.S) R.string.race_error_nearby_permission
+                    else R.string.race_connection_help_tip5
+                ))
             }
         },
         confirmButton = {
@@ -487,7 +507,8 @@ private fun ConnectionHelpTip(text: String) {
 
 @Composable
 private fun PairingContent(
-    pairingStatus: String,
+    pairingActivity: RacePairingActivity,
+    hasBluetoothPermission: Boolean,
     connectedDeviceCount: Int,
     syncedDeviceCount: Int,
     numberOfGates: Int,
@@ -500,7 +521,7 @@ private fun PairingContent(
 ) {
     var showHelpDialog by remember { mutableStateOf(false) }
     val hasRequiredConnections = connectedDeviceCount >= requiredDeviceCount
-    val hasRequiredDevices = pairingHasRequiredReadyDevices(
+    val hasRequiredDevices = hasBluetoothPermission && pairingHasRequiredReadyDevices(
         connectedDeviceCount = connectedDeviceCount,
         syncedDeviceCount = syncedDeviceCount,
         requiredDeviceCount = requiredDeviceCount
@@ -530,7 +551,9 @@ private fun PairingContent(
         ) {
             // Scanning animation with help button
             Box(contentAlignment = Alignment.TopEnd) {
-                ScanningAnimation()
+                ScanningAnimation(
+                    isScanning = hasBluetoothPermission && pairingActivity == RacePairingActivity.SEARCHING
+                )
 
                 IconButton(
                     onClick = { showHelpDialog = true },
@@ -611,7 +634,10 @@ private fun PairingContent(
             )
 
             if (isJoinMode) {
-                JoinSessionStatusCard(pairingStatus = pairingStatus)
+                JoinSessionStatusCard(
+                    activity = pairingActivity,
+                    hasBluetoothPermission = hasBluetoothPermission
+                )
             }
 
             if (isHostingSession) {
@@ -629,14 +655,18 @@ private fun PairingContent(
             }
 
             // Status pill
-            if (pairingStatus.isNotEmpty() && connectedDeviceCount == 0) {
+            if ((!hasBluetoothPermission || pairingActivity != RacePairingActivity.IDLE) &&
+                connectedDeviceCount == 0) {
                 Box(
                     modifier = Modifier
                         .background(TextSecondary.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = pairingStatus,
+                        text = stringResource(
+                            if (!hasBluetoothPermission) R.string.race_pairing_status_permission
+                            else pairingActivity.titleRes(hostMode = isHostingSession)
+                        ),
                         color = TextSecondary,
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.SemiBold
@@ -666,16 +696,25 @@ private fun PairingContent(
 }
 
 @Composable
-private fun JoinSessionStatusCard(pairingStatus: String) {
-    val isSearching = pairingStatus.isNotBlank()
-    val title = stringResource(
-        if (isSearching) R.string.race_join_scanning_title else R.string.race_join_ready_title
+internal fun JoinSessionStatusCard(
+    activity: RacePairingActivity,
+    hasBluetoothPermission: Boolean,
+    sdkInt: Int = Build.VERSION.SDK_INT
+) {
+    val isSearching = hasBluetoothPermission && activity == RacePairingActivity.SEARCHING
+    val showProgress = hasBluetoothPermission && activity in setOf(
+        RacePairingActivity.SEARCHING, RacePairingActivity.CONNECTING, RacePairingActivity.SYNCHRONIZING
     )
-    val detail = if (isSearching) {
-        stringResource(R.string.race_join_scanning_detail)
-    } else {
-        stringResource(R.string.race_join_ready_detail)
-    }
+    val title = stringResource(
+        if (!hasBluetoothPermission) R.string.race_pairing_status_permission else activity.titleRes()
+    )
+    val detail = stringResource(when {
+        !hasBluetoothPermission && sdkInt >= Build.VERSION_CODES.S -> R.string.race_error_nearby_permission
+        !hasBluetoothPermission -> R.string.race_bluetooth_required
+        activity == RacePairingActivity.ERROR -> R.string.race_error_connection
+        activity == RacePairingActivity.IDLE -> R.string.race_join_ready_detail
+        else -> R.string.race_join_scanning_detail
+    })
     val hostDetail = if (isSearching) {
         stringResource(R.string.race_join_host_scanning_detail)
     } else {
@@ -738,26 +777,28 @@ private fun JoinSessionStatusCard(pairingStatus: String) {
                     )
                 }
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = stringResource(
-                            if (isSearching) R.string.race_waiting else R.string.race_bluetooth
-                        ),
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = stringResource(
-                            if (isSearching) R.string.race_status_upper else R.string.race_mode_upper
-                        ),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = TextTertiary
-                    )
+                if (hasBluetoothPermission) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = stringResource(
+                                if (showProgress) R.string.race_waiting else R.string.race_bluetooth
+                            ),
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = TextPrimary,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = stringResource(
+                                if (showProgress) R.string.race_status_upper else R.string.race_mode_upper
+                            ),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = TextTertiary
+                        )
+                    }
                 }
             }
 
-            if (isSearching) {
+            if (showProgress) {
                 LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1178,62 +1219,63 @@ private fun roleLabel(role: DeviceRole): String = when (role) {
 }
 
 @Composable
-private fun ScanningAnimation() {
-    val infiniteTransition = rememberInfiniteTransition(label = "scan")
-    val alpha1 by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0.1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = EaseOut),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ring1"
-    )
-    val scale1 by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 2.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = EaseOut),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "scale1"
-    )
-    val alpha2 by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0.1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = EaseOut, delayMillis = 500),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ring2"
-    )
-    val scale2 by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 2.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = EaseOut, delayMillis = 500),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "scale2"
-    )
-
+private fun ScanningAnimation(isScanning: Boolean) {
     val accentBlueColor = AccentBlue
     Box(
         modifier = Modifier.size(120.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Animated rings
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                color = accentBlueColor.copy(alpha = alpha1),
-                radius = 30.dp.toPx() * scale1,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+        if (isScanning) {
+            val infiniteTransition = rememberInfiniteTransition(label = "scan")
+            val alpha1 by infiniteTransition.animateFloat(
+                initialValue = 0.6f,
+                targetValue = 0.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500, easing = EaseOut),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "ring1"
             )
-            drawCircle(
-                color = accentBlueColor.copy(alpha = alpha2),
-                radius = 30.dp.toPx() * scale2,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+            val scale1 by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = 2.5f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500, easing = EaseOut),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "scale1"
             )
+            val alpha2 by infiniteTransition.animateFloat(
+                initialValue = 0.6f,
+                targetValue = 0.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500, easing = EaseOut, delayMillis = 500),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "ring2"
+            )
+            val scale2 by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = 2.5f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500, easing = EaseOut, delayMillis = 500),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "scale2"
+            )
+            // Animated rings
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(
+                    color = accentBlueColor.copy(alpha = alpha1),
+                    radius = 30.dp.toPx() * scale1,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                )
+                drawCircle(
+                    color = accentBlueColor.copy(alpha = alpha2),
+                    radius = 30.dp.toPx() * scale2,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                )
+            }
         }
 
         // Center icon

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">正在載入成績…</string>
+    <string name="detail_load_error">無法載入這些成績。</string>
+    <string name="detail_load_error_saved">無法重新整理這些成績。目前顯示上次載入的成績。</string>
+</resources>

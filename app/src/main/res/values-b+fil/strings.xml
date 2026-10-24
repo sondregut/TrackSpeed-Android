@@ -206,6 +206,7 @@
     <string name="settings_theme">Hitsura</string>
     <string name="theme_midnight">hatinggabi</string>
     <string name="theme_light">Liwanag</string>
+    <string name="theme_dark">Madilim</string>
     <string name="theme_gold">ginto</string>
     <string name="settings_section_detection">Pagtuklas</string>
     <string name="settings_sensitivity">pagiging sensitibo</string>

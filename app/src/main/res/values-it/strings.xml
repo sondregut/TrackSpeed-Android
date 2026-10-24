@@ -208,6 +208,7 @@
     <string name="settings_theme">Aspetto</string>
     <string name="theme_midnight">Mezzanotte</string>
     <string name="theme_light">Chiaro</string>
+    <string name="theme_dark">Scuro</string>
     <string name="theme_gold">Oro</string>
     <string name="settings_section_detection">Rilevamento</string>
     <string name="settings_sensitivity">Sensibilita</string>

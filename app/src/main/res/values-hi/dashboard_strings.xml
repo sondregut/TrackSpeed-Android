@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">वेब डैशबोर्ड</string>
+    <string name="dashboard_description">अपने सभी एथलीट, सेशन, स्प्लिट और फ़ोटो अपने कंप्यूटर पर mytrackspeed.com/dashboard पर देखें।</string>
+    <string name="dashboard_sign_in_required">वेब डैशबोर्ड इस्तेमाल करने के लिए साइन इन करें</string>
+    <string name="dashboard_send_link">मेरे कंप्यूटर पर साइन-इन लिंक भेजें</string>
+    <string name="dashboard_open_here">यहीं खोलें</string>
+    <string name="dashboard_share_chooser">अपने ही डिवाइस पर भेजें</string>
+    <string name="dashboard_private_link_hint">साइन-इन लिंक। केवल अपने डिवाइस पर भेजें।</string>
+    <string name="dashboard_creating_link">साइन-इन लिंक बनाया जा रहा है…</string>
+    <string name="dashboard_offline">आप ऑफ़लाइन हैं। इंटरनेट से जुड़ें और फिर कोशिश करें।</string>
+    <string name="dashboard_session_expired">आपका साइन-इन समाप्त हो गया है। साइन आउट करके फिर से साइन इन करें, फिर कोशिश करें।</string>
+    <string name="dashboard_email_required">वेब डैशबोर्ड के लिए ईमेल पते वाला खाता ज़रूरी है।</string>
+    <string name="dashboard_rate_limited">बहुत अधिक लिंक मांगे गए। एक मिनट रुकें और फिर से कोशिश करें।</string>
+    <string name="dashboard_unavailable">वेब डैशबोर्ड अभी उपलब्ध नहीं है।</string>
+    <string name="dashboard_failed">साइन-इन लिंक नहीं बन सका। थोड़ी देर बाद फिर कोशिश करें।</string>
+    <string name="dashboard_open_unavailable">कोई संगत ऐप यह लिंक नहीं खोल सका। अपना ब्राउज़र या शेयर करने वाले ऐप जाँचें, फिर कोशिश करें।</string>
+</resources>

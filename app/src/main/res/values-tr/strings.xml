@@ -206,6 +206,7 @@
     <string name="settings_theme">Görünüm</string>
     <string name="theme_midnight">Gece yarısı</string>
     <string name="theme_light">Işık</string>
+    <string name="theme_dark">Koyu</string>
     <string name="theme_gold">Altın</string>
     <string name="settings_section_detection">Algılama</string>
     <string name="settings_sensitivity">Hassasiyet</string>

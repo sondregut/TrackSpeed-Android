@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Panou web</string>
+    <string name="dashboard_description">Vezi toți sportivii, sesiunile, timpii intermediari și fotografiile tale pe computer la mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Conectează-te pentru a folosi panoul web</string>
+    <string name="dashboard_send_link">Trimite linkul de conectare pe computerul meu</string>
+    <string name="dashboard_open_here">Deschide aici</string>
+    <string name="dashboard_share_chooser">Trimite pe un dispozitiv propriu</string>
+    <string name="dashboard_private_link_hint">Link de conectare. Trimite-l doar pe dispozitivele tale.</string>
+    <string name="dashboard_creating_link">Se creează linkul de conectare…</string>
+    <string name="dashboard_offline">Ești offline. Conectează-te la internet și încearcă din nou.</string>
+    <string name="dashboard_session_expired">Conectarea ta a expirat. Deconectează-te, conectează-te din nou, apoi încearcă iar.</string>
+    <string name="dashboard_email_required">Panoul web necesită un cont cu adresă de e-mail.</string>
+    <string name="dashboard_rate_limited">Prea multe linkuri solicitate. Așteaptă un minut și încearcă din nou.</string>
+    <string name="dashboard_unavailable">Panoul web nu este încă disponibil.</string>
+    <string name="dashboard_failed">Linkul de autentificare nu a putut fi creat. Încearcă din nou în câteva momente.</string>
+    <string name="dashboard_open_unavailable">Nicio aplicație compatibilă nu poate deschide acest link. Verifică browserul sau aplicațiile de partajare și încearcă din nou.</string>
+</resources>

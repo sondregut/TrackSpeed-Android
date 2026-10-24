@@ -206,6 +206,7 @@
     <string name="settings_theme">दिखावट</string>
     <string name="theme_midnight">मिडनाइट</string>
     <string name="theme_light">लाइट</string>
+    <string name="theme_dark">गहरा</string>
     <string name="theme_gold">सोना</string>
     <string name="settings_section_detection">डिटेक्शन</string>
     <string name="settings_sensitivity">संवेदनशीलता</string>

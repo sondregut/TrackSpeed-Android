@@ -281,8 +281,8 @@ fun SessionSetupScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AccentNavy,
-                        contentColor = Color.White
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     Text(
@@ -653,7 +653,7 @@ private fun CompactSetupSection(
 }
 
 @Composable
-private fun SessionStartOptionChip(
+internal fun SessionStartOptionChip(
     title: String,
     subtitle: String,
     icon: ImageVector,
@@ -665,7 +665,7 @@ private fun SessionStartOptionChip(
         modifier = modifier
             .heightIn(min = 78.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) AccentBlue else MaterialTheme.colorScheme.surfaceVariant)
+            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
             .border(
                 width = 1.dp,
                 color = if (selected) Color.Transparent else BorderSubtle,
@@ -676,7 +676,7 @@ private fun SessionStartOptionChip(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val contentColor = if (selected) Color.White else TextPrimary
+        val contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else TextPrimary
         Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(28.dp))
         }
@@ -740,7 +740,7 @@ private fun SessionStartTypeRow(
 }
 
 @Composable
-private fun SessionTextChoiceChip(
+internal fun SessionTextChoiceChip(
     title: String,
     selected: Boolean,
     onClick: () -> Unit
@@ -749,18 +749,18 @@ private fun SessionTextChoiceChip(
         text = title,
         modifier = Modifier
             .clip(CircleShape)
-            .background(if (selected) AccentNavy else MaterialTheme.colorScheme.surfaceVariant)
-            .border(1.dp, if (selected) AccentNavy else BorderSubtle, CircleShape)
+            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else BorderSubtle, CircleShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 11.dp),
-        color = if (selected) Color.White else TextPrimary,
+        color = if (selected) MaterialTheme.colorScheme.onPrimary else TextPrimary,
         fontWeight = FontWeight.SemiBold,
         maxLines = 1
     )
 }
 
 @Composable
-private fun SessionAthleteChip(
+internal fun SessionAthleteChip(
     athlete: AthleteEntity,
     selected: Boolean,
     onClick: () -> Unit
@@ -768,7 +768,7 @@ private fun SessionAthleteChip(
     Row(
         modifier = Modifier
             .clip(CircleShape)
-            .background(if (selected) AccentNavy else MaterialTheme.colorScheme.surfaceVariant)
+            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -789,12 +789,12 @@ private fun SessionAthleteChip(
         }
         Text(
             text = athlete.displayName,
-            color = if (selected) Color.White else TextPrimary,
+            color = if (selected) MaterialTheme.colorScheme.onPrimary else TextPrimary,
             fontWeight = FontWeight.Medium,
             maxLines = 1
         )
         if (selected) {
-            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(15.dp))
         }
     }
 }
@@ -809,8 +809,8 @@ private fun SessionSetupAddAthleteButton(onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
-        Icon(Icons.Default.Add, contentDescription = null, tint = AccentNavy, modifier = Modifier.size(17.dp))
-        Text(stringResource(R.string.athlete_chip_add), color = AccentNavy, fontWeight = FontWeight.SemiBold)
+        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(17.dp))
+        Text(stringResource(R.string.athlete_chip_add), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
     }
 }
 

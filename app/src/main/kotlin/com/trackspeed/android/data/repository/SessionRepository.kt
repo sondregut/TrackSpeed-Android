@@ -28,6 +28,8 @@ import com.trackspeed.android.notifications.NotificationTiming
 import com.trackspeed.android.onephone.SingleCameraSprintPersistence
 import com.trackspeed.android.onephone.SingleCameraSprintRunRecord
 import com.trackspeed.android.ui.screens.timing.SoloLapResult
+import com.trackspeed.android.ui.screens.profile.ProfilePersonalBestStore
+import com.trackspeed.android.ui.screens.profile.FlyingPrSyncSnapshot
 import com.trackspeed.android.util.ImageDownloadValidator
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -92,7 +94,8 @@ class SessionRepository @Inject constructor(
     private val profileService: ProfileService,
     private val settingsRepository: SettingsRepository,
     private val notificationService: NotificationService,
-    private val subscriptionManager: SubscriptionManager
+    private val subscriptionManager: SubscriptionManager,
+    private val personalBestStore: ProfilePersonalBestStore
 ) {
     private val runMutationMutex = Mutex()
     private val uploadRetryPrefs by lazy {
@@ -257,26 +260,13 @@ class SessionRepository @Inject constructor(
     }
 
     suspend fun processPendingFlyingPrSync(): Boolean {
-        val pending = settingsRepository.pendingFlyingPrSync.first()
-        if (pending.isBlank()) return false
-
-        val parts = pending.split(":")
-        if (parts.size != 2) {
-            settingsRepository.setPendingFlyingPrSync("")
-            return false
-        }
-
-        val distance = FlyingDistance.fromRawValue(parts[0])
-        val timeSeconds = parts[1].toDoubleOrNull()
-        if (distance == null || timeSeconds == null) {
-            settingsRepository.setPendingFlyingPrSync("")
-            return false
-        }
-
-        return if (profileService.updateFlyingPr(distance, timeSeconds)) {
-            settingsRepository.setPendingFlyingPrSync("")
-            true
+        if (workloadCoordinator.isLiveTimingActive) return false
+        val userId = profileService.currentProfileUserId ?: return false
+        val ticket = personalBestStore.pendingFlyingPr(userId) ?: return false
+        return if (profileService.updateFlyingPr(ticket)) {
+            personalBestStore.acknowledgeFlyingPr(ticket)
         } else {
+            // Already durable. Do not recreate a ticket invalidated by a manual save.
             false
         }
     }
@@ -1244,32 +1234,17 @@ class SessionRepository @Inject constructor(
             else -> return
         }
 
-        val trackedDistance = settingsRepository.flyingDistance.first()
-            ?.let(FlyingDistance::fromRawValue)
-        val currentPr = settingsRepository.flyingPR.first()
-
-        if (trackedDistance != matchedDistance) {
-            if (trackedDistance == null) {
-                settingsRepository.setFlyingDistance(matchedDistance.rawValue)
-                settingsRepository.setFlyingPR(timeSeconds)
-                syncFlyingPrToCloud(matchedDistance, timeSeconds)
-            }
-            return
-        }
-
-        if (currentPr == null || timeSeconds < currentPr) {
-            settingsRepository.setFlyingDistance(matchedDistance.rawValue)
-            settingsRepository.setFlyingPR(timeSeconds)
-            syncFlyingPrToCloud(matchedDistance, timeSeconds)
-        }
+        val accountId = profileService.currentProfileUserId
+        val ticket = personalBestStore.recordMeasuredFlyingPr(matchedDistance, timeSeconds, accountId) {
+            profileService.currentProfileUserId == accountId
+        } ?: return
+        syncFlyingPrToCloud(ticket)
     }
 
-    private suspend fun syncFlyingPrToCloud(distance: FlyingDistance, timeSeconds: Double) {
-        if (profileService.updateFlyingPr(distance, timeSeconds)) {
-            settingsRepository.setPendingFlyingPrSync("")
-        } else {
-            settingsRepository.setPendingFlyingPrSync("${distance.rawValue}:$timeSeconds")
-        }
+    private suspend fun syncFlyingPrToCloud(ticket: FlyingPrSyncSnapshot) {
+        if (workloadCoordinator.isLiveTimingActive) return
+        if (profileService.updateFlyingPr(ticket)) personalBestStore.acknowledgeFlyingPr(ticket)
+        // Failure/busy keeps the original ticket. A late callback never requeues it.
     }
 
     private fun getSeasonStartMillis(): Long {

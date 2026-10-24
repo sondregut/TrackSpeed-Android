@@ -204,6 +204,7 @@
     <string name="settings_theme">Penampilan</string>
     <string name="theme_midnight">tengah malam</string>
     <string name="theme_light">Cahaya</string>
+    <string name="theme_dark">Gelap</string>
     <string name="theme_gold">emas</string>
     <string name="settings_section_detection">Pengesanan</string>
     <string name="settings_sensitivity">Sensitiviti</string>

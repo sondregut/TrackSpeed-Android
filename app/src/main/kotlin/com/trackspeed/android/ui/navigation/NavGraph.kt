@@ -30,6 +30,7 @@ import com.trackspeed.android.ui.screens.athletes.AthleteFormScreen
 import com.trackspeed.android.ui.screens.athletes.AthleteListScreen
 import com.trackspeed.android.ui.screens.auth.AuthScreen
 import com.trackspeed.android.ui.screens.debug.DebugToolsScreen
+import com.trackspeed.android.ui.screens.dashboard.WebDashboardScreen
 import com.trackspeed.android.ui.screens.history.RunDetailScreen
 import com.trackspeed.android.ui.screens.history.RunFramesScrubberScreen
 import com.trackspeed.android.ui.screens.history.SessionDetailScreen
@@ -93,6 +94,9 @@ sealed class Screen(val route: String) {
     data object DevicePairing : Screen("device_pairing")
     data object History : Screen("history")
     data object Settings : Screen("settings")
+    data object HelpFeedback : Screen("help_feedback")
+    data object IdeasBoard : Screen("ideas_board")
+    data object WebDashboard : Screen("web_dashboard")
     data object Auth : Screen("auth?signIn={signIn}") {
         fun createRoute(signInMode: Boolean = false) = "auth?signIn=$signInMode"
     }
@@ -300,7 +304,9 @@ fun TrackSpeedNavHost(
                     navController.navigate(Screen.AthleteList.route)
                 },
                 onAuthClick = {
-                    navController.navigate(Screen.Auth.route)
+                    navController.navigate(Screen.Auth.createRoute(signInMode = true)) {
+                        launchSingleTop = true
+                    }
                 },
                 onStatsClick = {
                     navController.navigate(Screen.Stats.route)
@@ -391,6 +397,21 @@ fun TrackSpeedNavHost(
             )
         }
 
+        composable(Screen.HelpFeedback.route) {
+            com.trackspeed.android.ui.screens.help.HelpFeedbackScreen(
+                onBack = { navController.popBackStack() },
+                onBrowseIdeas = {
+                    navController.navigate(Screen.IdeasBoard.route) { launchSingleTop = true }
+                }
+            )
+        }
+
+        composable(Screen.IdeasBoard.route) {
+            com.trackspeed.android.ui.screens.ideas.IdeasBoardScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onPaywallClick = {
@@ -423,8 +444,18 @@ fun TrackSpeedNavHost(
                 },
                 onDebugToolsClick = {
                     navController.navigate(Screen.DebugTools.route)
+                },
+                onWebDashboardClick = {
+                    navController.navigate(Screen.WebDashboard.route) { launchSingleTop = true }
+                },
+                onHelpFeedbackClick = {
+                    navController.navigate(Screen.HelpFeedback.route)
                 }
             )
+        }
+
+        composable(Screen.WebDashboard.route) {
+            WebDashboardScreen(onBack = { navController.popBackStack() })
         }
 
         composable(

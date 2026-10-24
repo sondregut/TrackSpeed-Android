@@ -17,6 +17,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.SideEffect
+import androidx.core.view.WindowCompat
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.trackspeed.android.ui.navigation.Screen
+import com.trackspeed.android.ui.theme.AppTheme
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
@@ -135,6 +141,18 @@ class MainActivity : AppCompatActivity() {
             val appearanceMode by settingsRepository.appearanceMode.collectAsState(initial = "midnight")
             val appTheme = SettingsViewModel.appearanceModeToTheme(appearanceMode)
             val remoteConfigState by remoteConfigService.state.collectAsState()
+            val navController = rememberNavController()
+            val currentEntry by navController.currentBackStackEntryAsState()
+            // App appearance is independent of the system theme. Default
+            // edge-to-edge detection otherwise draws black icons on Midnight.
+            val lightSystemBars = appTheme == AppTheme.LIGHT &&
+                currentEntry?.destination?.route != Screen.Onboarding.route
+            SideEffect {
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = lightSystemBars
+                    isAppearanceLightNavigationBars = lightSystemBars
+                }
+            }
 
             TrackSpeedTheme(appTheme = appTheme) {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -142,7 +160,7 @@ class MainActivity : AppCompatActivity() {
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        TrackSpeedNavHost(deepLinkEvent = deepLinkEvent, onDeepLinkConsumed = ::consumeDeepLinkEvent)
+                        TrackSpeedNavHost(navController = navController, deepLinkEvent = deepLinkEvent, onDeepLinkConsumed = ::consumeDeepLinkEvent)
                     }
                     RemoteConfigGate(
                         state = remoteConfigState,

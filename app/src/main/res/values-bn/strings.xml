@@ -206,6 +206,7 @@
     <string name="settings_theme">চেহারা</string>
     <string name="theme_midnight">মধ্যরাত</string>
     <string name="theme_light">আলো</string>
+    <string name="theme_dark">গাঢ়</string>
     <string name="theme_gold">সোনা</string>
     <string name="settings_section_detection">সনাক্তকরণ</string>
     <string name="settings_sensitivity">সংবেদনশীলতা</string>

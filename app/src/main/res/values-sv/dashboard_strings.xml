@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Webböversikt</string>
+    <string name="dashboard_description">Se alla dina idrottare, pass, mellantider och bilder på datorn på mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Logga in för att använda webböversikten</string>
+    <string name="dashboard_send_link">Skicka inloggningslänk till min dator</string>
+    <string name="dashboard_open_here">Öppna här</string>
+    <string name="dashboard_share_chooser">Skicka till din egen enhet</string>
+    <string name="dashboard_private_link_hint">Inloggningslänk. Skicka endast till dina egna enheter.</string>
+    <string name="dashboard_creating_link">Skapar inloggningslänk …</string>
+    <string name="dashboard_offline">Du är offline. Anslut till internet och försök igen.</string>
+    <string name="dashboard_session_expired">Din inloggning har gått ut. Logga ut och in igen och försök sedan på nytt.</string>
+    <string name="dashboard_email_required">Webböversikten kräver ett konto med en e-postadress.</string>
+    <string name="dashboard_rate_limited">För många länkar har begärts. Vänta en minut och försök igen.</string>
+    <string name="dashboard_unavailable">Webböversikten är inte tillgänglig än.</string>
+    <string name="dashboard_failed">Det gick inte att skapa en inloggningslänk. Försök igen om en stund.</string>
+    <string name="dashboard_open_unavailable">Ingen kompatibel app kunde öppna länken. Kontrollera webbläsaren eller dina delningsappar och försök igen.</string>
+</resources>

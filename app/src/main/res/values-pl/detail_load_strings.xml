@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Wczytywanie wyników…</string>
+    <string name="detail_load_error">Nie udało się wczytać tych wyników.</string>
+    <string name="detail_load_error_saved">Nie udało się odświeżyć wyników. Wyświetlane są ostatnio wczytane wyniki.</string>
+</resources>

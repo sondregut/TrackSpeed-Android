@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Indlæser resultater …</string>
+    <string name="detail_load_error">Kunne ikke indlæse disse resultater.</string>
+    <string name="detail_load_error_saved">Kunne ikke opdatere disse resultater. Viser de senest indlæste resultater.</string>
+</resources>

@@ -204,6 +204,7 @@
     <string name="settings_theme">ลักษณะที่ปรากฏ</string>
     <string name="theme_midnight">เที่ยงคืน</string>
     <string name="theme_light">เบา</string>
+    <string name="theme_dark">มืด</string>
     <string name="theme_gold">ทอง</string>
     <string name="settings_section_detection">การตรวจจับ</string>
     <string name="settings_sensitivity">ความไว</string>

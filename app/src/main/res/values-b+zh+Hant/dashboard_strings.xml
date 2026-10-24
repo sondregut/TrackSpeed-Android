@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">網頁儀表板</string>
+    <string name="dashboard_description">在電腦上前往 mytrackspeed.com/dashboard，查看你的所有運動員、訓練、分段成績與照片。</string>
+    <string name="dashboard_sign_in_required">登入後即可使用網頁儀表板</string>
+    <string name="dashboard_send_link">將登入連結傳送到我的電腦</string>
+    <string name="dashboard_open_here">在此裝置上開啟</string>
+    <string name="dashboard_share_chooser">傳送至你自己的裝置</string>
+    <string name="dashboard_private_link_hint">登入連結。僅傳送到你自己的裝置。</string>
+    <string name="dashboard_creating_link">正在建立登入連結…</string>
+    <string name="dashboard_offline">你目前處於離線狀態。請連上網際網路後再試一次。</string>
+    <string name="dashboard_session_expired">你的登入已過期。請登出後重新登入，然後再試一次。</string>
+    <string name="dashboard_email_required">網頁儀表板需要一個附有電子郵件地址的帳號。</string>
+    <string name="dashboard_rate_limited">要求的連結太多。請稍候一分鐘再試一次。</string>
+    <string name="dashboard_unavailable">網頁控制台尚未開放。</string>
+    <string name="dashboard_failed">無法建立登入連結。請稍後再試一次。</string>
+    <string name="dashboard_open_unavailable">沒有相容的應用程式可以開啟此連結。請檢查瀏覽器或分享應用程式後再試一次。</string>
+</resources>

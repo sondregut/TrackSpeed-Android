@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Nettdashbord</string>
+    <string name="dashboard_description">Se alle utøverne, øktene, mellomtidene og bildene dine på datamaskinen på mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Logg inn for å bruke nettdashbordet</string>
+    <string name="dashboard_send_link">Send innloggingslenke til datamaskinen min</string>
+    <string name="dashboard_open_here">Åpne her</string>
+    <string name="dashboard_share_chooser">Send til din egen enhet</string>
+    <string name="dashboard_private_link_hint">Innloggingslenke. Send bare til dine egne enheter.</string>
+    <string name="dashboard_creating_link">Lager innloggingslenke …</string>
+    <string name="dashboard_offline">Du er frakoblet. Koble til internett og prøv igjen.</string>
+    <string name="dashboard_session_expired">Innloggingen har utløpt. Logg ut og inn igjen, og prøv på nytt.</string>
+    <string name="dashboard_email_required">Nettdashbordet krever en konto med e-postadresse.</string>
+    <string name="dashboard_rate_limited">For mange lenker er bedt om. Vent et minutt og prøv igjen.</string>
+    <string name="dashboard_unavailable">Nettdashbordet er ikke tilgjengelig ennå.</string>
+    <string name="dashboard_failed">Kunne ikke lage en innloggingslenke. Prøv igjen om litt.</string>
+    <string name="dashboard_open_unavailable">Ingen kompatibel app kunne åpne lenken. Sjekk nettleseren eller delingsappene dine og prøv igjen.</string>
+</resources>

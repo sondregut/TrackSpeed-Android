@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Eredmények betöltése…</string>
+    <string name="detail_load_error">Nem sikerült betölteni ezeket az eredményeket.</string>
+    <string name="detail_load_error_saved">Nem sikerült frissíteni az eredményeket. Az utoljára betöltött eredmények láthatók.</string>
+</resources>

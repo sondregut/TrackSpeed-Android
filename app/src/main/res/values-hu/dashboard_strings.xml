@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Webes vezérlőpult</string>
+    <string name="dashboard_description">Nézd meg az összes sportolót, edzést, részidőt és fotót a számítógépeden: mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">A webes vezérlőpulthoz jelentkezz be</string>
+    <string name="dashboard_send_link">Bejelentkezési hivatkozás küldése a számítógépemre</string>
+    <string name="dashboard_open_here">Megnyitás itt</string>
+    <string name="dashboard_share_chooser">Küldés saját eszközre</string>
+    <string name="dashboard_private_link_hint">Bejelentkezési hivatkozás. Csak saját eszközeidre küldd.</string>
+    <string name="dashboard_creating_link">Bejelentkezési hivatkozás létrehozása…</string>
+    <string name="dashboard_offline">Nincs internetkapcsolat. Csatlakozz az internethez, majd próbáld újra.</string>
+    <string name="dashboard_session_expired">A bejelentkezés lejárt. Jelentkezz ki, majd be, és próbáld újra.</string>
+    <string name="dashboard_email_required">A webes vezérlőpulthoz e-mail-címmel rendelkező fiók szükséges.</string>
+    <string name="dashboard_rate_limited">Túl sok hivatkozást kértél. Várj egy percet, majd próbáld újra.</string>
+    <string name="dashboard_unavailable">A webes vezérlőpult még nem érhető el.</string>
+    <string name="dashboard_failed">Nem sikerült létrehozni a bejelentkezési hivatkozást. Próbáld újra később.</string>
+    <string name="dashboard_open_unavailable">Nincs a hivatkozást megnyitni képes alkalmazás. Ellenőrizd a böngészőt vagy a megosztó alkalmazásokat, majd próbáld újra.</string>
+</resources>

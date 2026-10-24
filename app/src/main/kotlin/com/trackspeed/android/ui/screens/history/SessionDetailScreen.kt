@@ -204,7 +204,7 @@ fun SessionDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
+                    IconButton(enabled = uiState.session != null, onClick = {
                         val expandedRun = uiState.allRuns.firstOrNull { it.id == expandedRunId }
                         if (expandedRun != null) {
                             onShareRunClick(expandedRun.id, expandedRun.sessionId)
@@ -221,7 +221,7 @@ fun SessionDetailScreen(
                         )
                     }
                     Box {
-                        IconButton(onClick = { showMoreMenu = true }) {
+                        IconButton(onClick = { showMoreMenu = true }, enabled = uiState.session != null) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = stringResource(R.string.session_detail_more_cd),
@@ -274,6 +274,24 @@ fun SessionDetailScreen(
         },
         modifier = Modifier.gradientBackground()
     ) { paddingValues ->
+        if (uiState.session == null && (uiState.isLoading || uiState.loadFailed)) {
+            Box(Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                DetailLoadFeedback(uiState.isLoading, uiState.loadFailed, uiState.hasLoadedData,
+                    onRetry = viewModel::retryLoading)
+            }
+            return@Scaffold
+        }
+        if (uiState.session == null) {
+            Box(Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.share_session_data_not_found), color = TextPrimary,
+                        style = MaterialTheme.typography.titleMedium)
+                    Button(onClick = onNavigateBack) { Text(stringResource(R.string.common_back)) }
+                }
+            }
+            return@Scaffold
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -282,6 +300,12 @@ fun SessionDetailScreen(
             verticalArrangement = Arrangement.spacedBy(0.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
+            if (uiState.isLoading || uiState.loadFailed) {
+                item(key = "load-feedback") {
+                    DetailLoadFeedback(uiState.isLoading, uiState.loadFailed, uiState.hasLoadedData,
+                        onRetry = viewModel::retryLoading)
+                }
+            }
             uiState.session?.let { session ->
                 item {
                     SessionOverviewHeader(
@@ -327,7 +351,7 @@ fun SessionDetailScreen(
                 }
             }
 
-            if (uiState.session != null && uiState.runs.isEmpty()) {
+            if (uiState.showEmptyResults) {
                 item {
                     Column(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 40.dp),

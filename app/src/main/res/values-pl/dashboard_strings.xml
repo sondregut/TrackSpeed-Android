@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Panel internetowy</string>
+    <string name="dashboard_description">Zobacz wszystkich sportowców, sesje, międzyczasy i zdjęcia na komputerze pod adresem mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Zaloguj się, aby korzystać z panelu internetowego</string>
+    <string name="dashboard_send_link">Wyślij link logowania na mój komputer</string>
+    <string name="dashboard_open_here">Otwórz tutaj</string>
+    <string name="dashboard_share_chooser">Wyślij na własne urządzenie</string>
+    <string name="dashboard_private_link_hint">Link logowania. Wysyłaj go tylko na własne urządzenia.</string>
+    <string name="dashboard_creating_link">Tworzenie linku logowania…</string>
+    <string name="dashboard_offline">Jesteś offline. Połącz się z internetem i spróbuj ponownie.</string>
+    <string name="dashboard_session_expired">Logowanie wygasło. Wyloguj się, zaloguj ponownie i spróbuj jeszcze raz.</string>
+    <string name="dashboard_email_required">Panel internetowy wymaga konta z adresem e-mail.</string>
+    <string name="dashboard_rate_limited">Zażądano zbyt wielu linków. Poczekaj minutę i spróbuj ponownie.</string>
+    <string name="dashboard_unavailable">Panel internetowy nie jest jeszcze dostępny.</string>
+    <string name="dashboard_failed">Nie udało się utworzyć linku logowania. Spróbuj za chwilę.</string>
+    <string name="dashboard_open_unavailable">Żadna zgodna aplikacja nie może otworzyć linku. Sprawdź przeglądarkę lub aplikacje do udostępniania i spróbuj ponownie.</string>
+</resources>

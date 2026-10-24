@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Loading results…</string>
+    <string name="detail_load_error">Could not load these results.</string>
+    <string name="detail_load_error_saved">Could not refresh these results. Showing the last loaded results.</string>
+</resources>

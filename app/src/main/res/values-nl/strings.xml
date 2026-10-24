@@ -206,6 +206,7 @@
     <string name="settings_theme">Uiterlijk</string>
     <string name="theme_midnight">Middernacht</string>
     <string name="theme_light">Licht</string>
+    <string name="theme_dark">Donker</string>
     <string name="theme_gold">Goud</string>
     <string name="settings_section_detection">Detectie</string>
     <string name="settings_sensitivity">Gevoeligheid</string>

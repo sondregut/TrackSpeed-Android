@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Web Dashboard</string>
+    <string name="dashboard_description">See all your athletes, sessions, splits and photos on your computer at mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Sign in to use the web dashboard</string>
+    <string name="dashboard_send_link">Send sign-in link to my computer</string>
+    <string name="dashboard_open_here">Open here</string>
+    <string name="dashboard_share_chooser">Send to your own device</string>
+    <string name="dashboard_private_link_hint">Sign-in link. Send only to your own devices.</string>
+    <string name="dashboard_creating_link">Creating sign-in link…</string>
+    <string name="dashboard_offline">You are offline. Connect to the internet and try again.</string>
+    <string name="dashboard_session_expired">Your sign-in has expired. Sign out and sign in again, then try again.</string>
+    <string name="dashboard_email_required">The web dashboard needs an account with an email address.</string>
+    <string name="dashboard_rate_limited">Too many links requested. Wait a minute and try again.</string>
+    <string name="dashboard_unavailable">Web dashboard is not available yet.</string>
+    <string name="dashboard_failed">Could not create a sign-in link. Try again in a moment.</string>
+    <string name="dashboard_open_unavailable">No compatible app could open this link. Try again after checking your browser or sharing apps.</string>
+</resources>

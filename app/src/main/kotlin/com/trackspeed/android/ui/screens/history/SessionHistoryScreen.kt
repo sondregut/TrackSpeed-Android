@@ -127,7 +127,7 @@ fun SessionHistoryScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = null }) {
-                    Text(stringResource(R.string.common_cancel), color = AccentBlue)
+                    Text(stringResource(R.string.common_cancel), color = MaterialTheme.colorScheme.primary)
                 }
             },
             containerColor = SurfaceDark
@@ -311,8 +311,8 @@ fun SessionHistoryScreen(
                     Button(
                         onClick = { viewModel.clearFilters() },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AccentBlue,
-                            contentColor = Color.White
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -449,7 +449,7 @@ private fun ActiveFiltersRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(AccentBlue.copy(alpha = 0.12f))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -458,7 +458,7 @@ private fun ActiveFiltersRow(
             imageVector = Icons.Outlined.Tune,
             contentDescription = null,
             modifier = Modifier.size(18.dp),
-            tint = AccentBlue
+            tint = MaterialTheme.colorScheme.primary
         )
         Text(
             text = pluralStringResource(
@@ -473,7 +473,7 @@ private fun ActiveFiltersRow(
         Text(
             text = stringResource(R.string.session_history_clear_filters_short),
             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-            color = AccentBlue,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.clickable(onClick = onClear)
         )
     }
@@ -502,12 +502,12 @@ private fun HistoryStatsCard(
                     imageVector = Icons.Outlined.Tune,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = AccentBlue
+                    tint = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     text = stringResource(R.string.session_history_overview_filtered),
                     style = MaterialTheme.typography.labelSmall,
-                    color = AccentBlue
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -570,7 +570,7 @@ private fun HistoryStatsCard(
                 Surface(
                     modifier = Modifier.clickable(onClick = onStatsClick),
                     shape = RoundedCornerShape(50),
-                    color = AccentBlue.copy(alpha = 0.10f)
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -581,14 +581,14 @@ private fun HistoryStatsCard(
                             imageVector = Icons.Outlined.BarChart,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = AccentBlue
+                            tint = MaterialTheme.colorScheme.primary
                         )
                         Text(
                             text = stringResource(R.string.run_detail_details),
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            color = AccentBlue,
+                            color = MaterialTheme.colorScheme.primary,
                             maxLines = 1
                         )
                     }
@@ -661,7 +661,7 @@ private fun HistoryMetricDivider() {
 }
 
 @Composable
-private fun HistoryTimeAndFilterControls(
+internal fun HistoryTimeAndFilterControls(
     selectedTimeFilter: HistoryTimeFilter,
     onTimeFilterSelected: (HistoryTimeFilter) -> Unit,
     hasModifiedFilterSheet: Boolean,
@@ -696,7 +696,7 @@ private fun HistoryTimeAndFilterControls(
                         .weight(1f)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) AccentBlue else Color.Transparent)
+                        .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
                         .clickable { onTimeFilterSelected(filter) },
                     contentAlignment = Alignment.Center
                 ) {
@@ -705,7 +705,7 @@ private fun HistoryTimeAndFilterControls(
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                         ),
-                        color = if (isSelected) Color.White else TextSecondary,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else TextSecondary,
                         maxLines = 1
                     )
                 }
@@ -734,7 +734,7 @@ private fun HistoryTimeAndFilterControls(
                         .offset(x = 1.dp, y = (-1).dp)
                         .size(8.dp)
                         .clip(RoundedCornerShape(50))
-                        .background(AccentBlue)
+                        .background(MaterialTheme.colorScheme.primary)
                 )
             }
         }
@@ -789,7 +789,7 @@ private fun SearchBar(
             unfocusedIndicatorColor = Color.Transparent,
             focusedTextColor = TextPrimary,
             unfocusedTextColor = TextPrimary,
-            cursorColor = AccentBlue
+            cursorColor = MaterialTheme.colorScheme.primary
         ),
         textStyle = MaterialTheme.typography.bodyMedium
     )
@@ -871,7 +871,7 @@ private fun HistoryFilterSheet(
                     Text(
                         text = stringResource(R.string.race_pill_done),
                         fontWeight = FontWeight.SemiBold,
-                        color = AccentBlue
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -987,7 +987,7 @@ private fun HistoryFilterGrid(
 }
 
 @Composable
-private fun HistoryFilterChip(
+internal fun HistoryFilterChip(
     text: String,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -998,7 +998,7 @@ private fun HistoryFilterChip(
             .heightIn(min = 44.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
-        color = if (isSelected) AccentBlue else CardBackground,
+        color = if (isSelected) MaterialTheme.colorScheme.primary else CardBackground,
         border = if (isSelected) null else androidx.compose.foundation.BorderStroke(
             0.5.dp,
             BorderSubtle
@@ -1013,7 +1013,7 @@ private fun HistoryFilterChip(
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
-                color = if (isSelected) Color.White else TextPrimary,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else TextPrimary,
                 maxLines = 1
             )
         }

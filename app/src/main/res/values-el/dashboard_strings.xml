@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Πίνακας ελέγχου ιστού</string>
+    <string name="dashboard_description">Δείτε όλους τους αθλητές, τις προπονήσεις, τους ενδιάμεσους χρόνους και τις φωτογραφίες στον υπολογιστή σας στο mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Συνδεθείτε για να χρησιμοποιήσετε τον πίνακα ιστού</string>
+    <string name="dashboard_send_link">Αποστολή συνδέσμου σύνδεσης στον υπολογιστή μου</string>
+    <string name="dashboard_open_here">Άνοιγμα εδώ</string>
+    <string name="dashboard_share_chooser">Αποστολή σε δική σας συσκευή</string>
+    <string name="dashboard_private_link_hint">Σύνδεσμος σύνδεσης. Στείλτε τον μόνο στις δικές σας συσκευές.</string>
+    <string name="dashboard_creating_link">Δημιουργία συνδέσμου σύνδεσης…</string>
+    <string name="dashboard_offline">Είστε εκτός σύνδεσης. Συνδεθείτε στο διαδίκτυο και δοκιμάστε ξανά.</string>
+    <string name="dashboard_session_expired">Η σύνδεσή σας έληξε. Αποσυνδεθείτε, συνδεθείτε ξανά και επαναλάβετε την προσπάθεια.</string>
+    <string name="dashboard_email_required">Ο πίνακας ιστού απαιτεί λογαριασμό με διεύθυνση email.</string>
+    <string name="dashboard_rate_limited">Ζητήσατε πολλούς συνδέσμους. Περιμένετε ένα λεπτό και δοκιμάστε ξανά.</string>
+    <string name="dashboard_unavailable">Ο πίνακας ιστού δεν είναι ακόμη διαθέσιμος.</string>
+    <string name="dashboard_failed">Δεν ήταν δυνατή η δημιουργία συνδέσμου σύνδεσης. Δοκιμάστε ξανά σε λίγο.</string>
+    <string name="dashboard_open_unavailable">Δεν υπάρχει συμβατή εφαρμογή για το άνοιγμα του συνδέσμου. Ελέγξτε το πρόγραμμα περιήγησης ή τις εφαρμογές κοινοποίησης και δοκιμάστε ξανά.</string>
+</resources>

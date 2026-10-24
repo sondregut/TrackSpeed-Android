@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Painel web</string>
+    <string name="dashboard_description">Veja todos os seus atletas, sessões, parciais e fotos no computador em mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Entre para usar o painel web</string>
+    <string name="dashboard_send_link">Enviar link de acesso para meu computador</string>
+    <string name="dashboard_open_here">Abrir aqui</string>
+    <string name="dashboard_share_chooser">Enviar para seu próprio dispositivo</string>
+    <string name="dashboard_private_link_hint">Link de acesso. Envie só para seus próprios dispositivos.</string>
+    <string name="dashboard_creating_link">Criando link de acesso…</string>
+    <string name="dashboard_offline">Você está offline. Conecte-se à internet e tente novamente.</string>
+    <string name="dashboard_session_expired">Seu acesso expirou. Saia, entre novamente e tente de novo.</string>
+    <string name="dashboard_email_required">O painel web precisa de uma conta com endereço de e-mail.</string>
+    <string name="dashboard_rate_limited">Muitos links solicitados. Aguarde um minuto e tente novamente.</string>
+    <string name="dashboard_unavailable">O painel web ainda não está disponível.</string>
+    <string name="dashboard_failed">Não foi possível criar um link de acesso. Tente novamente em instantes.</string>
+    <string name="dashboard_open_unavailable">Nenhum app compatível conseguiu abrir este link. Verifique seu navegador ou os apps de compartilhamento e tente novamente.</string>
+</resources>

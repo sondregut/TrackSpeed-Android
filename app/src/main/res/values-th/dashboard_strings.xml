@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">แดชบอร์ดบนเว็บ</string>
+    <string name="dashboard_description">ดูนักกีฬา เซสชัน เวลารายช่วง และรูปภาพทั้งหมดบนคอมพิวเตอร์ได้ที่ mytrackspeed.com/dashboard</string>
+    <string name="dashboard_sign_in_required">ลงชื่อเข้าใช้เพื่อใช้แดชบอร์ดบนเว็บ</string>
+    <string name="dashboard_send_link">ส่งลิงก์ลงชื่อเข้าใช้ไปยังคอมพิวเตอร์ของฉัน</string>
+    <string name="dashboard_open_here">เปิดที่นี่</string>
+    <string name="dashboard_share_chooser">ส่งไปยังอุปกรณ์ของคุณเอง</string>
+    <string name="dashboard_private_link_hint">ลิงก์ลงชื่อเข้าใช้ ส่งไปยังอุปกรณ์ของคุณเองเท่านั้น</string>
+    <string name="dashboard_creating_link">กำลังสร้างลิงก์ลงชื่อเข้าใช้…</string>
+    <string name="dashboard_offline">คุณออฟไลน์อยู่ เชื่อมต่ออินเทอร์เน็ตแล้วลองอีกครั้ง</string>
+    <string name="dashboard_session_expired">การลงชื่อเข้าใช้หมดอายุแล้ว ออกจากระบบแล้วลงชื่อเข้าใช้อีกครั้ง จากนั้นลองใหม่</string>
+    <string name="dashboard_email_required">แดชบอร์ดบนเว็บต้องใช้บัญชีที่มีที่อยู่อีเมล</string>
+    <string name="dashboard_rate_limited">ขอลิงก์มากเกินไป รอหนึ่งนาทีแล้วลองอีกครั้ง</string>
+    <string name="dashboard_unavailable">แดชบอร์ดบนเว็บยังไม่พร้อมใช้งาน</string>
+    <string name="dashboard_failed">สร้างลิงก์ลงชื่อเข้าใช้ไม่ได้ โปรดลองอีกครั้งในอีกสักครู่</string>
+    <string name="dashboard_open_unavailable">ไม่มีแอปที่รองรับการเปิดลิงก์นี้ ตรวจสอบเบราว์เซอร์หรือแอปแชร์ของคุณแล้วลองอีกครั้ง</string>
+</resources>

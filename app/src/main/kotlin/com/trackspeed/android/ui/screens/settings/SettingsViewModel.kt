@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trackspeed.android.R
+import com.trackspeed.android.cloud.AuthService
+import com.trackspeed.android.cloud.isRealAuthenticated
 import com.trackspeed.android.audio.ElevenLabsService
 import com.trackspeed.android.audio.ElevenLabsVoiceId
 import com.trackspeed.android.audio.VoiceProvider
@@ -37,6 +39,7 @@ data class SettingsUiState(
     val onboardingCompleted: Boolean = SettingsRepository.Defaults.ONBOARDING_COMPLETED,
     val preferredFps: Int = SettingsRepository.Defaults.PREFERRED_FPS,
     val isProUser: Boolean = false,
+    val dashboardAvailable: Boolean = false,
     val voiceProvider: String = SettingsRepository.Defaults.VOICE_PROVIDER,
     val elevenLabsVoice: String = SettingsRepository.Defaults.ELEVEN_LABS_VOICE,
     val appLanguage: String = SettingsRepository.Defaults.APP_LANGUAGE,
@@ -68,6 +71,7 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
+    private val authService: AuthService,
     private val subscriptionManager: SubscriptionManager,
     private val elevenLabsService: ElevenLabsService,
     private val voiceStartService: VoiceStartService,
@@ -155,6 +159,8 @@ class SettingsViewModel @Inject constructor(
             appLanguage = appLanguage,
             announceTimesEnabled = announceTimesEnabled
         )
+    }.combine(authService.authState) { settings, auth ->
+        settings.copy(dashboardAvailable = auth.isRealAuthenticated())
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -187,7 +193,7 @@ class SettingsViewModel @Inject constructor(
 
     fun setAppTheme(theme: AppTheme) {
         viewModelScope.launch {
-            settingsRepository.setAppearanceMode(theme.key)
+            settingsRepository.setAppearanceMode(theme.supportedTheme.key)
         }
     }
 
@@ -337,11 +343,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     companion object {
-        fun appearanceModeToTheme(mode: String): AppTheme = when (mode) {
-            "midnight", "dark" -> AppTheme.MIDNIGHT
-            "light" -> AppTheme.LIGHT
-            "gold" -> AppTheme.DARKGOLD
-            else -> AppTheme.MIDNIGHT
-        }
+        fun appearanceModeToTheme(mode: String): AppTheme = AppTheme.fromPreference(mode)
     }
 }

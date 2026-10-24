@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">网页仪表板</string>
+    <string name="dashboard_description">在电脑上访问 mytrackspeed.com/dashboard，查看你的所有运动员、训练、分段成绩和照片。</string>
+    <string name="dashboard_sign_in_required">登录后即可使用网页仪表板</string>
+    <string name="dashboard_send_link">将登录链接发送到我的电脑</string>
+    <string name="dashboard_open_here">在此设备上打开</string>
+    <string name="dashboard_share_chooser">发送到你自己的设备</string>
+    <string name="dashboard_private_link_hint">登录链接。仅发送到你自己的设备。</string>
+    <string name="dashboard_creating_link">正在创建登录链接…</string>
+    <string name="dashboard_offline">你目前处于离线状态。请连接互联网后重试。</string>
+    <string name="dashboard_session_expired">你的登录已过期。请退出后重新登录，然后再试一次。</string>
+    <string name="dashboard_email_required">网页仪表板需要一个带电子邮件地址的账户。</string>
+    <string name="dashboard_rate_limited">请求的链接过多。请稍等一分钟后重试。</string>
+    <string name="dashboard_unavailable">网页控制台尚未开放。</string>
+    <string name="dashboard_failed">无法创建登录链接。请稍后重试。</string>
+    <string name="dashboard_open_unavailable">没有兼容的应用可以打开此链接。请检查浏览器或分享应用后重试。</string>
+</resources>

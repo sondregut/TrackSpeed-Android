@@ -496,7 +496,7 @@ fun HomeScreen(
     val forceShowFirstSessionTutorial by viewModel.forceShowFirstSessionTutorial.collectAsStateWithLifecycle()
     val pendingDiscountMilestone by viewModel.pendingDiscountMilestone.collectAsStateWithLifecycle()
     val lastDiscountMilestoneFired by viewModel.lastDiscountMilestoneFired.collectAsStateWithLifecycle()
-    var selectedTab by remember { mutableStateOf(HomeTab.HOME) }
+    var selectedTab by rememberSaveable { mutableStateOf(HomeTab.HOME) }
     var firstSessionTutorialStep by rememberSaveable {
         mutableStateOf(FirstSessionTutorialStep.CUSTOM_SESSION)
     }
@@ -610,8 +610,8 @@ fun HomeScreen(
                                     )
                                 },
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = AccentNavy,
-                                    selectedTextColor = AccentNavy,
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
                                     unselectedIconColor = TextSecondary,
                                     unselectedTextColor = TextSecondary,
                                     indicatorColor = Color.Transparent
@@ -634,13 +634,13 @@ fun HomeScreen(
                                         .size(48.dp)
                                         .shadow(8.dp, CircleShape)
                                         .clip(CircleShape)
-                                        .background(AccentNavy),
+                                        .background(MaterialTheme.colorScheme.primary),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Add,
                                         contentDescription = stringResource(R.string.home_start_session),
-                                        tint = Color.White,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.size(28.dp)
                                     )
                                 }
@@ -667,8 +667,8 @@ fun HomeScreen(
                                     )
                                 },
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = AccentNavy,
-                                    selectedTextColor = AccentNavy,
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
                                     unselectedIconColor = TextSecondary,
                                     unselectedTextColor = TextSecondary,
                                     indicatorColor = Color.Transparent
@@ -742,6 +742,7 @@ fun HomeScreen(
                         onStatsClick = onStatsClick
                     )
                     HomeTab.PROFILE -> ProfileScreen(
+                        onSignInClick = onAuthClick,
                         onPaywallClick = onPaywallClick,
                         onAthletesClick = onAthletesClick,
                         onSettingsClick = onSettingsClick,
@@ -838,7 +839,8 @@ private fun FirstSessionTutorialOverlay(
                 onStartSetup = onStartSetup,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(horizontal = 16.dp)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
                     .widthIn(max = 368.dp)
                     .heightIn(max = maxHeight - 32.dp)
             )
@@ -1112,7 +1114,7 @@ private fun FirstSessionStepBubble(
 }
 
 @Composable
-private fun FirstSessionFinalCard(
+internal fun FirstSessionFinalCard(
     onBack: () -> Unit,
     onDone: () -> Unit,
     onStartSetup: () -> Unit,
@@ -1124,62 +1126,69 @@ private fun FirstSessionFinalCard(
             .clip(RoundedCornerShape(28.dp))
             .background(FirstSessionTutorialPanel)
             .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(28.dp))
-            .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        // Keep navigation outside scrolling instructional content so compact
+        // screens and large text never clip Back, Done or Start Setup.
+        Column(
+            modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Icon(
-                imageVector = FirstSessionTutorialStep.OTHER_PHONES.icon,
-                contentDescription = null,
-                tint = FirstSessionTutorialAccent,
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.12f))
-                    .padding(9.dp)
-            )
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Icon(
+                    imageVector = FirstSessionTutorialStep.OTHER_PHONES.icon,
+                    contentDescription = null,
+                    tint = FirstSessionTutorialAccent,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.12f))
+                        .padding(9.dp)
+                )
 
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = stringResource(
-                        R.string.home_tutorial_step_progress,
-                        FirstSessionTutorialStep.OTHER_PHONES.ordinal + 1,
-                        FirstSessionTutorialStep.entries.size
-                    ),
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color.White.copy(alpha = 0.54f)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = stringResource(
+                            R.string.home_tutorial_step_progress,
+                            FirstSessionTutorialStep.OTHER_PHONES.ordinal + 1,
+                            FirstSessionTutorialStep.entries.size
+                        ),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White.copy(alpha = 0.54f)
+                    )
+                    Text(
+                        text = stringResource(R.string.home_tutorial_setup_each_phone),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                    Text(
+                        text = stringResource(R.string.home_tutorial_setup_each_phone_message),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.74f)
+                    )
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                FirstSessionRoleRow(
+                    icon = Icons.Outlined.PhoneAndroid,
+                    title = stringResource(R.string.home_tutorial_host_phone),
+                    message = stringResource(R.string.home_tutorial_host_phone_message)
                 )
-                Text(
-                    text = stringResource(R.string.home_tutorial_setup_each_phone),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White
-                )
-                Text(
-                    text = stringResource(R.string.home_tutorial_setup_each_phone_message),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.74f)
+                FirstSessionRoleRow(
+                    icon = Icons.Outlined.Groups,
+                    title = stringResource(R.string.home_tutorial_other_phones),
+                    message = stringResource(R.string.home_tutorial_other_phones_message)
                 )
             }
-        }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            FirstSessionRoleRow(
-                icon = Icons.Outlined.PhoneAndroid,
-                title = stringResource(R.string.home_tutorial_host_phone),
-                message = stringResource(R.string.home_tutorial_host_phone_message)
-            )
-            FirstSessionRoleRow(
-                icon = Icons.Outlined.Groups,
-                title = stringResource(R.string.home_tutorial_other_phones),
-                message = stringResource(R.string.home_tutorial_other_phones_message)
-            )
-        }
+            FirstSessionOnboardingJoinPreview()
 
-        FirstSessionOnboardingJoinPreview()
+        }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(
@@ -1191,7 +1200,7 @@ private fun FirstSessionFinalCard(
                 shape = RoundedCornerShape(999.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .heightIn(min = 48.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Tune,
@@ -1211,7 +1220,7 @@ private fun FirstSessionFinalCard(
                     ),
                     shape = RoundedCornerShape(999.dp),
                     modifier = Modifier
-                        .height(42.dp)
+                        .heightIn(min = 48.dp)
                         .weight(1f)
                 ) {
                     Text(stringResource(R.string.common_back), fontWeight = FontWeight.SemiBold)
@@ -1224,7 +1233,7 @@ private fun FirstSessionFinalCard(
                     ),
                     shape = RoundedCornerShape(999.dp),
                     modifier = Modifier
-                        .height(42.dp)
+                        .heightIn(min = 48.dp)
                         .weight(1f)
                 ) {
                     Text(stringResource(R.string.race_pill_done), fontWeight = FontWeight.SemiBold)
@@ -1649,7 +1658,7 @@ private fun DashboardSetupCard(solo: Boolean, onClick: () -> Unit, modifier: Mod
         modifier.surfaceCard().clickable(onClick = onClick).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(if (solo) Icons.Outlined.Replay else Icons.Outlined.Sync, null, tint = AccentBlue, modifier = Modifier.size(24.dp))
+        Icon(if (solo) Icons.Outlined.Replay else Icons.Outlined.Sync, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
         Text(
             stringResource(if (solo) R.string.parity_home_solo_laps else R.string.home_start_session),
             style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = TextPrimary

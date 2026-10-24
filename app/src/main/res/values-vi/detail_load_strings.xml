@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Đang tải kết quả…</string>
+    <string name="detail_load_error">Không thể tải các kết quả này.</string>
+    <string name="detail_load_error_saved">Không thể làm mới các kết quả này. Đang hiển thị kết quả đã tải gần nhất.</string>
+</resources>

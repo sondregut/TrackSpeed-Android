@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Se încarcă rezultatele…</string>
+    <string name="detail_load_error">Aceste rezultate nu au putut fi încărcate.</string>
+    <string name="detail_load_error_saved">Rezultatele nu au putut fi actualizate. Se afișează ultimele rezultate încărcate.</string>
+</resources>

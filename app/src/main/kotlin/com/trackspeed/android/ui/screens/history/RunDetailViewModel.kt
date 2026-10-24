@@ -10,11 +10,14 @@ import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.data.repository.SettingsRepository
 import com.trackspeed.android.diagnostics.DetectionReviewLogStore
 import com.trackspeed.android.ui.components.DetectionReviewSubmission
+import com.trackspeed.android.ui.util.RetainedFlowLoader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -25,7 +28,9 @@ data class RunDetailUiState(
     val speedFormatted: String = "--",
     val speedUnit: String = "m/s",
     val showSpeedInResults: Boolean = SettingsRepository.Defaults.SHOW_SPEED_IN_RESULTS,
-    val isLoading: Boolean = true,
+    val isLoading: Boolean = run == null,
+    val hasLoadedData: Boolean = run != null,
+    val loadFailed: Boolean = false,
     val deleted: Boolean = false,
     val detectionDiagnosticsEnabled: Boolean = SettingsRepository.Defaults.DETECTION_DIAGNOSTICS_ENABLED
 )
@@ -45,12 +50,8 @@ class RunDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(RunDetailUiState())
     val uiState: StateFlow<RunDetailUiState> = _uiState.asStateFlow()
 
-    init {
-        loadRun()
-    }
-
-    private fun loadRun() {
-        viewModelScope.launch {
+    private val detailLoader = RetainedFlowLoader(viewModelScope) {
+        flow {
             val run = sessionRepository.getRunById(runId)
             val session = sessionRepository.getSession(sessionId)
             val unit = settingsRepository.speedUnit.first()
@@ -68,19 +69,26 @@ class RunDetailViewModel @Inject constructor(
                 "--"
             }
 
-            _uiState.update {
-                it.copy(
-                    run = run,
-                    session = session,
-                    speedFormatted = speedFormatted,
-                    speedUnit = unit,
-                    showSpeedInResults = showSpeedInResults,
-                    detectionDiagnosticsEnabled = detectionDiagnosticsEnabled,
-                    isLoading = false
-                )
+            emit(RunDetailUiState(
+                run = run,
+                session = session,
+                speedFormatted = speedFormatted,
+                speedUnit = unit,
+                showSpeedInResults = showSpeedInResults,
+                detectionDiagnosticsEnabled = detectionDiagnosticsEnabled
+            ))
+        }
+    }
+
+    init {
+        viewModelScope.launch {
+            detailLoader.state.collect { loaded ->
+                _uiState.update { previous -> mergeRunDetailLoadState(previous, loaded) }
             }
         }
     }
+
+    fun retryLoading() = detailLoader.retry()
 
     fun deleteRun() {
         viewModelScope.launch {
@@ -92,7 +100,7 @@ class RunDetailViewModel @Inject constructor(
     fun updateRunDistance(newDistance: Double) {
         viewModelScope.launch {
             sessionRepository.updateRunDistance(runId, newDistance)
-            loadRun()
+            retryLoading()
         }
     }
 

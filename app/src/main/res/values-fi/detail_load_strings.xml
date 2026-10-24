@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Ladataan tuloksia…</string>
+    <string name="detail_load_error">Näitä tuloksia ei voitu ladata.</string>
+    <string name="detail_load_error_saved">Näitä tuloksia ei voitu päivittää. Näytetään viimeksi ladatut tulokset.</string>
+</resources>

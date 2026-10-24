@@ -206,6 +206,7 @@
     <string name="settings_theme">Megjelenés</string>
     <string name="theme_midnight">Éjfél</string>
     <string name="theme_light">Fény</string>
+    <string name="theme_dark">Sötét</string>
     <string name="theme_gold">Arany</string>
     <string name="settings_section_detection">Észlelés</string>
     <string name="settings_sensitivity">Érzékenység</string>

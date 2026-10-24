@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Cargando resultados…</string>
+    <string name="detail_load_error">No se pudieron cargar estos resultados.</string>
+    <string name="detail_load_error_saved">No se pudieron actualizar estos resultados. Se muestran los últimos resultados cargados.</string>
+</resources>

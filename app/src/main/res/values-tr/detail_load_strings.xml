@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Sonuçlar yükleniyor…</string>
+    <string name="detail_load_error">Bu sonuçlar yüklenemedi.</string>
+    <string name="detail_load_error_saved">Sonuçlar yenilenemedi. Son yüklenen sonuçlar gösteriliyor.</string>
+</resources>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Dasbor web</string>
+    <string name="dashboard_description">Lihat semua atlet, sesi, waktu split, dan foto di komputer Anda melalui mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Masuk untuk menggunakan dasbor web</string>
+    <string name="dashboard_send_link">Kirim tautan masuk ke komputer saya</string>
+    <string name="dashboard_open_here">Buka di sini</string>
+    <string name="dashboard_share_chooser">Kirim ke perangkat Anda sendiri</string>
+    <string name="dashboard_private_link_hint">Tautan masuk. Kirim hanya ke perangkat Anda sendiri.</string>
+    <string name="dashboard_creating_link">Membuat tautan masuk…</string>
+    <string name="dashboard_offline">Anda sedang offline. Hubungkan ke internet lalu coba lagi.</string>
+    <string name="dashboard_session_expired">Sesi masuk Anda telah berakhir. Keluar lalu masuk kembali, kemudian coba lagi.</string>
+    <string name="dashboard_email_required">Dasbor web memerlukan akun dengan alamat email.</string>
+    <string name="dashboard_rate_limited">Terlalu banyak permintaan tautan. Tunggu satu menit lalu coba lagi.</string>
+    <string name="dashboard_unavailable">Dasbor web belum tersedia.</string>
+    <string name="dashboard_failed">Tidak dapat membuat tautan masuk. Coba lagi sebentar lagi.</string>
+    <string name="dashboard_open_unavailable">Tidak ada aplikasi yang kompatibel untuk membuka tautan ini. Periksa browser atau aplikasi berbagi Anda lalu coba lagi.</string>
+</resources>

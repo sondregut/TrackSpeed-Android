@@ -206,6 +206,7 @@
     <string name="settings_theme">Εμφάνιση</string>
     <string name="theme_midnight">Μεσάνυχτα</string>
     <string name="theme_light">Φως</string>
+    <string name="theme_dark">Σκούρο</string>
     <string name="theme_gold">Χρυσός</string>
     <string name="settings_section_detection">Ανίχνευση</string>
     <string name="settings_sensitivity">Ευαισθησία</string>

@@ -15,6 +15,7 @@ import com.trackspeed.android.data.repository.SessionRepository
 import com.trackspeed.android.data.repository.SettingsRepository
 import com.trackspeed.android.diagnostics.DetectionReviewLogStore
 import com.trackspeed.android.ui.components.DetectionReviewSubmission
+import com.trackspeed.android.ui.util.RetainedFlowLoader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
@@ -51,8 +52,15 @@ data class SessionDetailUiState(
     val speedUnit: String = "m/s",
     val showSpeedInResults: Boolean = SettingsRepository.Defaults.SHOW_SPEED_IN_RESULTS,
     val detectionDiagnosticsEnabled: Boolean = SettingsRepository.Defaults.DETECTION_DIAGNOSTICS_ENABLED,
-    val deleted: Boolean = false
-)
+    val deleted: Boolean = false,
+    val isLoading: Boolean = session == null,
+    val hasLoadedData: Boolean = session != null,
+    val loadFailed: Boolean = false
+) {
+    /** A successful empty snapshot is distinct from pending/failed reads. */
+    val showEmptyResults: Boolean
+        get() = hasLoadedData && !isLoading && !loadFailed && session != null && runs.isEmpty()
+}
 
 @HiltViewModel
 class SessionDetailViewModel @Inject constructor(
@@ -73,14 +81,16 @@ class SessionDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SessionDetailUiState())
     val uiState: StateFlow<SessionDetailUiState> = _uiState.asStateFlow()
 
-    init {
-        viewModelScope.launch {
+    private val detailLoader = RetainedFlowLoader(viewModelScope) {
+        flow {
+            // Publish only a complete session/results snapshot. Session-first arrival
+            // must not render the default empty run list as a completed read.
             val session = sessionRepository.getSession(sessionId)
-            _uiState.update { it.copy(session = session) }
-        }
-
-        viewModelScope.launch {
-            combine(
+            if (session == null) {
+                emit(SessionDetailUiState())
+                return@flow
+            }
+            emitAll(combine(
                 sessionRepository.getRunsForSession(sessionId),
                 combine(_selectedAthleteId, _runSort) { athleteId, sort ->
                     SessionRunSelection(athleteId, sort)
@@ -130,7 +140,7 @@ class SessionDetailViewModel @Inject constructor(
                 val bestTime = comparableBestTime(filtered)
 
                 SessionDetailUiState(
-                    session = _uiState.value.session,
+                    session = session,
                     allRuns = runs,
                     runs = sorted,
                     bestTime = bestTime,
@@ -140,14 +150,21 @@ class SessionDetailViewModel @Inject constructor(
                     showAthleteColumn = athletes.size > 1,
                     speedUnit = unit,
                     showSpeedInResults = showSpeedInResults,
-                    detectionDiagnosticsEnabled = detectionDiagnosticsEnabled,
-                    deleted = _uiState.value.deleted
+                    detectionDiagnosticsEnabled = detectionDiagnosticsEnabled
                 )
-            }.collect { state ->
-                _uiState.value = state
+            })
+        }
+    }
+
+    init {
+        viewModelScope.launch {
+            detailLoader.state.collect { loaded ->
+                _uiState.update { previous -> mergeSessionDetailLoadState(previous, loaded) }
             }
         }
     }
+
+    fun retryLoading() = detailLoader.retry()
 
     fun setAthleteFilter(athleteId: String?) {
         _selectedAthleteId.value = athleteId

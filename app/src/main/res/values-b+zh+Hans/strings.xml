@@ -204,6 +204,7 @@
     <string name="settings_theme">外观</string>
     <string name="theme_midnight">午夜</string>
     <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
     <string name="theme_gold">黄金</string>
     <string name="settings_section_detection">检测</string>
     <string name="settings_sensitivity">灵敏度</string>

@@ -214,6 +214,7 @@
     <string name="settings_theme">المظهر</string>
     <string name="theme_midnight">منتصف الليل</string>
     <string name="theme_light">فاتح</string>
+    <string name="theme_dark">داكن</string>
     <string name="theme_gold">ذهبي</string>
     <string name="settings_section_detection">الكشف</string>
     <string name="settings_sensitivity">الحساسية</string>

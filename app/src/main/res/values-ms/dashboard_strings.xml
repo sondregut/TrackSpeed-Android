@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Papan pemuka web</string>
+    <string name="dashboard_description">Lihat semua atlet, sesi, masa pecahan dan foto pada komputer anda di mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Log masuk untuk menggunakan papan pemuka web</string>
+    <string name="dashboard_send_link">Hantar pautan log masuk ke komputer saya</string>
+    <string name="dashboard_open_here">Buka di sini</string>
+    <string name="dashboard_share_chooser">Hantar ke peranti anda sendiri</string>
+    <string name="dashboard_private_link_hint">Pautan log masuk. Hantar hanya ke peranti anda sendiri.</string>
+    <string name="dashboard_creating_link">Mencipta pautan log masuk…</string>
+    <string name="dashboard_offline">Anda di luar talian. Sambung ke internet dan cuba lagi.</string>
+    <string name="dashboard_session_expired">Sesi log masuk anda telah tamat. Log keluar dan log masuk semula, kemudian cuba lagi.</string>
+    <string name="dashboard_email_required">Papan pemuka web memerlukan akaun dengan alamat e-mel.</string>
+    <string name="dashboard_rate_limited">Terlalu banyak pautan diminta. Tunggu seminit dan cuba lagi.</string>
+    <string name="dashboard_unavailable">Papan pemuka web belum tersedia.</string>
+    <string name="dashboard_failed">Pautan log masuk tidak dapat dicipta. Cuba lagi sebentar lagi.</string>
+    <string name="dashboard_open_unavailable">Tiada aplikasi yang serasi dapat membuka pautan ini. Semak pelayar atau aplikasi perkongsian anda, kemudian cuba lagi.</string>
+</resources>

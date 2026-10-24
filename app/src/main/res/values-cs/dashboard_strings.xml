@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Webový přehled</string>
+    <string name="dashboard_description">Prohlédněte si všechny sportovce, tréninky, mezičasy a fotografie na počítači na mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Pro použití webového přehledu se přihlaste</string>
+    <string name="dashboard_send_link">Poslat přihlašovací odkaz na můj počítač</string>
+    <string name="dashboard_open_here">Otevřít zde</string>
+    <string name="dashboard_share_chooser">Poslat na vlastní zařízení</string>
+    <string name="dashboard_private_link_hint">Přihlašovací odkaz. Posílejte ho pouze na svá zařízení.</string>
+    <string name="dashboard_creating_link">Vytváření přihlašovacího odkazu…</string>
+    <string name="dashboard_offline">Jste offline. Připojte se k internetu a zkuste to znovu.</string>
+    <string name="dashboard_session_expired">Přihlášení vypršelo. Odhlaste se, znovu se přihlaste a opakujte akci.</string>
+    <string name="dashboard_email_required">Webový přehled vyžaduje účet s e-mailovou adresou.</string>
+    <string name="dashboard_rate_limited">Vyžádali jste příliš mnoho odkazů. Počkejte minutu a zkuste to znovu.</string>
+    <string name="dashboard_unavailable">Webový přehled zatím není k dispozici.</string>
+    <string name="dashboard_failed">Přihlašovací odkaz se nepodařilo vytvořit. Zkuste to za chvíli.</string>
+    <string name="dashboard_open_unavailable">Žádná kompatibilní aplikace nemůže tento odkaz otevřít. Zkontrolujte prohlížeč nebo aplikace pro sdílení a zkuste to znovu.</string>
+</resources>

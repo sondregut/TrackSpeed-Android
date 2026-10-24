@@ -204,6 +204,7 @@
     <string name="settings_theme">Ngoại hình</string>
     <string name="theme_midnight">Nửa đêm</string>
     <string name="theme_light">Ánh sáng</string>
+    <string name="theme_dark">Tối</string>
     <string name="theme_gold">Vàng</string>
     <string name="settings_section_detection">Phát hiện</string>
     <string name="settings_sensitivity">Độ nhạy</string>

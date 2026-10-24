@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Web paneli</string>
+    <string name="dashboard_description">Tüm sporcuları, antrenmanları, ara süreleri ve fotoğrafları bilgisayarınızda mytrackspeed.com/dashboard adresinde görüntüleyin.</string>
+    <string name="dashboard_sign_in_required">Web panelini kullanmak için giriş yapın</string>
+    <string name="dashboard_send_link">Giriş bağlantısını bilgisayarıma gönder</string>
+    <string name="dashboard_open_here">Burada aç</string>
+    <string name="dashboard_share_chooser">Kendi cihazınıza gönderin</string>
+    <string name="dashboard_private_link_hint">Giriş bağlantısı. Yalnızca kendi cihazlarınıza gönderin.</string>
+    <string name="dashboard_creating_link">Giriş bağlantısı oluşturuluyor…</string>
+    <string name="dashboard_offline">Çevrimdışısınız. İnternete bağlanıp tekrar deneyin.</string>
+    <string name="dashboard_session_expired">Oturumunuz sona erdi. Çıkış yapıp yeniden giriş yapın ve tekrar deneyin.</string>
+    <string name="dashboard_email_required">Web paneli için e-posta adresi olan bir hesap gerekir.</string>
+    <string name="dashboard_rate_limited">Çok fazla bağlantı istediniz. Bir dakika bekleyip tekrar deneyin.</string>
+    <string name="dashboard_unavailable">Web paneli henüz kullanılamıyor.</string>
+    <string name="dashboard_failed">Giriş bağlantısı oluşturulamadı. Birazdan tekrar deneyin.</string>
+    <string name="dashboard_open_unavailable">Bu bağlantıyı açabilecek uyumlu bir uygulama yok. Tarayıcınızı veya paylaşım uygulamalarınızı kontrol edip tekrar deneyin.</string>
+</resources>

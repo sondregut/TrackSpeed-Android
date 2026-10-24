@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Web-Dashboard</string>
+    <string name="dashboard_description">Sieh dir alle deine Athleten, Sessions, Zwischenzeiten und Fotos auf deinem Computer unter mytrackspeed.com/dashboard an.</string>
+    <string name="dashboard_sign_in_required">Melde dich an, um das Web-Dashboard zu nutzen</string>
+    <string name="dashboard_send_link">Anmeldelink an meinen Computer senden</string>
+    <string name="dashboard_open_here">Hier öffnen</string>
+    <string name="dashboard_share_chooser">An dein eigenes Gerät senden</string>
+    <string name="dashboard_private_link_hint">Anmeldelink. Nur an deine eigenen Geräte senden.</string>
+    <string name="dashboard_creating_link">Anmeldelink wird erstellt …</string>
+    <string name="dashboard_offline">Du bist offline. Stelle eine Internetverbindung her und versuche es erneut.</string>
+    <string name="dashboard_session_expired">Deine Anmeldung ist abgelaufen. Melde dich ab und wieder an und versuche es dann erneut.</string>
+    <string name="dashboard_email_required">Für das Web-Dashboard brauchst du ein Konto mit E-Mail-Adresse.</string>
+    <string name="dashboard_rate_limited">Zu viele Links angefordert. Warte eine Minute und versuche es erneut.</string>
+    <string name="dashboard_unavailable">Das Web-Dashboard ist noch nicht verfügbar.</string>
+    <string name="dashboard_failed">Der Anmeldelink konnte nicht erstellt werden. Versuche es gleich noch einmal.</string>
+    <string name="dashboard_open_unavailable">Keine kompatible App konnte diesen Link öffnen. Prüfe deinen Browser oder deine Apps zum Teilen und versuche es erneut.</string>
+</resources>

@@ -15,19 +15,19 @@ val AccentGreenDark = Color(0xFF1DA750)
 /** Yellow-gold used for warnings and the M3 tertiary role. */
 val AccentGold = Color(0xFFFEAA21)
 
-/** Warm bronze used as the primary accent in the DarkGold theme. */
+/** Legacy bronze retained for source compatibility; no longer a visible app theme. */
 val GoldPrimary = Color(0xFFC8A880)
 
 // ── Static backgrounds (safe to use in non-composable contexts) ───────────────
 
-val BackgroundDark = Color(0xFF191919)
-val BackgroundLight = Color(0xFFF5F5F7)
-val SurfaceLight = Color(0xFFFFFFFF)
-val OnBackgroundLight = Color(0xFF1D1312)
+val BackgroundDark = Color(0xFF1F1F24)
+val BackgroundLight = Color(0xFFF4F4F8)
+val SurfaceLight = Color(0xFFFCFCFC)
+val OnBackgroundLight = Color(0xFF202126)
 
 // ── Theme-adaptive colors ─────────────────────────────────────────────────────
 // All properties below delegate to LocalAppColors.current so they automatically
-// reflect whichever of the three themes (Midnight / Light / DarkGold) is active.
+// reflect the supported Light / Dark palette, including legacy saved theme aliases.
 // They may only be read inside a @Composable scope.
 
 val TextPrimary: Color
@@ -76,7 +76,7 @@ val IconMuted: Color
 // ── Composable aliases ────────────────────────────────────────────────────────
 // These exist to avoid import-alias boilerplate in screen files.
 
-/** Theme-adaptive accent: AccentNavy for Midnight/Light, GoldPrimary for DarkGold. */
+/** Legacy brand accent. New neutral CTAs must pair Material primary with onPrimary. */
 val AccentBlue: Color
     @Composable get() = LocalAppColors.current.accent
 

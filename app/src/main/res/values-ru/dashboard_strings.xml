@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Веб-панель</string>
+    <string name="dashboard_description">Смотрите всех спортсменов, сессии, отрезки и фото на компьютере на mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Войдите, чтобы пользоваться веб-панелью</string>
+    <string name="dashboard_send_link">Отправить ссылку для входа на компьютер</string>
+    <string name="dashboard_open_here">Открыть здесь</string>
+    <string name="dashboard_share_chooser">Отправить на своё устройство</string>
+    <string name="dashboard_private_link_hint">Ссылка для входа. Отправляйте только на свои устройства.</string>
+    <string name="dashboard_creating_link">Создаём ссылку для входа…</string>
+    <string name="dashboard_offline">Нет подключения к интернету. Подключитесь и попробуйте снова.</string>
+    <string name="dashboard_session_expired">Срок входа истёк. Выйдите из аккаунта, войдите снова и повторите попытку.</string>
+    <string name="dashboard_email_required">Для веб-панели нужен аккаунт с адресом электронной почты.</string>
+    <string name="dashboard_rate_limited">Слишком много запросов ссылки. Подождите минуту и попробуйте снова.</string>
+    <string name="dashboard_unavailable">Веб-панель пока недоступна.</string>
+    <string name="dashboard_failed">Не удалось создать ссылку для входа. Попробуйте чуть позже.</string>
+    <string name="dashboard_open_unavailable">Нет подходящего приложения для открытия ссылки. Проверьте браузер или приложения для отправки и попробуйте снова.</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Memuatkan keputusan…</string>
+    <string name="detail_load_error">Keputusan ini tidak dapat dimuatkan.</string>
+    <string name="detail_load_error_saved">Keputusan ini tidak dapat disegar semula. Memaparkan keputusan yang terakhir dimuatkan.</string>
+</resources>

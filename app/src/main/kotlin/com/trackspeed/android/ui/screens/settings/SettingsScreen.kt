@@ -10,14 +10,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Computer
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
-import androidx.compose.material.icons.outlined.Contrast
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.Info
@@ -87,6 +88,8 @@ fun SettingsScreen(
     onShowFirstSessionTutorial: () -> Unit = {},
     onNotificationSettingsClick: () -> Unit = {},
     onDebugToolsClick: () -> Unit = {},
+    onWebDashboardClick: () -> Unit = {},
+    onHelpFeedbackClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -201,7 +204,9 @@ fun SettingsScreen(
             }
         },
         onNotificationSettingsClick = onNotificationSettingsClick,
-        onDebugToolsClick = onDebugToolsClick
+        onDebugToolsClick = onDebugToolsClick,
+        onWebDashboardClick = onWebDashboardClick,
+        onHelpFeedbackClick = onHelpFeedbackClick
     )
 }
 
@@ -242,7 +247,9 @@ internal fun SettingsScreenContent(
     onShowOnboarding: () -> Unit = {},
     onShowFirstSessionTutorial: () -> Unit = {},
     onNotificationSettingsClick: () -> Unit = {},
-    onDebugToolsClick: () -> Unit = {}
+    onDebugToolsClick: () -> Unit = {},
+    onWebDashboardClick: () -> Unit = {},
+    onHelpFeedbackClick: () -> Unit = {}
 ) {
     val uriHandler = LocalUriHandler.current
     var distanceDropdownExpanded by remember { mutableStateOf(false) }
@@ -255,6 +262,7 @@ internal fun SettingsScreenContent(
         modifier = Modifier
             .fillMaxSize()
             .gradientBackground()
+            .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp)
     ) {
@@ -729,6 +737,12 @@ internal fun SettingsScreenContent(
 
         SectionFooter(stringResource(R.string.settings_clear_data_description))
 
+        SectionHeader(stringResource(R.string.dashboard_title))
+        Box(Modifier.fillMaxWidth().surfaceCard()) {
+            SettingsDashboardEntry(state.dashboardAvailable, onWebDashboardClick)
+        }
+        if (!state.dashboardAvailable) SectionFooter(stringResource(R.string.dashboard_sign_in_required))
+
         SectionHeader(stringResource(R.string.parity_settings_subscription))
 
         Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
@@ -782,6 +796,12 @@ internal fun SettingsScreenContent(
 
         // ── ABOUT SECTION ──
         SectionHeader(stringResource(R.string.settings_section_about))
+
+        Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
+            SettingsRow(icon = Icons.Outlined.Info,
+                label = stringResource(R.string.help_title), showChevron = true,
+                onClick = onHelpFeedbackClick)
+        }
 
         Box(modifier = Modifier.fillMaxWidth().surfaceCard()) {
             Column {
@@ -1010,23 +1030,22 @@ internal fun SettingsScreenContent(
 // ── Reusable row components ──
 
 @Composable
-private fun SettingsAppearanceChoices(selectedTheme: AppTheme, onSelected: (AppTheme) -> Unit) {
-    val options = listOf(
-        AppTheme.MIDNIGHT to stringResource(R.string.theme_midnight),
-        AppTheme.LIGHT to stringResource(R.string.theme_light),
-        AppTheme.DARKGOLD to stringResource(R.string.theme_gold)
-    )
+internal fun SettingsAppearanceChoices(selectedTheme: AppTheme, onSelected: (AppTheme) -> Unit) {
+    val options = AppTheme.visibleThemes.map { theme ->
+        theme to stringResource(if (theme == AppTheme.LIGHT) R.string.theme_light else R.string.theme_dark)
+    }
+    val supportedSelection = selectedTheme.supportedTheme
     val largeText = LocalDensity.current.fontScale >= 1.3f
     if (largeText) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (theme, label) ->
-                SettingsAppearanceChoice(theme, label, selectedTheme == theme, true, { onSelected(theme) }, Modifier.fillMaxWidth())
+                SettingsAppearanceChoice(theme, label, supportedSelection == theme, true, { onSelected(theme) }, Modifier.fillMaxWidth())
             }
         }
     } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().selectableGroup()) {
             options.forEach { (theme, label) ->
-                SettingsAppearanceChoice(theme, label, selectedTheme == theme, false, { onSelected(theme) }, Modifier.weight(1f))
+                SettingsAppearanceChoice(theme, label, supportedSelection == theme, false, { onSelected(theme) }, Modifier.weight(1f))
             }
         }
     }
@@ -1043,12 +1062,11 @@ private fun SettingsAppearanceChoice(
 ) {
     val icon = when (theme) {
         AppTheme.LIGHT -> Icons.Outlined.LightMode
-        AppTheme.DARKGOLD -> Icons.Outlined.Contrast
         else -> Icons.Outlined.DarkMode
     }
-    val foreground = if (selected) Color.White else TextSecondary
+    val foreground = if (selected) MaterialTheme.colorScheme.onPrimary else TextSecondary
     val card = modifier.clip(RoundedCornerShape(12.dp))
-        .background(if (selected) AccentBlue else CardBackground)
+        .background(if (selected) MaterialTheme.colorScheme.primary else CardBackground)
         .selectable(selected, role = Role.RadioButton, onClick = onClick)
         .padding(horizontal = 12.dp, vertical = 16.dp)
     if (horizontal) {
@@ -1372,5 +1390,21 @@ private fun SettingsScreenDarkPreview() {
             onNotificationSettingsClick = {},
             onDebugToolsClick = {}
         )
+    }
+}
+
+/** Named-account gate mirrors the released iPhone Settings entry. */
+@Composable
+internal fun SettingsDashboardEntry(available: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(enabled = available, role = Role.Button, onClick = onClick)
+        .padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        ParitySettingsIconBadge(Icons.Outlined.Computer, Color(0xFF9B92E6))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.dashboard_title), style = MaterialTheme.typography.bodyLarge,
+                color = if (available) TextPrimary else TextMuted)
+            Text("mytrackspeed.com", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        }
+        Icon(Icons.Outlined.ChevronRight, null, tint = TextMuted)
     }
 }

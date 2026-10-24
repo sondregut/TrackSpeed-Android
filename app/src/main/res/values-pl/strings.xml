@@ -210,6 +210,7 @@
     <string name="settings_theme">Wygląd</string>
     <string name="theme_midnight">Północ</string>
     <string name="theme_light">Światło</string>
+    <string name="theme_dark">Ciemny</string>
     <string name="theme_gold">Złoto</string>
     <string name="settings_section_detection">Wykrywanie</string>
     <string name="settings_sensitivity">Czułość</string>

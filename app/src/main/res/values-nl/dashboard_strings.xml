@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Webdashboard</string>
+    <string name="dashboard_description">Bekijk al je atleten, sessies, tussentijden en foto\'s op je computer via mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Meld je aan om het webdashboard te gebruiken</string>
+    <string name="dashboard_send_link">Aanmeldlink naar mijn computer sturen</string>
+    <string name="dashboard_open_here">Hier openen</string>
+    <string name="dashboard_share_chooser">Naar je eigen apparaat sturen</string>
+    <string name="dashboard_private_link_hint">Inloglink. Stuur alleen naar je eigen apparaten.</string>
+    <string name="dashboard_creating_link">Aanmeldlink wordt gemaakt…</string>
+    <string name="dashboard_offline">Je bent offline. Maak verbinding met internet en probeer het opnieuw.</string>
+    <string name="dashboard_session_expired">Je aanmelding is verlopen. Meld je af en weer aan en probeer het dan opnieuw.</string>
+    <string name="dashboard_email_required">Voor het webdashboard heb je een account met een e-mailadres nodig.</string>
+    <string name="dashboard_rate_limited">Te veel links aangevraagd. Wacht een minuut en probeer het opnieuw.</string>
+    <string name="dashboard_unavailable">Het webdashboard is nog niet beschikbaar.</string>
+    <string name="dashboard_failed">De aanmeldlink kon niet worden gemaakt. Probeer het over een ogenblik opnieuw.</string>
+    <string name="dashboard_open_unavailable">Geen geschikte app kon deze link openen. Controleer je browser of apps voor delen en probeer het opnieuw.</string>
+</resources>

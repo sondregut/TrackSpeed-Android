@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">नतीजे लोड हो रहे हैं…</string>
+    <string name="detail_load_error">ये नतीजे लोड नहीं हो सके।</string>
+    <string name="detail_load_error_saved">ये नतीजे रीफ़्रेश नहीं हो सके। पिछली बार लोड हुए नतीजे दिखाए जा रहे हैं।</string>
+</resources>

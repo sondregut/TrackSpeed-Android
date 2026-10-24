@@ -56,6 +56,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.trackspeed.android.ui.util.localizedDisplayName
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
@@ -96,9 +98,14 @@ fun ProfileScreen(
     onReferralClick: () -> Unit = {},
     onWindAdjustmentClick: () -> Unit = {},
     onDistanceConverterClick: () -> Unit = {},
+    onSignInClick: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val manualPersonalBests by viewModel.manualPersonalBests.collectAsState()
+    val savingPersonalBest by viewModel.savingPersonalBest.collectAsState()
+    val personalBestError by viewModel.personalBestError.collectAsState()
+    var showPersonalBestEditor by rememberSaveable { mutableStateOf(false) }
 
     // Photo picker launcher (gallery)
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -126,6 +133,9 @@ fun ProfileScreen(
         onReferralClick = onReferralClick,
         onWindAdjustmentClick = onWindAdjustmentClick,
         onDistanceConverterClick = onDistanceConverterClick,
+        onSignInClick = onSignInClick,
+        manualPersonalBests = manualPersonalBests,
+        onPersonalBestClick = { viewModel.preparePersonalBestEditor(); showPersonalBestEditor = true },
         onAvatarClick = {
             if (uiState.avatarPhotoPath != null) {
                 // Has existing photo -- show options to change/remove
@@ -144,6 +154,15 @@ fun ProfileScreen(
         onDismissDeleteAccount = viewModel::dismissDeleteAccountDialog,
         onDismissAccountActionError = viewModel::dismissAccountActionError
     )
+
+    if (showPersonalBestEditor) {
+        manualPersonalBests?.let { values ->
+            ProfilePersonalBestEditor(initialValues = values,
+                isSaving = savingPersonalBest, errorMessage = personalBestError,
+                onDismiss = { showPersonalBestEditor = false },
+                onSave = { draft -> viewModel.savePersonalBest(draft) { showPersonalBestEditor = false } })
+        }
+    }
 
     // Photo source selection dialog
     if (showPhotoSourceDialog) {
@@ -184,7 +203,7 @@ fun ProfileScreen(
 
 @android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
-private fun ProfileScreenContent(
+internal fun ProfileScreenContent(
     uiState: ProfileUiState,
     onPaywallClick: () -> Unit = {},
     onAthletesClick: () -> Unit = {},
@@ -192,6 +211,9 @@ private fun ProfileScreenContent(
     onReferralClick: () -> Unit = {},
     onWindAdjustmentClick: () -> Unit = {},
     onDistanceConverterClick: () -> Unit = {},
+    onSignInClick: () -> Unit = {},
+    manualPersonalBests: ProfilePersonalBestValues? = ProfilePersonalBestValues(),
+    onPersonalBestClick: () -> Unit = {},
     onAvatarClick: () -> Unit = {},
     onNameChanged: (String) -> Unit = {},
     onSignOutClick: () -> Unit = {},
@@ -377,12 +399,40 @@ private fun ProfileScreenContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Explicit profile records are separate from measured session bests.
+        Card(onClick = onPersonalBestClick, enabled = manualPersonalBests != null,
+            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.EmojiEvents, contentDescription = null, tint = AccentNavy,
+                    modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.run_detail_badge_personal_best),
+                        style = MaterialTheme.typography.bodyLarge, color = TextPrimary)
+                    val summary = buildList {
+                        manualPersonalBests?.personalRecordSeconds?.let {
+                            add("${manualPersonalBests.primaryEvent.localizedDisplayName()}: ${formatEditableProfileRecord(it)} s")
+                        }
+                        manualPersonalBests?.flyingPrSeconds?.let {
+                            add("${manualPersonalBests.flyingDistance?.rawValue} · ${stringResource(R.string.start_type_flying)}: ${formatEditableProfileRecord(it)} s")
+                        }
+                    }.joinToString("\n")
+                    Text(summary.ifEmpty { stringResource(R.string.profile_no_personal_bests) },
+                        style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                }
+                Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = TextMuted)
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
         // -- Subscription Status / Pro Upgrade Banner --
         if (uiState.isProUser) {
+            val accessColors = profileAccessColors(LocalAppColors.current.isDark)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = ProGreen.copy(alpha = 0.12f))
+                colors = CardDefaults.cardColors(containerColor = accessColors.container)
             ) {
                 Row(
                     modifier = Modifier
@@ -393,7 +443,7 @@ private fun ProfileScreenContent(
                     Icon(
                         imageVector = Icons.Outlined.Star,
                         contentDescription = null,
-                        tint = ProGreen,
+                        tint = accessColors.content,
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
@@ -406,7 +456,7 @@ private fun ProfileScreenContent(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = ProGreen
+                        color = accessColors.content
                     )
                 }
             }
@@ -758,10 +808,11 @@ private fun ProfileScreenContent(
                         onClick = onDeleteAccountClick
                     )
                 } else {
-                    // Guest mode: show sign-in prompt
+                    // Return to the existing auth flow without replaying onboarding.
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onSignInClick)
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

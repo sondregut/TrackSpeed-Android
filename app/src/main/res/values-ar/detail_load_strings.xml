@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">جارٍ تحميل النتائج…</string>
+    <string name="detail_load_error">تعذّر تحميل هذه النتائج.</string>
+    <string name="detail_load_error_saved">تعذّر تحديث النتائج. تُعرض آخر نتائج تم تحميلها.</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Завантаження результатів…</string>
+    <string name="detail_load_error">Не вдалося завантажити ці результати.</string>
+    <string name="detail_load_error_saved">Не вдалося оновити результати. Показано останні завантажені результати.</string>
+</resources>

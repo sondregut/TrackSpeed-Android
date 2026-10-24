@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">لوحة الويب</string>
+    <string name="dashboard_description">اطّلع على جميع الرياضيين والجلسات والأزمنة الجزئية والصور على جهاز الكمبيوتر عبر mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">سجّل الدخول لاستخدام لوحة الويب</string>
+    <string name="dashboard_send_link">إرسال رابط تسجيل الدخول إلى جهاز الكمبيوتر الخاص بي</string>
+    <string name="dashboard_open_here">فتح هنا</string>
+    <string name="dashboard_share_chooser">إرسال إلى جهازك الخاص</string>
+    <string name="dashboard_private_link_hint">رابط تسجيل الدخول. أرسله إلى أجهزتك الخاصة فقط.</string>
+    <string name="dashboard_creating_link">جارٍ إنشاء رابط تسجيل الدخول…</string>
+    <string name="dashboard_offline">أنت غير متصل بالإنترنت. اتصل بالإنترنت وحاول مجددًا.</string>
+    <string name="dashboard_session_expired">انتهت صلاحية تسجيل الدخول. سجّل الخروج ثم ادخل مجددًا وأعد المحاولة.</string>
+    <string name="dashboard_email_required">تحتاج لوحة الويب إلى حساب له عنوان بريد إلكتروني.</string>
+    <string name="dashboard_rate_limited">طلبت روابط كثيرة. انتظر دقيقة ثم حاول مجددًا.</string>
+    <string name="dashboard_unavailable">لوحة الويب غير متاحة بعد.</string>
+    <string name="dashboard_failed">تعذّر إنشاء رابط تسجيل الدخول. حاول مجددًا بعد قليل.</string>
+    <string name="dashboard_open_unavailable">لا يوجد تطبيق متوافق لفتح هذا الرابط. تحقّق من المتصفح أو تطبيقات المشاركة ثم حاول مجددًا.</string>
+</resources>

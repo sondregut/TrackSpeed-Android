@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Painel web</string>
+    <string name="dashboard_description">Veja todos os seus atletas, sessões, tempos parciais e fotografias no computador em mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Inicie sessão para utilizar o painel web</string>
+    <string name="dashboard_send_link">Enviar ligação de início de sessão para o meu computador</string>
+    <string name="dashboard_open_here">Abrir aqui</string>
+    <string name="dashboard_share_chooser">Enviar para o seu próprio dispositivo</string>
+    <string name="dashboard_private_link_hint">Ligação de início de sessão. Envie apenas para os seus próprios dispositivos.</string>
+    <string name="dashboard_creating_link">A criar ligação de início de sessão…</string>
+    <string name="dashboard_offline">Está offline. Ligue-se à Internet e tente novamente.</string>
+    <string name="dashboard_session_expired">A sua sessão expirou. Termine sessão, volte a iniciar sessão e tente novamente.</string>
+    <string name="dashboard_email_required">O painel web requer uma conta com um endereço de e-mail.</string>
+    <string name="dashboard_rate_limited">Foram pedidas demasiadas ligações. Aguarde um minuto e tente novamente.</string>
+    <string name="dashboard_unavailable">O painel web ainda não está disponível.</string>
+    <string name="dashboard_failed">Não foi possível criar uma ligação de início de sessão. Tente novamente dentro de momentos.</string>
+    <string name="dashboard_open_unavailable">Nenhuma aplicação compatível conseguiu abrir esta ligação. Verifique o navegador ou as aplicações de partilha e tente novamente.</string>
+</resources>

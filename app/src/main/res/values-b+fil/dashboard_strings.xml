@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Dashboard sa web</string>
+    <string name="dashboard_description">Tingnan ang lahat ng atleta, session, split at larawan sa iyong computer sa mytrackspeed.com/dashboard.</string>
+    <string name="dashboard_sign_in_required">Mag-sign in para magamit ang web dashboard</string>
+    <string name="dashboard_send_link">Ipadala ang link sa pag-sign in sa aking computer</string>
+    <string name="dashboard_open_here">Buksan dito</string>
+    <string name="dashboard_share_chooser">Ipadala sa sarili mong device</string>
+    <string name="dashboard_private_link_hint">Link sa pag-sign in. Ipadala lamang sa sarili mong mga device.</string>
+    <string name="dashboard_creating_link">Ginagawa ang link sa pag-sign in…</string>
+    <string name="dashboard_offline">Offline ka. Kumonekta sa internet at subukang muli.</string>
+    <string name="dashboard_session_expired">Nag-expire na ang pag-sign in mo. Mag-sign out at mag-sign in muli, saka subukang muli.</string>
+    <string name="dashboard_email_required">Kailangan ng web dashboard ng account na may email address.</string>
+    <string name="dashboard_rate_limited">Napakaraming hiniling na link. Maghintay ng isang minuto at subukang muli.</string>
+    <string name="dashboard_unavailable">Hindi pa available ang web dashboard.</string>
+    <string name="dashboard_failed">Hindi nagawa ang link sa pag-sign in. Subukang muli pagkaraan ng ilang sandali.</string>
+    <string name="dashboard_open_unavailable">Walang angkop na app na makapagbukas ng link na ito. Suriin ang browser o mga app sa pagbabahagi, saka subukang muli.</string>
+</resources>

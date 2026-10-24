@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Nilo-load ang mga resulta…</string>
+    <string name="detail_load_error">Hindi ma-load ang mga resultang ito.</string>
+    <string name="detail_load_error_saved">Hindi na-refresh ang mga resultang ito. Ipinapakita ang huling na-load na mga resulta.</string>
+</resources>

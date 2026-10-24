@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">ফলাফল লোড হচ্ছে…</string>
+    <string name="detail_load_error">এই ফলাফলগুলো লোড করা যায়নি।</string>
+    <string name="detail_load_error_saved">এই ফলাফলগুলো রিফ্রেশ করা যায়নি। সর্বশেষ লোড করা ফলাফল দেখানো হচ্ছে।</string>
+</resources>

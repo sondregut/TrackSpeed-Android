@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_title">Webダッシュボード</string>
+    <string name="dashboard_description">すべてのアスリート、セッション、スプリット、写真をパソコンの mytrackspeed.com/dashboard で確認できます。</string>
+    <string name="dashboard_sign_in_required">Webダッシュボードを使うにはサインインしてください</string>
+    <string name="dashboard_send_link">サインインリンクをパソコンに送る</string>
+    <string name="dashboard_open_here">この端末で開く</string>
+    <string name="dashboard_share_chooser">自分のデバイスに送信</string>
+    <string name="dashboard_private_link_hint">サインインリンクです。自分のデバイスにのみ送信してください。</string>
+    <string name="dashboard_creating_link">サインインリンクを作成中…</string>
+    <string name="dashboard_offline">オフラインです。インターネットに接続して、もう一度お試しください。</string>
+    <string name="dashboard_session_expired">サインインの有効期限が切れました。サインアウトしてから再度サインインし、もう一度お試しください。</string>
+    <string name="dashboard_email_required">Webダッシュボードを使うには、メールアドレス付きのアカウントが必要です。</string>
+    <string name="dashboard_rate_limited">リンクのリクエストが多すぎます。1分ほど待ってからもう一度お試しください。</string>
+    <string name="dashboard_unavailable">ウェブダッシュボードはまだ利用できません。</string>
+    <string name="dashboard_failed">サインインリンクを作成できませんでした。しばらくしてから、もう一度お試しください。</string>
+    <string name="dashboard_open_unavailable">このリンクを開けるアプリがありません。ブラウザや共有アプリを確認して、もう一度お試しください。</string>
+</resources>

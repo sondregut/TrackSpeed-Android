@@ -206,6 +206,7 @@
     <string name="settings_theme">Aussehen</string>
     <string name="theme_midnight">Mitternacht</string>
     <string name="theme_light">Hell</string>
+    <string name="theme_dark">Dunkel</string>
     <string name="theme_gold">Gold</string>
     <string name="settings_section_detection">Erkennung</string>
     <string name="settings_sensitivity">Empfindlichkeit</string>

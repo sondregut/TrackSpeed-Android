@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_loading">Загрузка результатов…</string>
+    <string name="detail_load_error">Не удалось загрузить эти результаты.</string>
+    <string name="detail_load_error_saved">Не удалось обновить результаты. Показаны последние загруженные результаты.</string>
+</resources>

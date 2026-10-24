@@ -208,6 +208,7 @@
     <string name="settings_theme">Aspect</string>
     <string name="theme_midnight">Miezul noptii</string>
     <string name="theme_light">Luminos</string>
+    <string name="theme_dark">Întunecat</string>
     <string name="theme_gold">Aur</string>
     <string name="settings_section_detection">Detecție</string>
     <string name="settings_sensitivity">Sensibilitate</string>

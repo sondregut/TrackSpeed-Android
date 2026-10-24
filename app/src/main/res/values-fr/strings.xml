@@ -208,6 +208,7 @@
     <string name="settings_theme">Apparence</string>
     <string name="theme_midnight">Minuit</string>
     <string name="theme_light">Clair</string>
+    <string name="theme_dark">Sombre</string>
     <string name="theme_gold">Or</string>
     <string name="settings_section_detection">Détection</string>
     <string name="settings_sensitivity">Sensibilité</string>
