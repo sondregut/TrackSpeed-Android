@@ -267,7 +267,10 @@ class ClockSyncManager @Inject constructor(
                         // Handled per-device via clientReadyDevices flow below
                     }
                     is BleClockSyncService.State.Syncing -> {
-                        _protocolState.value = ProtocolState.SYNCING
+                        // Provisional reference pings may precede config/assignment.
+                        // Keep that handshake phase until its authoritative messages arrive.
+                        _protocolState.value = ClockSyncHandshakeReplayPolicy
+                            .stateDuringClockMeasurement(_protocolState.value)
                         _syncState.value = SyncState.Syncing(bleState.progress)
                     }
                     is BleClockSyncService.State.Synced -> {
@@ -539,7 +542,11 @@ class ClockSyncManager @Inject constructor(
                     )
                     Log.i(TAG, "Joiner: Sent RoleRequest (preferred=$preferredRole)")
                     _protocolState.value = ProtocolState.AWAITING_ASSIGNMENT
-                    _syncState.value = SyncState.Connecting
+                    // The host can validate a provisional start reference before
+                    // sending config. Retain that result through the role exchange.
+                    if (_syncState.value !is SyncState.Synced) {
+                        _syncState.value = SyncState.Connecting
+                    }
                 } else {
                     Log.i(
                         TAG,
@@ -637,10 +644,12 @@ class ClockSyncManager @Inject constructor(
                     if (assignedRole == TimingRole.START_LINE &&
                         sessionConfig.hostRole != TimingRole.START_LINE
                     ) {
-                        val shouldStartReferenceSync = !payload.deviceId.equals(
-                            activeServerSyncReferenceSenderId,
-                            ignoreCase = true
-                        )
+                        val shouldStartReferenceSync = ClockSyncHandshakeReplayPolicy
+                            .shouldStartReferenceSync(
+                                handshakeCompleteOnCurrentLink = clientState?.handshakeComplete == true,
+                                previousReferenceDeviceId = activeServerSyncReferenceSenderId,
+                                incomingReferenceDeviceId = payload.deviceId
+                            )
                         activeServerSyncReferenceSenderId = payload.deviceId
                         activeServerSyncReferenceAddress = senderAddress
                         bleClockSyncService.configureClockReference(
@@ -784,7 +793,8 @@ class ClockSyncManager @Inject constructor(
                     _localGateAssignment.value?.role == TimingRole.START_LINE
                 ) {
                     syncTimestampNanos = SystemClock.elapsedRealtimeNanos()
-                    _protocolState.value = ProtocolState.READY
+                    _protocolState.value = ClockSyncHandshakeReplayPolicy
+                        .stateAfterReferenceValidation(_protocolState.value)
                     _syncState.value = SyncState.Synced(
                         offsetMs = 0.0,
                         quality = SyncQuality.fromUncertainty(payload.uncertaintyMs),
@@ -1053,7 +1063,10 @@ class ClockSyncManager @Inject constructor(
 
         if (assignedRole == TimingRole.START_LINE) {
             bleClockSyncService.configureClockReference(isReference = true)
-            if (_syncState.value !is SyncState.Synced) {
+            if (_syncState.value is SyncState.Synced) {
+                _protocolState.value = ClockSyncHandshakeReplayPolicy
+                    .stateAfterReferenceValidation(_protocolState.value)
+            } else {
                 _syncState.value = SyncState.Syncing(0f)
             }
             Log.i(TAG, "Joiner: Start gate is the reference clock; waiting for host pings")
